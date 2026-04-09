@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /tmp/apk_analysis)",
+      "Read(//tmp/**)",
+      "Bash(rm -rf *)",
+      "Bash(unzip -o \"/c/Users/Moti Levi/Downloads/uptodown-com.caynax.alarmclock.apk\" -d extracted)",
+      "Bash(python next_page.py init)",
+      "Bash(python next_page.py start)",
+      "Bash(python next_page.py extract)",
+      "Bash(python next_page.py next)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(python next_page.py done)",
+      "Bash(python next_page.py status)"
+    ]
+  }
+}

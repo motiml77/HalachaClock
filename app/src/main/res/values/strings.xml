@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Zmanim Clock</string>
+    <string name="tab_home">Times</string>
+    <string name="tab_calendar">Calendar</string>
+    <string name="tab_alerts">Alerts</string>
+    <string name="settings">Settings</string>
+    <string name="location">Location</string>
+    <string name="no_location">No location set</string>
+    <string name="gps_location">GPS Location</string>
+    <string name="manual_location">Manual Location</string>
+    <string name="select_city">Select City</string>
+    <string name="add_alert">Add Alert</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="snooze">Snooze</string>
+    <string name="minutes_before">%d min before</string>
+    <string name="minutes_after">%d min after</string>
+    <string name="info">Info</string>
+    <string name="widget_description">Displays the 3 nearest upcoming halachic times</string>
+
+    <!-- Categories -->
+    <string name="category_night">Night</string>
+    <string name="category_morning">Morning</string>
+    <string name="category_midday">Midday</string>
+    <string name="category_afternoon">Afternoon</string>
+    <string name="category_evening">Evening</string>
+    <string name="category_shabbat">Shabbat &amp; Holidays</string>
+
+    <!-- Zmanim Names -->
+    <string name="zman_chatzot_layla">Chatzot HaLayla</string>
+    <string name="zman_alos_90">Alot HaShachar - 90 min</string>
+    <string name="zman_alos_72">Alot HaShachar - 72 min</string>
+    <string name="zman_misheyakir_66">Misheyakir - 66 min</string>
+    <string name="zman_misheyakir_60">Misheyakir - 60 min</string>
+    <string name="zman_hanetz_sea">Sunrise (Sea Level)</string>
+    <string name="zman_hanetz_elevated">Sunrise (Elevation)</string>
+    <string name="zman_hanetz_visible">Sunrise (Visible)</string>
+    <string name="zman_shma_gra">Sof Zman Shma - GR\"A</string>
+    <string name="zman_shma_mga">Sof Zman Shma - MG\"A</string>
+    <string name="zman_tfila_gra">Sof Zman Tfila - GR\"A</string>
+    <string name="zman_tfila_mga">Sof Zman Tfila - MG\"A</string>
+    <string name="zman_mincha_gedola">Mincha Gedola</string>
+    <string name="zman_mincha_ketana_161">Mincha Ketana - 16.1\u00B0</string>
+    <string name="zman_mincha_ketana_72">Mincha Ketana - 72 min</string>
+    <string name="zman_plag_yy">Plag HaMincha - Yalkut Yosef</string>
+    <string name="zman_shkia_sea">Sunset (Sea Level)</string>
+    <string name="zman_shkia_elevated">Sunset (Elevation)</string>
+    <string name="zman_shkia_general">Sunset</string>
+    <string name="zman_bein_hashmashot">Bein HaShmashot - Yereim</string>
+    <string name="zman_tzais_3_8">Tzait HaKochavim - 3.8\u00B0</string>
+    <string name="zman_tzais_4_61">Tzait HaKochavim - 4.61\u00B0</string>
+    <string name="zman_tzais_4_8">Tzait HaKochavim - 4.8\u00B0</string>
+    <string name="zman_tzais_5_95">Tzait HaKochavim - 5.95\u00B0</string>
+    <string name="zman_tzais_7_67">Tzait HaKochavim - 7.67\u00B0</string>
+    <string name="zman_tzais_8_5">Tzait HaKochavim - 8.5\u00B0</string>
+    <string name="zman_tzais_9_75">Tzait HaKochavim - 9.75\u00B0</string>
+    <string name="zman_tzais_13_5">Tzait HaKochavim - 13.5 min</string>
+    <string name="zman_tzais_lechumra">Tzait HaKochavim - Stringent</string>
+    <string name="zman_tzais_shabbat_8_5">Motzaei Shabbat - 8.5 Degrees</string>
+    <string name="zman_tzais_shabbat_yy">Motzaei Shabbat - Yalkut Yosef</string>
+    <string name="zman_tzais_shabbat_ah">Motzaei Shabbat - Amudei Horaah</string>
+    <string name="zman_tzais_shabbat_ah_40">Motzaei Shabbat - AH (&lt;40)</string>
+    <string name="zman_tzais_rt">Tzait R\"T - Amudei Horaah</string>
+    <string name="zman_shaah_gra">Shaah Zmanit - GR\"A</string>
+    <string name="zman_shaah_mga">Shaah Zmanit - MG\"A</string>
+    <string name="zman_kiddush_levana_3">Kiddush Levana - 3 Days</string>
+    <string name="zman_kiddush_levana_7">Kiddush Levana - 7 Days</string>
+    <string name="zman_kiddush_levana_15">Sof Zman Kiddush Levana</string>
+    <string name="zman_candle_lighting">Candle Lighting</string>
+</resources>
