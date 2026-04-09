@@ -19,11 +19,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        javaCompileOptions {
-            annotationProcessorOptions {
-                arguments += mapOf("room.schemaLocation" to "$projectDir/schemas")
-            }
-        }
+    }
+
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
     }
 
     buildTypes {
@@ -76,6 +75,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     // Room Database
     implementation(libs.androidx.room.runtime)
@@ -105,6 +106,10 @@ dependencies {
 
     // DateTime
     implementation(libs.kotlinx.datetime)
+
+    // HTML Parsing (ChaiTables)
+    implementation(libs.jsoup)
+    implementation(libs.okhttp)
 
     // Desugaring for java.time on older APIs
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")

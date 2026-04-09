@@ -60,7 +60,7 @@ enum class ZmanId(
     ),
     HANETZ_VISIBLE(
         R.string.zman_hanetz_visible, ZmanCategory.MORNING, ZmanSource.ZEMANEH_YOSEF, ZmanOpinion.RAV_OVADIA,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "הרגע שבו דיסקת השמש נראית מעל האופק בפועל, בהתחשבות בטופוגרפיה. הרב עובדיה יוסף זצ\"ל פסק שהנץ ההלכתי הוא הנראה ולא האסטרונומי."
     ),
     SOF_ZMAN_SHMA_GRA(
@@ -125,27 +125,27 @@ enum class ZmanId(
     ),
     TZAIS_3_8(
         R.string.zman_tzais_3_8, ZmanCategory.EVENING, ZmanSource.KOSHERJAVA, ZmanOpinion.GEONIM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ לפי הגאונים: 3.8° מתחת לאופק. מקביל ל-13.5 דקות בירושלים בתקופת ניסן."
     ),
     TZAIS_4_61(
         R.string.zman_tzais_4_61, ZmanCategory.EVENING, ZmanSource.KOSHERJAVA, ZmanOpinion.GEONIM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ לפי הגאונים: 4.61° (18 דקות, 3/4 מיל לפי 24 דק' למיל)."
     ),
     TZAIS_4_8(
         R.string.zman_tzais_4_8, ZmanCategory.EVENING, ZmanSource.KOSHERJAVA, ZmanOpinion.GEONIM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ לפי הגאונים: 4.8° מתחת לאופק."
     ),
     TZAIS_5_95(
         R.string.zman_tzais_5_95, ZmanCategory.EVENING, ZmanSource.KOSHERJAVA, ZmanOpinion.GEONIM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ לפי הגאונים: 5.95° (24 דקות בירושלים, מהלך מיל שלם)."
     ),
     TZAIS_7_67(
         R.string.zman_tzais_7_67, ZmanCategory.EVENING, ZmanSource.KOSHERJAVA, ZmanOpinion.GEONIM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ: 7.67° - הרב משה פיינשטיין (אגרות משה אהע\"ז ד:ד) והרב שמואל קמנצקי."
     ),
     TZAIS_8_5(
@@ -155,7 +155,7 @@ enum class ZmanId(
     ),
     TZAIS_9_75(
         R.string.zman_tzais_9_75, ZmanCategory.EVENING, ZmanSource.KOSHERJAVA, ZmanOpinion.GEONIM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ: 9.75° (60 דקות בתקופת ניסן). שיטת הרב אליהו הנקין."
     ),
     TZAIS_13_5_ZMANIYOT(
@@ -165,7 +165,7 @@ enum class ZmanId(
     ),
     TZAIS_LECHUMRA(
         R.string.zman_tzais_lechumra, ZmanCategory.EVENING, ZmanSource.ZEMANEH_YOSEF, ZmanOpinion.RAV_OVADIA,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צה\"כ מחמיר: 20 דקות זמניות. משמש לסוף תעניות, הדלקת נרות מיו\"ט ליו\"ט."
     ),
     TZAIS_SHABBAT_8_5(
@@ -180,17 +180,17 @@ enum class ZmanId(
     ),
     TZAIS_SHABBAT_AH(
         R.string.zman_tzais_shabbat_ah, ZmanCategory.SHABBAT_HOLIDAY, ZmanSource.ZEMANEH_YOSEF, ZmanOpinion.RAV_OVADIA,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צאת שבת לפי לוח \"עמודי הוראה\" (הרב דהן): 7.165° מתחת לאופק - מבטיח תמיד 30+ דקות אחרי השקיעה בנקודה הצפונית ביותר בארץ. מינימום 20 דקות."
     ),
     TZAIS_SHABBAT_AH_40(
         R.string.zman_tzais_shabbat_ah_40, ZmanCategory.SHABBAT_HOLIDAY, ZmanSource.ZEMANEH_YOSEF, ZmanOpinion.RAV_OVADIA,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "כמו צאת שבת עמודי הוראה, עם תקרה של 40 דקות. לפי הרב מאיר גבריאל אלבז."
     ),
     TZAIS_RT_AH(
         R.string.zman_tzais_rt, ZmanCategory.EVENING, ZmanSource.ZEMANEH_YOSEF, ZmanOpinion.RABBEINU_TAM,
-        defaultEnabled = false,
+        defaultEnabled = true,
         infoText = "צאת ר\"ת עמודי הוראה: המוקדם מבין 72 דקות קבועות ו-72 זמניות. הרב עובדיה החמיר כזמניות, הרב דהן מיקל."
     ),
     SHAAH_ZMANIT_GRA(

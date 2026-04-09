@@ -81,7 +81,9 @@ class ZmanimForegroundService : Service() {
     private lateinit var notificationManager: NotificationManager
 
     private val handler = Handler(Looper.getMainLooper())
-    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("Asia/Jerusalem")
+    }
 
     // Current state
     private var todayZmanim: List<ZmanTime> = emptyList()
@@ -281,16 +283,18 @@ class ZmanimForegroundService : Service() {
         val lon = prefs.getFloat("saved_longitude", Float.MIN_VALUE)
 
         if (lat != Float.MIN_VALUE && lon != Float.MIN_VALUE) {
+            val tz = TimeZone.getTimeZone(
+                prefs.getString("saved_timezone", "Asia/Jerusalem") ?: "Asia/Jerusalem"
+            )
             currentLocation = AppGeoLocation(
                 cityNameHebrew = prefs.getString("saved_location_name", "ירושלים") ?: "ירושלים",
                 cityNameEnglish = prefs.getString("saved_location_name_en", "Jerusalem") ?: "Jerusalem",
                 latitude = lat.toDouble(),
                 longitude = lon.toDouble(),
                 elevation = prefs.getFloat("saved_elevation", 0f).toDouble(),
-                timeZone = TimeZone.getTimeZone(
-                    prefs.getString("saved_timezone", "Asia/Jerusalem") ?: "Asia/Jerusalem"
-                ),
+                timeZone = tz,
             )
+            timeFormat.timeZone = tz
         }
     }
 

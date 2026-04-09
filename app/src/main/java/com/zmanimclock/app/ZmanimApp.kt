@@ -4,14 +4,75 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.core.content.getSystemService
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.zmanimclock.app.feature.chaitables.data.ChaiTablesPreloader
+import com.zmanimclock.app.feature.chaitables.worker.ChaiTablesRefreshWorker
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 @HiltAndroidApp
-class ZmanimApp : Application() {
+class ZmanimApp : Application(), Configuration.Provider {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var chaiTablesPreloader: ChaiTablesPreloader
+
+    private val appScope = CoroutineScope(Dispatchers.IO)
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        loadPreBundledData()
+        scheduleChaiTablesRefresh()
+    }
+
+    /**
+     * Load pre-bundled ChaiTables visible sunrise data from assets on first launch.
+     * This makes the data available immediately without requiring network access.
+     */
+    private fun loadPreBundledData() {
+        appScope.launch {
+            chaiTablesPreloader.ensureDataLoaded()
+        }
+    }
+
+    /**
+     * Schedule daily background refresh of ChaiTables visible sunrise data.
+     * Only runs when network is available. Uses KEEP policy to avoid duplicate work.
+     */
+    private fun scheduleChaiTablesRefresh() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val periodicRequest = PeriodicWorkRequestBuilder<ChaiTablesRefreshWorker>(
+            1, TimeUnit.DAYS,
+        )
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            ChaiTablesRefreshWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            periodicRequest,
+        )
     }
 
     private fun createNotificationChannels() {

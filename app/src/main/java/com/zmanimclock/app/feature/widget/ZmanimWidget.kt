@@ -57,6 +57,7 @@ class ZmanimWidget : GlanceAppWidget() {
                     locationName = dayZmanim.locationName,
                     upcomingZmanim = upcomingZmanim,
                     context = context,
+                    timeZone = location.timeZone,
                 )
             }
         }
@@ -103,6 +104,7 @@ private fun WidgetContent(
     locationName: String,
     upcomingZmanim: List<ZmanTime>,
     context: Context,
+    timeZone: TimeZone,
 ) {
     val surfaceColor = GlanceTheme.colors.widgetBackground
     val onSurfaceColor = GlanceTheme.colors.onSurface
@@ -163,6 +165,7 @@ private fun WidgetContent(
                         zman = zman,
                         isFirst = index == 0,
                         context = context,
+                        timeZone = timeZone,
                         primaryColor = primaryColor,
                         onSurfaceColor = onSurfaceColor,
                     )
@@ -180,6 +183,7 @@ private fun ZmanRow(
     zman: ZmanTime,
     isFirst: Boolean,
     context: Context,
+    timeZone: TimeZone,
     primaryColor: ColorProvider,
     onSurfaceColor: ColorProvider,
 ) {
@@ -188,6 +192,7 @@ private fun ZmanRow(
     } else {
         SimpleDateFormat("h:mm a", Locale.getDefault())
     }
+    timeFormat.timeZone = timeZone
 
     val textColor = if (isFirst) primaryColor else onSurfaceColor
     val weight = if (isFirst) FontWeight.Bold else FontWeight.Normal

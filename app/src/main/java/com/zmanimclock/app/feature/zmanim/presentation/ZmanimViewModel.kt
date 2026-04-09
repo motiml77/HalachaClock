@@ -2,7 +2,9 @@ package com.zmanimclock.app.feature.zmanim.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kosherjava.zmanim.hebrewcalendar.JewishCalendar
 import com.zmanimclock.app.feature.alerts.data.local.AlertDao
+import com.zmanimclock.app.feature.chaitables.data.ChaiTablesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimCalculator
 import com.zmanimclock.app.feature.zmanim.data.model.ZmanCategory
 import com.zmanimclock.app.feature.zmanim.data.model.ZmanId
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 
 data class ZmanimUiState(
@@ -37,6 +40,7 @@ data class ZmanimUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val selectedInfoZman: ZmanId? = null,
+    val locationTimeZone: TimeZone = TimeZone.getDefault(),
 )
 
 @HiltViewModel
@@ -45,6 +49,7 @@ class ZmanimViewModel @Inject constructor(
     private val locationProvider: LocationProvider,
     private val alertDao: AlertDao,
     private val prefsRepository: UserPreferencesRepository,
+    private val chaiTablesRepository: ChaiTablesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ZmanimUiState())
@@ -77,10 +82,26 @@ class ZmanimViewModel @Inject constructor(
             currentLocation = location
 
             try {
+                // Fetch visible sunrise from ChaiTables (async, may hit network on first call)
+                val cityId = if (prefs.useGps) null else prefs.cityId
+                val jewishCal = JewishCalendar()
+                val visibleSunrise = try {
+                    chaiTablesRepository.getVisibleSunrise(
+                        location = location,
+                        cityId = cityId,
+                        hebrewYear = jewishCal.getJewishYear(),
+                        hebrewMonth = jewishCal.getJewishMonth(),
+                        hebrewDay = jewishCal.getJewishDayOfMonth(),
+                    )
+                } catch (e: Exception) {
+                    null // Graceful fallback if ChaiTables fails
+                }
+
                 val dayZmanim = zmanimCalculator.calculateZmanim(
                     location = location,
                     useElevation = prefs.useElevation,
                     candleLightingOffset = prefs.candleLightingMinutes.toDouble(),
+                    visibleSunrise = visibleSunrise,
                 )
                 val holiday = zmanimCalculator.getHebrewHoliday()
 
@@ -102,6 +123,11 @@ class ZmanimViewModel @Inject constructor(
 
                 val nextZman = filteredZmanim.firstOrNull { it.isNext }
 
+                // Set formatters to location timezone
+                val tz = location.timeZone
+                timeFormat.timeZone = tz
+                dateFormat.timeZone = tz
+
                 _uiState.update {
                     it.copy(
                         hebrewDate = dayZmanim.hebrewDate,
@@ -114,6 +140,7 @@ class ZmanimViewModel @Inject constructor(
                         shaahZmanisMga = formatDuration(dayZmanim.shaahZmanisMga),
                         isLoading = false,
                         error = null,
+                        locationTimeZone = tz,
                     )
                 }
             } catch (e: Exception) {

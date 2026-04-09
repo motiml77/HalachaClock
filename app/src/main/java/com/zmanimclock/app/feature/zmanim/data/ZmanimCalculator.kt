@@ -23,11 +23,14 @@ class ZmanimCalculator @Inject constructor() {
 
     fun calculateZmanim(
         location: AppGeoLocation,
-        date: Calendar = Calendar.getInstance(),
+        date: Calendar = Calendar.getInstance(location.timeZone),
         useElevation: Boolean = false,
         candleLightingOffset: Double = 20.0,
+        visibleSunrise: Date? = null,
     ): DayZmanim {
         val geoLocation = location.toKosherJavaGeoLocation()
+        // Ensure the calendar uses the location's timezone
+        date.timeZone = location.timeZone
         val cal = ComplexZmanimCalendar(geoLocation).apply {
             calendar = date
             isUseElevation = useElevation
@@ -38,7 +41,7 @@ class ZmanimCalculator @Inject constructor() {
         val hebrewDate = formatHebrewDate(jewishCal)
 
         val zmanim = ZmanId.entries.map { zmanId ->
-            calculateSingleZman(cal, jewishCal, zmanId, location, useElevation)
+            calculateSingleZman(cal, jewishCal, zmanId, location, useElevation, visibleSunrise)
         }
 
         val now = Date()
@@ -60,6 +63,7 @@ class ZmanimCalculator @Inject constructor() {
         zmanId: ZmanId,
         location: AppGeoLocation,
         useElevation: Boolean,
+        visibleSunrise: Date? = null,
     ): ZmanTime {
         val time: Date? = when (zmanId) {
             // Night
@@ -76,7 +80,7 @@ class ZmanimCalculator @Inject constructor() {
             // Sunrise
             ZmanId.HANETZ_SEA -> cal.seaLevelSunrise
             ZmanId.HANETZ_ELEVATED -> if (useElevation) cal.sunrise else cal.seaLevelSunrise
-            ZmanId.HANETZ_VISIBLE -> null // Requires Chai Tables data
+            ZmanId.HANETZ_VISIBLE -> visibleSunrise // From ChaiTables (null if unavailable)
 
             // Shma
             ZmanId.SOF_ZMAN_SHMA_GRA -> cal.sofZmanShmaGRA

@@ -58,6 +58,7 @@ import com.zmanimclock.app.ui.theme.NextZmanHighlight
 import com.zmanimclock.app.ui.theme.ShabbatGold
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,6 +148,7 @@ fun HomeScreen(
                     items(categoryZmanim, key = { it.id.name }) { zman ->
                         ZmanRow(
                             zman = zman,
+                            timeZone = state.locationTimeZone,
                             onInfoClick = { viewModel.showZmanInfo(zman.id) },
                             onAlertClick = { onNavigateToAlertEditor(zman.id.name) },
                         )
@@ -293,10 +295,13 @@ private fun CategoryHeader(category: ZmanCategory) {
 @Composable
 private fun ZmanRow(
     zman: ZmanTime,
+    timeZone: TimeZone,
     onInfoClick: () -> Unit,
     onAlertClick: () -> Unit,
 ) {
-    val timeFormatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val timeFormatter = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
+        this.timeZone = timeZone
+    }
     val backgroundColor = when {
         zman.isNext -> NextZmanHighlight
         zman.isPassed -> MaterialTheme.colorScheme.surface
@@ -329,10 +334,9 @@ private fun ZmanRow(
             // Time or display value
             Text(
                 text = zman.displayValue ?: zman.time?.let { timeFormatter.format(it) } ?: "--:--",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
-                fontFeatureSettings = "tnum",
             )
 
             Spacer(Modifier.width(8.dp))

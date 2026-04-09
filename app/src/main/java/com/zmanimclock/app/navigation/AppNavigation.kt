@@ -87,7 +87,7 @@ fun AppNavigation() {
                 )
             }
             composable(Screen.Calendar.route) {
-                CalendarScreen()
+                CalendarScreen() // ViewModel injected via hiltViewModel()
             }
             composable(Screen.Alerts.route) {
                 AlertsScreen(
