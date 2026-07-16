@@ -2,11 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Location -->
+    <!-- Location (zmanim are location-dependent) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Alarms -->
+    <!-- Exact alarms (Android 12+: SCHEDULE requires user grant, USE is auto-granted for alarm apps) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -17,14 +17,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
-    <!-- Notifications -->
+    <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Network (Hebcal API) -->
+    <!-- Network (ChaiTables visible sunrise tables) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Battery -->
+    <!-- Alarm reliability under Doze -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
@@ -36,9 +36,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ZmanimClock"
         android:localeConfig="@xml/locales_config"
-        tools:targetApi="34">
+        tools:targetApi="35">
 
-        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -50,47 +49,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Alarm Full Screen Activity -->
-        <activity
-            android:name=".feature.alarm.presentation.AlarmActivity"
-            android:exported="false"
-            android:launchMode="singleInstance"
-            android:showOnLockScreen="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.ZmanimClock" />
-
-        <!-- Boot Receiver - reschedule alarms after reboot -->
-        <receiver
-            android:name=".scheduling.AlarmBootReceiver"
-            android:exported="true"
-            android:enabled="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Alarm Trigger Receiver -->
-        <receiver
-            android:name=".scheduling.AlarmTriggerReceiver"
-            android:exported="false" />
-
-        <!-- Foreground Service for alarm sound -->
-        <service
-            android:name=".scheduling.AlarmSoundService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
-
-        <!-- Foreground Service for persistent zmanim notification -->
-        <service
-            android:name=".scheduling.ZmanimForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-
-        <!-- Disable default WorkManager initializer (using Hilt) -->
+        <!-- Disable default WorkManager initializer (initialized via Hilt) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -101,18 +60,6 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
-
-        <!-- Zmanim Widget -->
-        <receiver
-            android:name=".feature.widget.ZmanimWidgetReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
-        </receiver>
 
     </application>
 

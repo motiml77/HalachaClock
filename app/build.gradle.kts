@@ -18,7 +18,6 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
     }
 
     ksp {
@@ -89,28 +88,25 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
-    // KosherJava Zmanim
+    // KosherJava Zmanim (astronomical substrate only)
     implementation(libs.kosherjava.zmanim)
 
     // Location
     implementation(libs.play.services.location)
 
-    // Network (Hebcal API)
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.moshi)
+    // JSON (cities.json)
     implementation(libs.moshi.kotlin)
-
-    // Widgets
-    implementation(libs.androidx.glance)
-    implementation(libs.androidx.glance.material3)
 
     // DateTime
     implementation(libs.kotlinx.datetime)
 
-    // HTML Parsing (ChaiTables)
+    // ChaiTables (HTML scraping)
     implementation(libs.jsoup)
     implementation(libs.okhttp)
 
     // Desugaring for java.time on older APIs
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // Unit tests (zmanim engine verification against the luach)
+    testImplementation(libs.junit)
 }
