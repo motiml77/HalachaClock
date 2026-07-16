@@ -54,11 +54,19 @@ fun ZmanimContent(state: ZmanimViewModel.UiState) {
         ) {
             Text(state.hebrewDate, style = MaterialTheme.typography.titleLarge)
             Text(
-                text = state.locationName +
+                text = "${state.gregorianDate} · ${state.locationName}" +
                     if (state.basedOnVisibleSunrise) " · הנץ הנראה" else " · מישור",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
+            state.nextZmanCountdown?.let { countdown ->
+                Text(
+                    text = countdown,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         }
 
         LazyColumn(

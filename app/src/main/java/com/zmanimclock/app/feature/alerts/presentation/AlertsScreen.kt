@@ -5,25 +5,36 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Button
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,28 +49,28 @@ import com.zmanimclock.app.feature.alerts.data.local.AlertEntity
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 
 /**
- * Placeholder alerts management. [AlertsContent] is stateless — the design
- * seam for the future Claude Design screens.
+ * Alerts management. [AlertsContent] and [AddAlertSheet] are stateless —
+ * the design seam for the future Claude Design screens.
  */
 @Composable
 fun AlertsScreen(viewModel: AlertsViewModel = hiltViewModel()) {
     val alerts by viewModel.alerts.collectAsStateWithLifecycle()
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
 
     AlertsContent(
         alerts = alerts,
         onToggle = viewModel::toggleAlert,
         onDelete = viewModel::deleteAlert,
-        onAddClick = { showAddDialog = true },
+        onAddClick = { showAddSheet = true },
     )
 
-    if (showAddDialog) {
-        AddAlertDialog(
-            onConfirm = { kind, fullScreen ->
-                viewModel.addAlert(kind, offsetMinutes = 0, offsetBefore = true, fullScreen = fullScreen)
-                showAddDialog = false
+    if (showAddSheet) {
+        AddAlertSheet(
+            onConfirm = { draft ->
+                viewModel.addAlert(draft)
+                showAddSheet = false
             },
-            onDismiss = { showAddDialog = false },
+            onDismiss = { showAddSheet = false },
         )
     }
 }
@@ -78,9 +89,15 @@ fun AlertsContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
+                Icon(
+                    Icons.Filled.Notifications,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.height(8.dp))
                 Text("אין התראות", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "הוסף התראה עם הכפתור למטה",
+                    "הוסף התראה לזמן הלכתי עם הכפתור למטה",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
@@ -119,11 +136,20 @@ private fun AlertCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Icon(
+                imageVector = if (alert.isFullScreenAlarm) Icons.Filled.Alarm else Icons.Filled.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(0.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
                 Text(
                     text = kind?.hebrewName ?: alert.zmanId,
                     style = MaterialTheme.typography.bodyLarge,
@@ -132,9 +158,13 @@ private fun AlertCard(
                     if (alert.offsetMinutes > 0) {
                         append("${alert.offsetMinutes} דק' ")
                         append(if (alert.offsetBefore) "לפני" else "אחרי")
-                        append(" · ")
+                    } else {
+                        append("בזמן עצמו")
                     }
+                    append(" · ")
                     append(if (alert.isFullScreenAlarm) "שעון מעורר" else "התראה")
+                    if (alert.skipShabbat) append(" · ללא שבת")
+                    if (alert.skipYomTov) append(" · ללא יו\"ט")
                 }
                 Text(
                     text = desc,
@@ -153,48 +183,138 @@ private fun AlertCard(
     }
 }
 
+/** Everything needed to create an alert — mirrors AlertEntity's options. */
+data class AlertDraft(
+    val kind: ZmanKind = ZmanKind.HANETZ,
+    val offsetMinutes: Int = 0,
+    val offsetBefore: Boolean = true,
+    val fullScreenAlarm: Boolean = true,
+    val vibrate: Boolean = true,
+    val skipShabbat: Boolean = false,
+    val skipYomTov: Boolean = false,
+    val snoozeMinutes: Int = 5,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddAlertDialog(
-    onConfirm: (ZmanKind, Boolean) -> Unit,
+fun AddAlertSheet(
+    onConfirm: (AlertDraft) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selected by remember { mutableStateOf(ZmanKind.HANETZ) }
-    var fullScreen by remember { mutableStateOf(true) }
+    var draft by remember { mutableStateOf(AlertDraft()) }
+    var zmanMenuOpen by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("התראה חדשה") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("בחר זמן:", style = MaterialTheme.typography.bodyMedium)
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("התראה חדשה", style = MaterialTheme.typography.titleLarge)
+
+            // Zman selection
+            ExposedDropdownMenuBox(
+                expanded = zmanMenuOpen,
+                onExpandedChange = { zmanMenuOpen = it },
+            ) {
+                OutlinedTextField(
+                    value = draft.kind.hebrewName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("זמן") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(zmanMenuOpen) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                )
+                ExposedDropdownMenu(
+                    expanded = zmanMenuOpen,
+                    onDismissRequest = { zmanMenuOpen = false },
                 ) {
-                    items(ZmanKind.entries) { kind ->
-                        FilterChip(
-                            selected = kind == selected,
-                            onClick = { selected = kind },
-                            label = { Text(kind.hebrewName) },
+                    ZmanKind.entries.forEach { kind ->
+                        DropdownMenuItem(
+                            text = { Text(kind.hebrewName) },
+                            onClick = {
+                                draft = draft.copy(kind = kind)
+                                zmanMenuOpen = false
+                            },
                         )
                     }
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("שעון מעורר (מסך מלא)")
-                    Switch(checked = fullScreen, onCheckedChange = { fullScreen = it })
+            }
+
+            // Offset
+            Text("תזמון", style = MaterialTheme.typography.titleSmall)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                listOf(0, 5, 10, 15, 30, 45, 60).forEach { minutes ->
+                    FilterChip(
+                        selected = draft.offsetMinutes == minutes,
+                        onClick = { draft = draft.copy(offsetMinutes = minutes) },
+                        label = { Text(if (minutes == 0) "בזמן" else "$minutes'") },
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(selected, fullScreen) }) { Text("הוסף") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("ביטול") }
-        },
-    )
+            if (draft.offsetMinutes > 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = draft.offsetBefore,
+                        onClick = { draft = draft.copy(offsetBefore = true) },
+                        label = { Text("לפני הזמן") },
+                    )
+                    FilterChip(
+                        selected = !draft.offsetBefore,
+                        onClick = { draft = draft.copy(offsetBefore = false) },
+                        label = { Text("אחרי הזמן") },
+                    )
+                }
+            }
+
+            // Type + options
+            Text("סוג", style = MaterialTheme.typography.titleSmall)
+            SheetSwitchRow("שעון מעורר (מסך מלא + צלצול)", draft.fullScreenAlarm) {
+                draft = draft.copy(fullScreenAlarm = it)
+            }
+            SheetSwitchRow("רטט", draft.vibrate) { draft = draft.copy(vibrate = it) }
+            SheetSwitchRow("דלג בשבת", draft.skipShabbat) { draft = draft.copy(skipShabbat = it) }
+            SheetSwitchRow("דלג ביום טוב", draft.skipYomTov) { draft = draft.copy(skipYomTov = it) }
+
+            if (draft.fullScreenAlarm) {
+                Text("נודניק", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 15).forEach { minutes ->
+                        FilterChip(
+                            selected = draft.snoozeMinutes == minutes,
+                            onClick = { draft = draft.copy(snoozeMinutes = minutes) },
+                            label = { Text("$minutes דק'") },
+                        )
+                    }
+                }
+            }
+
+            Button(
+                onClick = { onConfirm(draft) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("הוסף התראה")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetSwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
 }

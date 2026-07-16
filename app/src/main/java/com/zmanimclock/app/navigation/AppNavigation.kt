@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.zmanimclock.app.feature.alerts.presentation.AlertsScreen
+import com.zmanimclock.app.feature.settings.presentation.CityPickerScreen
 import com.zmanimclock.app.feature.settings.presentation.SettingsScreen
 import com.zmanimclock.app.feature.zmanim.presentation.HomeScreen
 
@@ -53,7 +54,12 @@ fun AppNavigation() {
         ) {
             composable(Screen.Zmanim.route) { HomeScreen() }
             composable(Screen.Alerts.route) { AlertsScreen() }
-            composable(Screen.Settings.route) { SettingsScreen() }
+            composable(Screen.Settings.route) {
+                SettingsScreen(onOpenCityPicker = { navController.navigate("city_picker") })
+            }
+            composable("city_picker") {
+                CityPickerScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

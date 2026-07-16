@@ -7,7 +7,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.zmanimclock.app.feature.alerts.data.local.AlertDao
 import com.zmanimclock.app.feature.alerts.data.local.AlertEntity
-import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.scheduling.AlarmScheduler
 import com.zmanimclock.app.scheduling.RescheduleWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,15 +27,19 @@ class AlertsViewModel @Inject constructor(
     val alerts: StateFlow<List<AlertEntity>> = alertDao.getAllAlerts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun addAlert(kind: ZmanKind, offsetMinutes: Int, offsetBefore: Boolean, fullScreen: Boolean) {
+    fun addAlert(draft: AlertDraft) {
         viewModelScope.launch {
             alertDao.insertAlert(
                 AlertEntity(
-                    zmanId = kind.name,
-                    offsetMinutes = offsetMinutes,
-                    offsetBefore = offsetBefore,
-                    useSound = fullScreen,
-                    isFullScreenAlarm = fullScreen,
+                    zmanId = draft.kind.name,
+                    offsetMinutes = draft.offsetMinutes,
+                    offsetBefore = draft.offsetBefore,
+                    useSound = draft.fullScreenAlarm,
+                    useVibration = draft.vibrate,
+                    isFullScreenAlarm = draft.fullScreenAlarm,
+                    skipShabbat = draft.skipShabbat,
+                    skipYomTov = draft.skipYomTov,
+                    snoozeDurationMinutes = draft.snoozeMinutes,
                 )
             )
             requestReschedule()
