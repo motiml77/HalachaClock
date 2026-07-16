@@ -113,13 +113,14 @@ class AlarmActivity : ComponentActivity() {
     }
 }
 
-// === Design tokens for this screen (night-friendly, self-contained) ===
-private val NightTop = Color(0xFF0D1226)
-private val NightBottom = Color(0xFF23305E)
+// === Ringing-screen tokens — style 1D (README §7.7 mock) + Shabbat skin ===
+private val NightTop = Color(0xFF0B1220)
+private val NightBottom = Color(0xFF0B1220)
+private val NightButton = Color(0xFF123A8B)
 private val ShabbatTop = Color(0xFF2A1233)
 private val ShabbatBottom = Color(0xFF7A3B2E)
-private val WarmGold = Color(0xFFFFC969)
-private val SoftWhite = Color(0xFFF4F1FF)
+private val WarmGold = Color(0xFFF5C518)
+private val SoftWhite = Color(0xFFE6EAF4)
 
 @Composable
 private fun AlarmScreen(
@@ -252,13 +253,14 @@ private fun AlarmScreen(
             Spacer(Modifier.height(44.dp))
             Button(
                 onClick = ::tryDismiss,
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = accent,
-                    contentColor = if (shabbatMode) ShabbatTop else NightTop,
-                ),
+                shape = RoundedCornerShape(32.dp),
+                colors = if (shabbatMode) {
+                    ButtonDefaults.buttonColors(containerColor = WarmGold, contentColor = ShabbatTop)
+                } else {
+                    ButtonDefaults.buttonColors(containerColor = NightButton, contentColor = Color.White)
+                },
                 modifier = Modifier
-                    .fillMaxWidth(0.72f)
+                    .fillMaxWidth(0.82f)
                     .height(64.dp),
             ) {
                 Text("אישור", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)

@@ -1,5 +1,6 @@
 package com.zmanimclock.app.feature.alarms.presentation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -41,13 +44,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
+import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.ui.theme.Ext
 
 private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 
 /**
- * The alarms tab: one list for both regular (fixed-time) and zman-anchored
- * alarms. FAB opens a type chooser; rows navigate to the edit screen.
+ * טאב המעורר — style 1D (§6.6, §7.2–7.4): AlarmCards on the app canvas,
+ * type-chooser bottom sheet, FAB.
  */
 @Composable
 fun AlarmsScreen(
@@ -60,7 +65,7 @@ fun AlarmsScreen(
     var showTypeChooser by remember { mutableStateOf(false) }
 
     AlarmsContent(
-        alarms = alarms,
+        items = alarms,
         onToggle = viewModel::toggleAlarm,
         onDelete = viewModel::deleteAlarm,
         onAddClick = { showTypeChooser = true },
@@ -84,14 +89,14 @@ fun AlarmsScreen(
 
 @Composable
 fun AlarmsContent(
-    alarms: List<AlarmEntity>,
+    items: List<AlarmListItem>,
     onToggle: (AlarmEntity, Boolean) -> Unit,
     onDelete: (AlarmEntity) -> Unit,
     onAddClick: () -> Unit,
     onEditAlarm: (Long) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        if (alarms.isEmpty()) {
+        if (items.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -100,92 +105,130 @@ fun AlarmsContent(
                 Icon(
                     Icons.Filled.Alarm,
                     contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(76.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(12.dp))
-                Text("אין שעונים מעוררים", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(20.dp))
+                Text("אין שעונים מעוררים", style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(6.dp))
                 Text(
                     "הוסף שעון רגיל או שעון לפי זמן הלכתי",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(alarms, key = { it.id }) { alarm ->
-                    AlarmCard(alarm, onToggle, onDelete, onClick = { onEditAlarm(alarm.id) })
+                items(items, key = { it.alarm.id }) { item ->
+                    AlarmCard(item, onToggle, onDelete, onClick = { onEditAlarm(item.alarm.id) })
                 }
             }
         }
 
         FloatingActionButton(
             onClick = onAddClick,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(24.dp),
+                .padding(26.dp),
         ) {
             Icon(Icons.Filled.Add, contentDescription = "הוסף שעון מעורר")
         }
     }
 }
 
+/** §6.6 — alarm card: tinted icon container, big time / anchor + live label. */
 @Composable
 private fun AlarmCard(
-    alarm: AlarmEntity,
+    item: AlarmListItem,
     onToggle: (AlarmEntity, Boolean) -> Unit,
     onDelete: (AlarmEntity) -> Unit,
     onClick: () -> Unit,
 ) {
-    Card(modifier = Modifier.clickable(onClick = onClick)) {
+    val alarm = item.alarm
+    val cs = MaterialTheme.colorScheme
+    val ext = Ext.colors
+    val isZman = alarm.type == AlarmType.ZMAN
+
+    Card(
+        modifier = Modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cs.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (alarm.shabbatMode) {
-                Text("🕯️", style = MaterialTheme.typography.headlineSmall)
-            } else {
-                Icon(
-                    imageVector = if (alarm.type == AlarmType.ZMAN) Icons.Filled.WbTwilight else Icons.Filled.Alarm,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+            // icon container
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(
+                        if (isZman) cs.tertiaryContainer else cs.primaryContainer,
+                        RoundedCornerShape(14.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (alarm.shabbatMode) {
+                    Text("🕯️", style = MaterialTheme.typography.titleLarge)
+                } else {
+                    Icon(
+                        imageVector = if (isZman) Icons.Filled.WbTwilight else Icons.Filled.Alarm,
+                        contentDescription = null,
+                        tint = if (isZman) cs.onTertiaryContainer else cs.primary,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
             }
+
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 14.dp),
             ) {
-                // Big anchor line
-                Text(
-                    text = when (alarm.type) {
-                        AlarmType.FIXED -> "%02d:%02d".format(alarm.hour, alarm.minute)
-                        AlarmType.ZMAN -> zmanAnchorText(alarm)
-                    },
-                    style = if (alarm.type == AlarmType.FIXED) {
-                        MaterialTheme.typography.headlineMedium
-                    } else {
-                        MaterialTheme.typography.titleMedium
-                    },
-                    fontWeight = FontWeight.Bold,
-                )
-                if (alarm.label.isNotBlank()) {
-                    Text(alarm.label, style = MaterialTheme.typography.bodyMedium)
+                if (isZman) {
+                    Text(
+                        text = zmanAnchorText(alarm),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = cs.onSurface,
+                    )
+                    item.nextFireLabel?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            // gold family: #7A5E00 on light, #F5C518 on dark
+                            color = cs.tertiary,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "%02d:%02d".format(alarm.hour, alarm.minute),
+                        style = MaterialTheme.typography.displaySmall,
+                        color = cs.primary,
+                    )
                 }
                 Text(
                     text = daysText(alarm),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = cs.onSurfaceVariant,
                 )
             }
+
             IconButton(onClick = { onDelete(alarm) }) {
-                Icon(Icons.Filled.Delete, contentDescription = "מחק")
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "מחק",
+                    tint = cs.onSurfaceVariant,
+                )
             }
             Switch(
                 checked = alarm.isActive,
@@ -210,6 +253,7 @@ private fun daysText(alarm: AlarmEntity): String {
         AlarmEntity.ALL_DAYS -> "כל יום"
         AlarmEntity.SUNDAY_TO_FRIDAY -> "א'-ו'"
         AlarmEntity.SUNDAY_TO_THURSDAY -> "א'-ה'"
+        AlarmEntity.FRIDAY_ONLY -> "כל שישי"
         else -> DAY_LETTERS.filterIndexed { i, _ -> (alarm.daysOfWeek shr i) and 1 == 1 }
             .joinToString(" ")
     }
@@ -217,9 +261,7 @@ private fun daysText(alarm: AlarmEntity): String {
         append(base)
         if (alarm.skipShabbat && alarm.daysOfWeek == AlarmEntity.ALL_DAYS) append(" · ללא שבת")
         if (alarm.skipYomTov) append(" · ללא יו\"ט")
-        if (alarm.dismissChallenge != com.zmanimclock.app.feature.alarms.data.DismissChallenge.NONE) {
-            append(" · תרגיל לכיבוי")
-        }
+        if (alarm.dismissChallenge != DismissChallenge.NONE) append(" · תרגיל לכיבוי")
     }
 }
 
@@ -230,24 +272,33 @@ private fun AlarmTypeChooserSheet(
     onChooseShabbat: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 22.dp)
                 .padding(bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("שעון מעורר חדש", style = MaterialTheme.typography.titleLarge)
+            Text("שעון מעורר חדש", style = MaterialTheme.typography.headlineSmall)
 
             TypeCard(
                 icon = Icons.Filled.Alarm,
+                iconTint = MaterialTheme.colorScheme.primary,
+                iconBg = MaterialTheme.colorScheme.primaryContainer,
                 title = "שעון מעורר רגיל",
                 subtitle = "שעה קבועה — למשל 06:30 כל בוקר",
+                highlighted = true,
                 onClick = { onChoose(AlarmType.FIXED) },
             )
             TypeCard(
                 icon = Icons.Filled.WbTwilight,
+                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                iconBg = MaterialTheme.colorScheme.tertiaryContainer,
                 title = "שעון לפי זמן הלכתי",
                 subtitle = "למשל 30 דק' לפני הנץ — מתעדכן כל יום לפי המיקום",
                 onClick = { onChoose(AlarmType.ZMAN) },
@@ -265,30 +316,47 @@ private fun AlarmTypeChooserSheet(
 @Composable
 private fun TypeCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    iconTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
+    iconBg: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primaryContainer,
     emoji: String? = null,
     title: String,
     subtitle: String,
+    highlighted: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Card(modifier = Modifier.clickable(onClick = onClick)) {
+    val cs = MaterialTheme.colorScheme
+    Card(
+        modifier = Modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cs.surface),
+        border = androidx.compose.foundation.BorderStroke(
+            2.dp,
+            if (highlighted) cs.primary else cs.outlineVariant,
+        ),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            when {
-                icon != null ->
-                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                emoji != null ->
-                    Text(emoji, style = MaterialTheme.typography.headlineSmall)
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(iconBg, RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    icon != null -> Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
+                    emoji != null -> Text(emoji, style = MaterialTheme.typography.headlineSmall)
+                }
             }
-            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(horizontal = 14.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = cs.onSurfaceVariant,
                 )
             }
         }

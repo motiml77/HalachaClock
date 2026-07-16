@@ -50,6 +50,7 @@ class ZmanimViewModel @Inject constructor(
         val name: String,
         val time: String,
         val isNext: Boolean,
+        val isPast: Boolean,
     )
 
     data class UiState(
@@ -58,8 +59,11 @@ class ZmanimViewModel @Inject constructor(
         val hebrewDate: String = "",
         val gregorianDate: String = "",
         val basedOnVisibleSunrise: Boolean = false,
-        /** e.g. "עוד שעה ו-12 דק' — שקיעה"; null when nothing left today. */
-        val nextZmanCountdown: String? = null,
+        /** Hero: the next zman of the day (null when the day is done). */
+        val nextName: String? = null,
+        val nextTime: String? = null,
+        /** Short countdown, e.g. "1:06". */
+        val countdown: String? = null,
         val rows: List<ZmanRow> = emptyList(),
     )
 
@@ -107,15 +111,16 @@ class ZmanimViewModel @Inject constructor(
                 hebrewDate = hebrewDate(today, zone),
                 gregorianDate = DateTimeFormatter.ofPattern("d.M.yyyy").format(today),
                 basedOnVisibleSunrise = day.basedOnVisibleSunrise,
-                nextZmanCountdown = next?.let { (kind, instant) ->
-                    "${kind.hebrewName} בעוד ${formatCountdown(now, instant)}"
-                },
+                nextName = next?.first?.hebrewName,
+                nextTime = next?.second?.let { timeFormat.format(it.atZone(zone)) },
+                countdown = next?.second?.let { formatCountdown(now, it) },
                 rows = timed.map { (kind, instant) ->
                     ZmanRow(
                         kind = kind,
                         name = kind.hebrewName,
                         time = timeFormat.format(instant.atZone(zone)),
                         isNext = kind == next?.first,
+                        isPast = instant.isBefore(now),
                     )
                 },
             )
@@ -127,14 +132,9 @@ class ZmanimViewModel @Inject constructor(
         return hebrewFormatter.format(JewishDate(cal))
     }
 
+    /** Short "1:06" / "0:42" countdown (README §7.1). */
     private fun formatCountdown(now: Instant, target: Instant): String {
         val minutes = java.time.Duration.between(now, target).toMinutes()
-        val h = minutes / 60
-        val m = minutes % 60
-        return when {
-            h > 0 && m > 0 -> "$h ש' ו-$m דק'"
-            h > 0 -> "$h שעות"
-            else -> "$m דק'"
-        }
+        return "%d:%02d".format(minutes / 60, minutes % 60)
     }
 }
