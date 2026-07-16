@@ -34,9 +34,18 @@ class AlarmsViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
-    val alarms: StateFlow<List<AlarmListItem>> = alarmDao.getAllAlarms()
-        .map { list -> list.map { AlarmListItem(it, nextFireLabel(it)) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** Re-emits every minute so the "בעוד X ש' Y דק'" labels stay fresh. */
+    private val minuteTicker = kotlinx.coroutines.flow.flow {
+        while (true) {
+            emit(Unit)
+            kotlinx.coroutines.delay(60_000)
+        }
+    }
+
+    val alarms: StateFlow<List<AlarmListItem>> =
+        kotlinx.coroutines.flow.combine(alarmDao.getAllAlarms(), minuteTicker) { list, _ ->
+            list.map { AlarmListItem(it, nextFireLabel(it)) }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private suspend fun nextFireLabel(alarm: AlarmEntity): String? {
         if (!alarm.isActive) return null
@@ -52,8 +61,23 @@ class AlarmsViewModel @Inject constructor(
                 LocalDate.now(zone).plusDays(1) -> "מחר"
                 else -> DateTimeFormatter.ofPattern("dd/MM").format(local)
             }
-            "$day: ${DateTimeFormatter.ofPattern("HH:mm").format(local)}"
+            val time = DateTimeFormatter.ofPattern("HH:mm").format(local)
+            "$day: $time · ${remainingText(fire)}"
         }.getOrNull()
+    }
+
+    /** "בעוד 9 ש' ו-33 דק'" — the user always sees how far the alarm is. */
+    private fun remainingText(fire: java.time.Instant): String {
+        val minutes = java.time.Duration.between(java.time.Instant.now(), fire)
+            .toMinutes().coerceAtLeast(0)
+        val h = minutes / 60
+        val m = minutes % 60
+        // U+05BE (maqaf) keeps the hyphen RTL-safe next to digits
+        return when {
+            h > 0 && m > 0 -> "בעוד $h ש' ו־$m דק'"
+            h > 0 -> "בעוד $h ש'"
+            else -> "בעוד $m דק'"
+        }
     }
 
     fun toggleAlarm(alarm: AlarmEntity, isActive: Boolean) {

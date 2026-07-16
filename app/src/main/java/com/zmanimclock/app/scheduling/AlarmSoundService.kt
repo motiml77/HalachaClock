@@ -93,6 +93,16 @@ class AlarmSoundService : Service() {
         if (alarmId < 0) {
             stopSelf(); return
         }
+        // startForegroundService() gives us ~5s to call startForeground —
+        // post a placeholder IMMEDIATELY (before any DB work), otherwise a
+        // slow query or a deleted alarm crashes with
+        // ForegroundServiceDidNotStartInTimeException on real devices.
+        goForeground(
+            notificationHelper.buildAlarmNotification(
+                alertId = alarmId, title = "שעון מעורר", timeText = "",
+                snoozeMinutes = 5,
+            )
+        )
         acquireWakeLock()
         scope.launch {
             val loaded = alarmDao.getAlarmById(alarmId)
@@ -109,15 +119,7 @@ class AlarmSoundService : Service() {
         }
     }
 
-    private fun ring(alarm: AlarmEntity) {
-        val notification = notificationHelper.buildAlarmNotification(
-            alertId = alarm.id,
-            title = titleOf(alarm),
-            timeText = timeTextOf(alarm),
-            snoozeMinutes = alarm.snoozeMinutes,
-            challenge = alarm.dismissChallenge.name,
-            shabbatMode = alarm.shabbatMode,
-        )
+    private fun goForeground(notification: android.app.Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NotificationHelper.ALARM_NOTIFICATION_ID,
@@ -127,6 +129,20 @@ class AlarmSoundService : Service() {
         } else {
             startForeground(NotificationHelper.ALARM_NOTIFICATION_ID, notification)
         }
+    }
+
+    private fun ring(alarm: AlarmEntity) {
+        // Replace the placeholder posted in start() with the real content
+        goForeground(
+            notificationHelper.buildAlarmNotification(
+                alertId = alarm.id,
+                title = titleOf(alarm),
+                timeText = timeTextOf(alarm),
+                snoozeMinutes = alarm.snoozeMinutes,
+                challenge = alarm.dismissChallenge.name,
+                shabbatMode = alarm.shabbatMode,
+            )
+        )
 
         if (alarm.soundEnabled) startSound(alarm)
         if (alarm.vibrate) startVibration()

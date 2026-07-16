@@ -200,20 +200,21 @@ private fun AlarmCard(
                         style = MaterialTheme.typography.titleLarge,
                         color = cs.onSurface,
                     )
-                    item.nextFireLabel?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            // gold family: #7A5E00 on light, #F5C518 on dark
-                            color = cs.tertiary,
-                        )
-                    }
                 } else {
                     Text(
                         text = "%02d:%02d".format(alarm.hour, alarm.minute),
                         style = MaterialTheme.typography.displaySmall,
                         color = cs.primary,
+                    )
+                }
+                // "מחר: 05:15 · בעוד 9 ש' ו-33 דק'" — on EVERY active alarm
+                item.nextFireLabel?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        // gold family: #7A5E00 on light, #F5C518 on dark
+                        color = cs.tertiary,
                     )
                 }
                 Text(
