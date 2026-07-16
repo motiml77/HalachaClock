@@ -49,6 +49,42 @@
             </intent-filter>
         </activity>
 
+        <!-- Full-screen ringing UI, shown over the lock screen -->
+        <activity
+            android:name=".feature.alarm.presentation.AlarmActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ZmanimClock" />
+
+        <!-- Re-arm alarms after boot / update / clock or timezone change -->
+        <receiver
+            android:name=".scheduling.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Exact-alarm firing point -->
+        <receiver
+            android:name=".scheduling.AlarmTriggerReceiver"
+            android:exported="false" />
+
+        <!-- Foreground service that owns the ringing alarm -->
+        <service
+            android:name=".scheduling.AlarmSoundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <!-- Disable default WorkManager initializer (initialized via Hilt) -->
         <provider
             android:name="androidx.startup.InitializationProvider"

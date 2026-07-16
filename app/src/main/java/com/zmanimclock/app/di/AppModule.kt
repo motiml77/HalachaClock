@@ -3,6 +3,7 @@ package com.zmanimclock.app.di
 import android.content.Context
 import androidx.room.Room
 import com.zmanimclock.app.data.local.ZmanimDatabase
+import com.zmanimclock.app.feature.alerts.data.local.AlertDao
 import com.zmanimclock.app.feature.chaitables.data.local.ChaiTablesDao
 import dagger.Module
 import dagger.Provides
@@ -26,6 +27,10 @@ object AppModule {
     @Provides
     fun provideChaiTablesDao(database: ZmanimDatabase): ChaiTablesDao =
         database.chaiTablesDao()
+
+    @Provides
+    fun provideAlertDao(database: ZmanimDatabase): AlertDao =
+        database.alertDao()
 
     @Provides
     @Singleton

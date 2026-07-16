@@ -1,0 +1,147 @@
+package com.zmanimclock.app.scheduling
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import androidx.core.app.NotificationCompat
+import androidx.core.content.getSystemService
+import com.zmanimclock.app.R
+import com.zmanimclock.app.feature.alarm.presentation.AlarmActivity
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Owns notification channels and builders for the alarm engine.
+ *
+ * Channel design (yuriykulikov/AlarmClock pattern): the ALARM channel itself is
+ * SILENT — sound and vibration are produced by [AlarmSoundService] so that we
+ * control ramp-up volume, looping and stop/snooze precisely. The channel only
+ * carries importance + full-screen-intent capability.
+ */
+@Singleton
+class NotificationHelper @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    companion object {
+        const val CHANNEL_ALARM = "zmanim_alarm"
+        const val CHANNEL_REMINDER = "zmanim_reminder"
+        const val CHANNEL_SERVICE = "zmanim_service"
+
+        const val ALARM_NOTIFICATION_ID = 1001
+    }
+
+    fun createChannels() {
+        val manager = context.getSystemService<NotificationManager>() ?: return
+
+        val alarm = NotificationChannel(
+            CHANNEL_ALARM,
+            "התראות זמנים",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "צלצול בזמני הלכה (הצליל מנוהל על ידי האפליקציה)"
+            setSound(null, null) // sound comes from AlarmSoundService
+            enableVibration(false) // vibration comes from AlarmSoundService
+            setBypassDnd(true)
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+        }
+
+        val reminder = NotificationChannel(
+            CHANNEL_REMINDER,
+            "תזכורות",
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            description = "תזכורות שקטות על זמנים קרבים"
+        }
+
+        val service = NotificationChannel(
+            CHANNEL_SERVICE,
+            "שירות רקע",
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = "שירותי רקע של האפליקציה"
+        }
+
+        manager.createNotificationChannels(listOf(alarm, reminder, service))
+    }
+
+    /**
+     * The ongoing full-screen alarm notification shown while
+     * [AlarmSoundService] is ringing. Launches [AlarmActivity] over the
+     * lock screen and offers dismiss/snooze actions.
+     */
+    fun buildAlarmNotification(
+        alertId: Long,
+        title: String,
+        timeText: String,
+        snoozeMinutes: Int,
+    ): android.app.Notification {
+        val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(AlarmSoundService.EXTRA_ALERT_ID, alertId)
+            putExtra(AlarmSoundService.EXTRA_TITLE, title)
+            putExtra(AlarmSoundService.EXTRA_TIME_TEXT, timeText)
+            putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
+        }
+        val fullScreenPi = PendingIntent.getActivity(
+            context,
+            alertId.toInt(),
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val dismissPi = servicePendingIntent(alertId, AlarmSoundService.ACTION_DISMISS, 1)
+        val snoozePi = servicePendingIntent(alertId, AlarmSoundService.ACTION_SNOOZE, 2, snoozeMinutes)
+
+        return NotificationCompat.Builder(context, CHANNEL_ALARM)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
+            .setContentText(if (timeText.isNotEmpty()) "בשעה $timeText" else "עכשיו")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setFullScreenIntent(fullScreenPi, true)
+            .setContentIntent(fullScreenPi)
+            .addAction(0, "ביטול", dismissPi)
+            .addAction(0, "נודניק ($snoozeMinutes ד')", snoozePi)
+            .build()
+    }
+
+    /** A plain (non-ringing) reminder notification for notification-only alerts. */
+    fun showReminder(alertId: Long, title: String, timeText: String, vibrate: Boolean) {
+        val manager = context.getSystemService<NotificationManager>() ?: return
+        val notification = NotificationCompat.Builder(context, CHANNEL_REMINDER)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
+            .setContentText(if (timeText.isNotEmpty()) "בשעה $timeText" else "עכשיו")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .apply { if (vibrate) setVibrate(longArrayOf(0, 400, 200, 400)) }
+            .build()
+        manager.notify(alertId.toInt(), notification)
+    }
+
+    private fun servicePendingIntent(
+        alertId: Long,
+        action: String,
+        requestOffset: Int,
+        snoozeMinutes: Int? = null,
+    ): PendingIntent {
+        val intent = Intent(context, AlarmSoundService::class.java).apply {
+            this.action = action
+            putExtra(AlarmSoundService.EXTRA_ALERT_ID, alertId)
+            snoozeMinutes?.let { putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, it) }
+        }
+        return PendingIntent.getService(
+            context,
+            alertId.toInt() * 10 + requestOffset,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+}
