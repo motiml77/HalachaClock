@@ -88,7 +88,7 @@ class MaranZmanimEngine @Inject constructor() {
         // === Night ===
         val tzeit = sunset.plusMillis(zmaniyotMinutes(TZEIT_ZMANIYOT_MINUTES))
         val tzeitShabbat = sunset.plusMillis(Duration.ofMinutes(TZEIT_SHABBAT_FIXED_MINUTES).toMillis())
-        val tzeitRabbeinuTam = sunset.plusMillis(zmaniyotMinutes(RABBEINU_TAM_ZMANIYOT_MINUTES))
+        val tzeitRabbeinuTam = sunset.plusMillis(Duration.ofMinutes(RABBEINU_TAM_FIXED_MINUTES).toMillis())
 
         // Plag hamincha (Yalkut Yosef): one hour and 15 zmaniyot minutes before tzeit
         val plag = tzeit.minusMillis((shaahGra * PLAG_YY_SHAOS_BEFORE_TZEIT).toLong())
@@ -177,10 +177,19 @@ class MaranZmanimEngine @Inject constructor() {
         /** עלות השחר — 72 zmaniyot minutes before the netz. */
         const val ALOT_ZMANIYOT_MINUTES = 72.0
 
-        /** משיכיר — 66 zmaniyot minutes before the netz (luach standard). */
+        /**
+         * משיכיר (טלית ותפילין) — 66 zmaniyot minutes before the netz.
+         * Kept as the earlier variant; the luach standard is 60 (see below),
+         * verified against royzmanim.com (Chazon Yosef mode, 4 cities).
+         */
         const val MISHEYAKIR_ZMANIYOT_MINUTES = 66.0
 
-        /** משיכיר לחומרא — 60 zmaniyot minutes before the netz. */
+        /**
+         * משיכיר — 60 zmaniyot minutes (exactly one shaah zmanit) before the
+         * netz. THE luach value: "Earliest Tallit and Tefilin" on
+         * royzmanim.com equals sunrise minus one seasonal hour in all
+         * verified cities (2026-07-16).
+         */
         const val MISHEYAKIR_STRICT_ZMANIYOT_MINUTES = 60.0
 
         /** MGA day is extended 72 zmaniyot on each side: shaah = 14.4/12 = 1.2 GRA. */
@@ -195,8 +204,14 @@ class MaranZmanimEngine @Inject constructor() {
         /** צאת שבת — 40 fixed minutes after shkia. */
         const val TZEIT_SHABBAT_FIXED_MINUTES = 40L
 
-        /** רבנו תם — 72 zmaniyot minutes after shkia. */
-        const val RABBEINU_TAM_ZMANIYOT_MINUTES = 72.0
+        /**
+         * רבנו תם — 72 FIXED minutes after shkia.
+         * The rebuild plan said "72 zmaniyot", but the approved Zemaneh Yosef
+         * implementation (royzmanim.com, Chazon Yosef mode) shows
+         * "Rabbenu Tam (Fixed)" = sunset + 72 fixed minutes in all verified
+         * cities (2026-07-16) — per the plan's protocol the luach wins.
+         */
+        const val RABBEINU_TAM_FIXED_MINUTES = 72L
 
         /** פלג המנחה (ילקוט יוסף) — hour + 15 zmaniyot minutes before tzeit. */
         const val PLAG_YY_SHAOS_BEFORE_TZEIT = 1.25

@@ -101,10 +101,12 @@ class MaranZmanimEngineTest {
     }
 
     @Test
-    fun `rabbeinu tam is 72 zmaniyot minutes after shkia`() {
+    fun `rabbeinu tam is 72 fixed minutes after shkia`() {
         val day = engine.calculate(jerusalem, testDate)
-        val expected = day.shkia!!.plusMillis(day.shaahZmanisGra!! * 72 / 60)
-        assertCloseMillis(expected, day.tzeitRabbeinuTam!!)
+        assertEquals(
+            Duration.ofMinutes(72),
+            Duration.between(day.shkia, day.tzeitRabbeinuTam),
+        )
     }
 
     @Test

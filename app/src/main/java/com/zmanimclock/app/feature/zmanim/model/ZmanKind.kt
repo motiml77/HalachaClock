@@ -37,7 +37,7 @@ enum class ZmanKind(val hebrewName: String) {
 fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.CHATZOT_LAYLA -> chatzotLayla
     ZmanKind.ALOT_HASHACHAR -> alotHashachar
-    ZmanKind.MISHEYAKIR -> misheyakir66
+    ZmanKind.MISHEYAKIR -> misheyakir60 // luach standard: one shaah zmanit before the netz
     ZmanKind.HANETZ -> hanetzVisible ?: hanetzMishor
     ZmanKind.SOF_ZMAN_SHMA_MGA -> sofZmanShmaMga
     ZmanKind.SOF_ZMAN_SHMA_GRA -> sofZmanShmaGra
