@@ -72,7 +72,10 @@ class ZmanimViewModel @Inject constructor(
     }
 
     init {
-        refresh()
+        // Recompute whenever preferences change (city switch, candle offset…)
+        viewModelScope.launch {
+            prefsRepository.preferences.collect { refresh() }
+        }
     }
 
     fun refresh() {
