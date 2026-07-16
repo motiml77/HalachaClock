@@ -79,6 +79,11 @@
             android:name=".scheduling.AlarmTriggerReceiver"
             android:exported="false" />
 
+        <!-- Persistent "next zman / next alarm" status notification updater -->
+        <receiver
+            android:name=".scheduling.StatusNotificationReceiver"
+            android:exported="false" />
+
         <!-- Foreground service that owns the ringing alarm -->
         <service
             android:name=".scheduling.AlarmSoundService"

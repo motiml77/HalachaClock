@@ -25,6 +25,7 @@ class RescheduleWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         return try {
             alarmScheduler.rescheduleAll()
+            StatusNotificationReceiver.ping(applicationContext)
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Reschedule failed", e)

@@ -26,6 +26,7 @@ class BootReceiver : BroadcastReceiver() {
                 Log.i(TAG, "Rescheduling alarms due to ${intent.action}")
                 WorkManager.getInstance(context)
                     .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+                StatusNotificationReceiver.ping(context)
             }
         }
     }

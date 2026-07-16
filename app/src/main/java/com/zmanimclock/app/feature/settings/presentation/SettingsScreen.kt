@@ -23,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,6 +58,7 @@ fun SettingsScreen(
         exactAlarmsOk = exactAlarmsOk,
         onCityClick = onOpenCityPicker,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
+        onPersistentNotificationChange = viewModel::setPersistentNotification,
         onRequestExactAlarms = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
@@ -71,6 +73,7 @@ fun SettingsContent(
     exactAlarmsOk: Boolean,
     onCityClick: () -> Unit,
     onCandleMinutesChange: (Int) -> Unit,
+    onPersistentNotificationChange: (Boolean) -> Unit,
     onRequestExactAlarms: () -> Unit,
 ) {
     Column(
@@ -169,6 +172,30 @@ fun SettingsContent(
                         onCandleMinutesChange((prefs.candleLightingMinutes + 10).coerceAtMost(40))
                     }) { Text("+") }
                 }
+            }
+        }
+
+        // Persistent status notification
+        Card {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("שורת מצב קבועה", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "הזמן הבא והשעון הבא — תמיד בהתראות",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                Switch(
+                    checked = prefs.persistentNotification,
+                    onCheckedChange = onPersistentNotificationChange,
+                )
             }
         }
 

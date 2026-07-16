@@ -31,6 +31,38 @@ class NotificationHelper @Inject constructor(
         const val CHANNEL_SERVICE = "zmanim_service"
 
         const val ALARM_NOTIFICATION_ID = 1001
+        const val STATUS_NOTIFICATION_ID = 1002
+    }
+
+    /**
+     * The persistent status notification: always-visible line with the next
+     * zman of the day and the next armed alarm. Silent, ongoing, updates in
+     * place (no re-alert).
+     */
+    fun showOngoingStatus(nextZmanText: String, nextAlarmText: String?) {
+        val manager = context.getSystemService<NotificationManager>() ?: return
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, com.zmanimclock.app.MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_SERVICE)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("הזמן הבא: $nextZmanText")
+            .setContentText(nextAlarmText?.let { "השעון הבא: $it" } ?: "אין שעון מעורר פעיל")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setContentIntent(contentIntent)
+            .build()
+        manager.notify(STATUS_NOTIFICATION_ID, notification)
+    }
+
+    fun cancelOngoingStatus() {
+        context.getSystemService<NotificationManager>()?.cancel(STATUS_NOTIFICATION_ID)
     }
 
     fun createChannels() {

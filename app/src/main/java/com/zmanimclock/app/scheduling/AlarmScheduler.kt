@@ -71,18 +71,38 @@ class AlarmScheduler @Inject constructor(
         cityId: String?,
     ) {
         val zone = ZoneId.of(location.timeZone.id)
-        val now = Instant.now()
-
-        val fireTime = when (alarm.type) {
-            AlarmType.FIXED -> AlarmTimeCalculator.nextFixedOccurrence(alarm, zone, now)
-            AlarmType.ZMAN -> nextZmanOccurrence(alarm, location, cityId, zone, now)
-        }
-
+        val fireTime = computeNextOccurrence(alarm, location, cityId)
         if (fireTime == null) {
             Log.w(TAG, "No occurrence for alarm ${alarm.id} within lookahead")
             return
         }
         arm(alarm, fireTime, zone)
+    }
+
+    /** The next fire time of one alarm (no side effects). */
+    suspend fun computeNextOccurrence(
+        alarm: AlarmEntity,
+        location: AppGeoLocation,
+        cityId: String?,
+    ): Instant? {
+        val zone = ZoneId.of(location.timeZone.id)
+        val now = Instant.now()
+        return when (alarm.type) {
+            AlarmType.FIXED -> AlarmTimeCalculator.nextFixedOccurrence(alarm, zone, now)
+            AlarmType.ZMAN -> nextZmanOccurrence(alarm, location, cityId, zone, now)
+        }
+    }
+
+    /** The earliest upcoming firing across ALL active alarms (for the status bar). */
+    suspend fun nextAlarmOccurrence(): Pair<AlarmEntity, Instant>? {
+        val prefs = prefsRepository.preferences.first()
+        val location = prefsRepository.prefsToGeoLocation(prefs)
+        val cityId = if (prefs.useGps) null else prefs.cityId
+        return alarmDao.getActiveAlarmsList()
+            .mapNotNull { alarm ->
+                computeNextOccurrence(alarm, location, cityId)?.let { alarm to it }
+            }
+            .minByOrNull { (_, fire) -> fire }
     }
 
     /** Compute the next firing of a snoozed alarm. */

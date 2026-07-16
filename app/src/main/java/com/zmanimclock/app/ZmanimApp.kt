@@ -45,6 +45,8 @@ class ZmanimApp : Application(), Configuration.Provider {
         notificationHelper.createChannels()
         loadPreBundledData()
         schedulePeriodicWork()
+        // Keep the "next zman / next alarm" status line alive
+        com.zmanimclock.app.scheduling.StatusNotificationReceiver.ping(this)
     }
 
     /** Bundle-shipped ChaiTables data → Room, so netz works offline on day one. */
