@@ -4,15 +4,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter
 import com.kosherjava.zmanim.hebrewcalendar.JewishDate
+import com.zmanimclock.app.feature.alerts.data.local.AlertDao
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -29,7 +33,14 @@ import javax.inject.Inject
 class ZmanimViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val zmanimRepository: ZmanimRepository,
+    alertDao: AlertDao,
 ) : ViewModel() {
+
+    /** Zman kinds that currently have at least one ACTIVE alert (for the bell markers). */
+    val alertedKinds: StateFlow<Set<String>> =
+        alertDao.getActiveAlerts()
+            .map { alerts -> alerts.map { it.zmanId }.toSet() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     data class ZmanRow(
         val kind: ZmanKind,

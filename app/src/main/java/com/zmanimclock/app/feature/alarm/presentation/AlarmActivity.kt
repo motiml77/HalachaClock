@@ -115,8 +115,9 @@ private fun AlarmScreen(
             }
             Spacer(Modifier.height(48.dp))
             Row(horizontalArrangement = Arrangement.Center) {
+                // Primary acknowledge — the user confirms they saw the alert
                 Button(onClick = onDismiss) {
-                    Text("ביטול")
+                    Text("אישור", style = MaterialTheme.typography.titleLarge)
                 }
                 Spacer(Modifier.width(24.dp))
                 OutlinedButton(onClick = onSnooze) {

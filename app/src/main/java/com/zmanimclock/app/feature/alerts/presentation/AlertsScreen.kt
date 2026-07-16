@@ -200,9 +200,11 @@ data class AlertDraft(
 fun AddAlertSheet(
     onConfirm: (AlertDraft) -> Unit,
     onDismiss: () -> Unit,
+    initialKind: ZmanKind = ZmanKind.HANETZ,
 ) {
-    var draft by remember { mutableStateOf(AlertDraft()) }
+    var draft by remember { mutableStateOf(AlertDraft(kind = initialKind)) }
     var zmanMenuOpen by remember { mutableStateOf(false) }
+    var customMinutes by remember { mutableStateOf("") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -246,20 +248,35 @@ fun AddAlertSheet(
                 }
             }
 
-            // Offset
-            Text("תזמון", style = MaterialTheme.typography.titleSmall)
+            // Offset — how many minutes before/after the zman (user-chosen)
+            Text("כמה דקות לפני הזמן?", style = MaterialTheme.typography.titleSmall)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                listOf(0, 5, 10, 15, 30, 45, 60).forEach { minutes ->
+                listOf(0, 5, 10, 15, 30, 45).forEach { minutes ->
                     FilterChip(
-                        selected = draft.offsetMinutes == minutes,
-                        onClick = { draft = draft.copy(offsetMinutes = minutes) },
+                        selected = draft.offsetMinutes == minutes && customMinutes.isBlank(),
+                        onClick = {
+                            customMinutes = ""
+                            draft = draft.copy(offsetMinutes = minutes)
+                        },
                         label = { Text(if (minutes == 0) "בזמן" else "$minutes'") },
                     )
                 }
             }
+            OutlinedTextField(
+                value = customMinutes,
+                onValueChange = { value ->
+                    if (value.length <= 3 && value.all(Char::isDigit)) {
+                        customMinutes = value
+                        value.toIntOrNull()?.let { draft = draft.copy(offsetMinutes = it) }
+                    }
+                },
+                label = { Text("או מספר דקות אחר") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (draft.offsetMinutes > 0) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
