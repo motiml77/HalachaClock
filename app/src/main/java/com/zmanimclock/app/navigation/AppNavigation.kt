@@ -68,6 +68,9 @@ fun AppNavigation() {
                     onCreateAlarm = { type ->
                         navController.navigate("alarm_edit?type=${type.name}")
                     },
+                    onCreateShabbatAlarm = {
+                        navController.navigate("alarm_edit?type=ZMAN&shabbat=true")
+                    },
                     onEditAlarm = { id ->
                         navController.navigate("alarm_edit?alarmId=$id")
                     },
@@ -80,11 +83,12 @@ fun AppNavigation() {
                 CityPickerScreen(onBack = { navController.popBackStack() })
             }
             composable(
-                route = "alarm_edit?type={type}&alarmId={alarmId}&zman={zman}",
+                route = "alarm_edit?type={type}&alarmId={alarmId}&zman={zman}&shabbat={shabbat}",
                 arguments = listOf(
                     navArgument("type") { type = NavType.StringType; defaultValue = "FIXED" },
                     navArgument("alarmId") { type = NavType.LongType; defaultValue = -1L },
                     navArgument("zman") { type = NavType.StringType; defaultValue = "" },
+                    navArgument("shabbat") { type = NavType.BoolType; defaultValue = false },
                 ),
             ) { entry ->
                 val args = entry.arguments
@@ -97,6 +101,7 @@ fun AppNavigation() {
                     type = type,
                     alarmId = alarmId,
                     preselectedZman = zman,
+                    shabbatPreset = args?.getBoolean("shabbat") == true,
                     onBack = { navController.popBackStack() },
                 )
             }

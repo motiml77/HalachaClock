@@ -6,24 +6,30 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,15 +49,15 @@ import androidx.core.content.getSystemService
 import com.zmanimclock.app.feature.alarm.MathChallenge
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.scheduling.AlarmSoundService
-import com.zmanimclock.app.ui.theme.ZmanimTheme
 
 /**
- * Full-screen ringing UI over the lock screen.
+ * Full-screen ringing UI over the lock screen — night-friendly designed
+ * screen with a big אישור button.
  *
- * The אישור (acknowledge) button is the primary action. When the alarm has a
- * math dismiss-challenge, אישור unlocks only after a correct answer (a wrong
- * one generates a fresh problem). Snooze is NEVER gated — a groggy user must
- * always have a safe way out.
+ * Two skins:
+ *  - Regular: deep-night gradient, huge time, zman name.
+ *  - Shabbat entry: warm sunset gradient + drawn candles — "שבת נכנסת!".
+ * A math dismiss-challenge (when set) gates אישור only; snooze never.
  */
 class AlarmActivity : ComponentActivity() {
 
@@ -59,17 +69,21 @@ class AlarmActivity : ComponentActivity() {
         val timeText = intent.getStringExtra(AlarmSoundService.EXTRA_TIME_TEXT) ?: ""
         val alarmId = intent.getLongExtra(AlarmSoundService.EXTRA_ALARM_ID, -1)
         val snoozeMinutes = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 5)
+        val shabbatMode = intent.getBooleanExtra(AlarmSoundService.EXTRA_SHABBAT, false)
         val challenge = intent.getStringExtra(AlarmSoundService.EXTRA_CHALLENGE)
             ?.let { runCatching { DismissChallenge.valueOf(it) }.getOrNull() }
             ?: DismissChallenge.NONE
 
         setContent {
-            ZmanimTheme {
+            // ZmanimTheme forces RTL and provides typography; the screen's
+            // night/shabbat gradients override its surfaces entirely.
+            com.zmanimclock.app.ui.theme.ZmanimTheme {
                 AlarmScreen(
                     title = title,
                     timeText = timeText,
                     snoozeMinutes = snoozeMinutes,
                     challenge = challenge,
+                    shabbatMode = shabbatMode,
                     onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, alarmId); finish() },
                     onSnooze = { sendCommand(AlarmSoundService.ACTION_SNOOZE, alarmId); finish() },
                 )
@@ -99,12 +113,21 @@ class AlarmActivity : ComponentActivity() {
     }
 }
 
+// === Design tokens for this screen (night-friendly, self-contained) ===
+private val NightTop = Color(0xFF0D1226)
+private val NightBottom = Color(0xFF23305E)
+private val ShabbatTop = Color(0xFF2A1233)
+private val ShabbatBottom = Color(0xFF7A3B2E)
+private val WarmGold = Color(0xFFFFC969)
+private val SoftWhite = Color(0xFFF4F1FF)
+
 @Composable
 private fun AlarmScreen(
     title: String,
     timeText: String,
     snoozeMinutes: Int,
     challenge: DismissChallenge,
+    shabbatMode: Boolean,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
 ) {
@@ -114,76 +137,190 @@ private fun AlarmScreen(
 
     fun tryDismiss() {
         val p = problem
-        if (p == null) {
-            onDismiss()
-        } else if (answerText.toIntOrNull() == p.answer) {
-            onDismiss()
-        } else {
-            wrongCount++
-            answerText = ""
-            problem = MathChallenge.generate(challenge)
+        when {
+            p == null -> onDismiss()
+            answerText.toIntOrNull() == p.answer -> onDismiss()
+            else -> {
+                wrongCount++
+                answerText = ""
+                problem = MathChallenge.generate(challenge)
+            }
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    val gradient = if (shabbatMode) {
+        Brush.verticalGradient(listOf(ShabbatTop, ShabbatBottom))
+    } else {
+        Brush.verticalGradient(listOf(NightTop, NightBottom))
+    }
+    val accent = if (shabbatMode) WarmGold else SoftWhite
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradient),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
+                .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Alarm,
-                contentDescription = null,
-                modifier = Modifier.size(88.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(20.dp))
-            Text(text = title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+            if (shabbatMode) {
+                Candles(modifier = Modifier.size(width = 150.dp, height = 130.dp))
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "שבת נכנסת!",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = WarmGold,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "עוד מעט שקיעה — זמן להדליק נרות",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SoftWhite.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Alarm,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    tint = accent,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = SoftWhite,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
             if (timeText.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(text = timeText, style = MaterialTheme.typography.displayLarge)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = timeText,
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = SoftWhite,
+                )
             }
 
             problem?.let { p ->
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(24.dp))
                 Text(
-                    text = "כדי לכבות — פתור:",
+                    "כדי לכבות — פתור:",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = SoftWhite.copy(alpha = 0.8f),
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(text = p.text, style = MaterialTheme.typography.headlineLarge)
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    p.text,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = SoftWhite,
+                )
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = answerText,
                     onValueChange = { v -> if (v.length <= 4 && v.all(Char::isDigit)) answerText = v },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     label = { Text("התשובה") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = SoftWhite,
+                        unfocusedTextColor = SoftWhite,
+                        focusedBorderColor = accent,
+                        unfocusedBorderColor = SoftWhite.copy(alpha = 0.5f),
+                        focusedLabelColor = accent,
+                        unfocusedLabelColor = SoftWhite.copy(alpha = 0.7f),
+                    ),
                 )
                 if (wrongCount > 0) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "לא נכון — נסה שוב",
-                        color = MaterialTheme.colorScheme.error,
+                        "לא נכון — נסה שוב",
+                        color = Color(0xFFFF8A80),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
 
-            Spacer(Modifier.height(40.dp))
-            Row(horizontalArrangement = Arrangement.Center) {
-                Button(onClick = ::tryDismiss) {
-                    Text("אישור", style = MaterialTheme.typography.titleLarge)
-                }
-                Spacer(Modifier.width(24.dp))
-                // Snooze is intentionally never gated by the challenge
-                OutlinedButton(onClick = onSnooze) {
-                    Text("נודניק ($snoozeMinutes ד')")
-                }
+            Spacer(Modifier.height(44.dp))
+            Button(
+                onClick = ::tryDismiss,
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accent,
+                    contentColor = if (shabbatMode) ShabbatTop else NightTop,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth(0.72f)
+                    .height(64.dp),
+            ) {
+                Text("אישור", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
+            Spacer(Modifier.height(14.dp))
+            OutlinedButton(
+                onClick = onSnooze,
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
+            ) {
+                Text("נודניק ($snoozeMinutes ד')")
+            }
+        }
+    }
+}
+
+/** Two Shabbat candles with warm flames — drawn, no assets. */
+@Composable
+private fun Candles(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val candleWidth = w * 0.13f
+        val candleTop = h * 0.42f
+        val candleBottom = h * 0.98f
+
+        listOf(w * 0.32f, w * 0.68f).forEach { cx ->
+            // body
+            drawRoundRect(
+                color = Color(0xFFFDF6E3),
+                topLeft = Offset(cx - candleWidth / 2, candleTop),
+                size = androidx.compose.ui.geometry.Size(candleWidth, candleBottom - candleTop),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(candleWidth * 0.3f),
+            )
+            // wick
+            drawLine(
+                color = Color(0xFF6B5B45),
+                start = Offset(cx, candleTop),
+                end = Offset(cx, candleTop - h * 0.05f),
+                strokeWidth = w * 0.012f,
+            )
+            // flame glow
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xCCFFC969), Color(0x00FFC969)),
+                    center = Offset(cx, candleTop - h * 0.14f),
+                    radius = h * 0.14f,
+                ),
+                radius = h * 0.14f,
+                center = Offset(cx, candleTop - h * 0.14f),
+            )
+            // flame core
+            drawOval(
+                color = Color(0xFFFFB300),
+                topLeft = Offset(cx - w * 0.035f, candleTop - h * 0.21f),
+                size = androidx.compose.ui.geometry.Size(w * 0.07f, h * 0.16f),
+            )
+            drawOval(
+                color = Color(0xFFFFF3C4),
+                topLeft = Offset(cx - w * 0.018f, candleTop - h * 0.15f),
+                size = androidx.compose.ui.geometry.Size(w * 0.036f, h * 0.09f),
+            )
         }
     }
 }

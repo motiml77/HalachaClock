@@ -52,6 +52,7 @@ private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 @Composable
 fun AlarmsScreen(
     onCreateAlarm: (AlarmType) -> Unit,
+    onCreateShabbatAlarm: () -> Unit,
     onEditAlarm: (Long) -> Unit,
     viewModel: AlarmsViewModel = hiltViewModel(),
 ) {
@@ -71,6 +72,10 @@ fun AlarmsScreen(
             onChoose = { type ->
                 showTypeChooser = false
                 onCreateAlarm(type)
+            },
+            onChooseShabbat = {
+                showTypeChooser = false
+                onCreateShabbatAlarm()
             },
             onDismiss = { showTypeChooser = false },
         )
@@ -143,11 +148,15 @@ private fun AlarmCard(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = if (alarm.type == AlarmType.ZMAN) Icons.Filled.WbTwilight else Icons.Filled.Alarm,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
+            if (alarm.shabbatMode) {
+                Text("🕯️", style = MaterialTheme.typography.headlineSmall)
+            } else {
+                Icon(
+                    imageVector = if (alarm.type == AlarmType.ZMAN) Icons.Filled.WbTwilight else Icons.Filled.Alarm,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -218,6 +227,7 @@ private fun daysText(alarm: AlarmEntity): String {
 @Composable
 private fun AlarmTypeChooserSheet(
     onChoose: (AlarmType) -> Unit,
+    onChooseShabbat: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -242,13 +252,20 @@ private fun AlarmTypeChooserSheet(
                 subtitle = "למשל 30 דק' לפני הנץ — מתעדכן כל יום לפי המיקום",
                 onClick = { onChoose(AlarmType.ZMAN) },
             )
+            TypeCard(
+                emoji = "🕯️",
+                title = "התראת כניסת שבת",
+                subtitle = "כל שישי, 4 דק' לפני השקיעה — מסך נרות וצליל מיוחד",
+                onClick = onChooseShabbat,
+            )
         }
     }
 }
 
 @Composable
 private fun TypeCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    emoji: String? = null,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
@@ -260,7 +277,12 @@ private fun TypeCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            when {
+                icon != null ->
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                emoji != null ->
+                    Text(emoji, style = MaterialTheme.typography.headlineSmall)
+            }
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(

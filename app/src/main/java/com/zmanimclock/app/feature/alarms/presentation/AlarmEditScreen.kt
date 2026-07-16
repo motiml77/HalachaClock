@@ -72,10 +72,11 @@ fun AlarmEditScreen(
     type: AlarmType,
     alarmId: Long?,
     preselectedZman: String?,
+    shabbatPreset: Boolean = false,
     onBack: () -> Unit,
     viewModel: AlarmEditViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(Unit) { viewModel.initialize(type, alarmId, preselectedZman) }
+    LaunchedEffect(Unit) { viewModel.initialize(type, alarmId, preselectedZman, shabbatPreset) }
     val alarm by viewModel.alarm.collectAsStateWithLifecycle()
     val zmanPreview by viewModel.zmanPreview.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -92,7 +93,15 @@ fun AlarmEditScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text(if (alarm.type == AlarmType.ZMAN) "שעון לפי זמן הלכתי" else "שעון מעורר") },
+            title = {
+                Text(
+                    when {
+                        alarm.shabbatMode -> "התראת כניסת שבת"
+                        alarm.type == AlarmType.ZMAN -> "שעון לפי זמן הלכתי"
+                        else -> "שעון מעורר"
+                    }
+                )
+            },
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
@@ -107,6 +116,20 @@ fun AlarmEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (alarm.shabbatMode) {
+                Card {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text("🕯️ התראת כניסת שבת", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "תופיע בכל יום שישי, ${alarm.offsetMinutes} דק' לפני שקיעת " +
+                                "המקום שלך, עם מסך נרות מיוחד. בחר לה צליל ועוצמה משלה.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                }
+            }
+
             // === Anchor ===
             when (alarm.type) {
                 AlarmType.FIXED -> FixedAnchorSection(alarm, viewModel::update)
@@ -118,47 +141,71 @@ fun AlarmEditScreen(
             DaysSelector(alarm, viewModel::update)
 
             // === Sound & volume ===
-            SectionTitle("צליל ועוצמה")
+            SectionTitle("צליל ורטט")
             Card {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "בחר צליל")
-                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                                    putExtra(
-                                        RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                        alarm.soundUri?.let(Uri::parse),
-                                    )
-                                }
-                                ringtoneLauncher.launch(intent)
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                            Text("צליל", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = alarm.soundUri?.let { soundTitle(context, it) } ?: "ברירת מחדל",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.secondary,
-                            )
-                        }
+                    // Ring mode: sound+vibrate / sound only / vibrate only
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = alarm.soundEnabled && alarm.vibrate,
+                            onClick = { viewModel.update { it.copy(soundEnabled = true, vibrate = true) } },
+                            label = { Text("צלצול ורטט") },
+                        )
+                        FilterChip(
+                            selected = alarm.soundEnabled && !alarm.vibrate,
+                            onClick = { viewModel.update { it.copy(soundEnabled = true, vibrate = false) } },
+                            label = { Text("צלצול בלבד") },
+                        )
+                        FilterChip(
+                            selected = !alarm.soundEnabled,
+                            onClick = { viewModel.update { it.copy(soundEnabled = false, vibrate = true) } },
+                            label = { Text("רטט בלבד") },
+                        )
                     }
 
-                    Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
-                    Slider(
-                        value = alarm.volumePercent.toFloat(),
-                        onValueChange = { v ->
-                            viewModel.update { it.copy(volumePercent = v.toInt().coerceIn(10, 100)) }
-                        },
-                        valueRange = 10f..100f,
-                    )
+                    if (alarm.soundEnabled) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "בחר צליל")
+                                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                        putExtra(
+                                            RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                            alarm.soundUri?.let(Uri::parse),
+                                        )
+                                    }
+                                    ringtoneLauncher.launch(intent)
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                                Text(
+                                    if (alarm.shabbatMode) "צליל מיוחד לכניסת שבת" else "צליל",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = alarm.soundUri?.let { soundTitle(context, it) } ?: "ברירת מחדל",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
+                        }
 
-                    Text("משך צלצול", style = MaterialTheme.typography.bodyMedium)
+                        Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
+                        Slider(
+                            value = alarm.volumePercent.toFloat(),
+                            onValueChange = { v ->
+                                viewModel.update { it.copy(volumePercent = v.toInt().coerceIn(10, 100)) }
+                            },
+                            valueRange = 10f..100f,
+                        )
+                    }
+
+                    Text("משך התראה", style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(1, 5, 10).forEach { minutes ->
                             FilterChip(
@@ -168,8 +215,6 @@ fun AlarmEditScreen(
                             )
                         }
                     }
-
-                    SwitchRow("רטט", alarm.vibrate) { v -> viewModel.update { it.copy(vibrate = v) } }
                 }
             }
 

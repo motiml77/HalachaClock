@@ -110,6 +110,7 @@ class NotificationHelper @Inject constructor(
         timeText: String,
         snoozeMinutes: Int,
         challenge: String = "NONE",
+        shabbatMode: Boolean = false,
     ): android.app.Notification {
         val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -118,6 +119,7 @@ class NotificationHelper @Inject constructor(
             putExtra(AlarmSoundService.EXTRA_TIME_TEXT, timeText)
             putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
             putExtra(AlarmSoundService.EXTRA_CHALLENGE, challenge)
+            putExtra(AlarmSoundService.EXTRA_SHABBAT, shabbatMode)
         }
         val fullScreenPi = PendingIntent.getActivity(
             context,
@@ -131,8 +133,14 @@ class NotificationHelper @Inject constructor(
 
         return NotificationCompat.Builder(context, CHANNEL_ALARM)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(if (timeText.isNotEmpty()) "בשעה $timeText" else "עכשיו")
+            .setContentTitle(if (shabbatMode) "🕯️ $title" else title)
+            .setContentText(
+                when {
+                    shabbatMode -> "השקיעה בעוד דקות ספורות — שבת שלום!"
+                    timeText.isNotEmpty() -> "בשעה $timeText"
+                    else -> "עכשיו"
+                }
+            )
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

@@ -116,6 +116,7 @@ class AlarmSoundService : Service() {
             timeText = timeTextOf(alarm),
             snoozeMinutes = alarm.snoozeMinutes,
             challenge = alarm.dismissChallenge.name,
+            shabbatMode = alarm.shabbatMode,
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -127,7 +128,7 @@ class AlarmSoundService : Service() {
             startForeground(NotificationHelper.ALARM_NOTIFICATION_ID, notification)
         }
 
-        startSound(alarm)
+        if (alarm.soundEnabled) startSound(alarm)
         if (alarm.vibrate) startVibration()
         handler.postDelayed(autoSilence, alarm.ringDurationMinutes.coerceIn(1, 30) * 60_000L)
         Log.i(TAG, "Ringing alarm ${alarm.id} ('${titleOf(alarm)}')")
@@ -222,6 +223,7 @@ class AlarmSoundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun titleOf(alarm: AlarmEntity): String {
+        if (alarm.shabbatMode) return "שבת נכנסת!"
         if (alarm.label.isNotBlank()) return alarm.label
         return when (alarm.type) {
             AlarmType.FIXED -> "שעון מעורר"
@@ -256,6 +258,7 @@ class AlarmSoundService : Service() {
         const val EXTRA_TIME_TEXT = "time_text"
         const val EXTRA_SNOOZE_MINUTES = "snooze_minutes"
         const val EXTRA_CHALLENGE = "challenge"
+        const val EXTRA_SHABBAT = "shabbat_mode"
 
         private const val VOLUME_STEP = 0.09f
         private const val VOLUME_STEP_INTERVAL_MS = 6_000L // target in ~1 minute

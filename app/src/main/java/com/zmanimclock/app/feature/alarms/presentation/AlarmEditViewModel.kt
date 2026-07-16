@@ -40,7 +40,12 @@ class AlarmEditViewModel @Inject constructor(
 
     private var loadedId: Long? = null
 
-    fun initialize(type: AlarmType, alarmId: Long?, preselectedZman: String?) {
+    fun initialize(
+        type: AlarmType,
+        alarmId: Long?,
+        preselectedZman: String?,
+        shabbatPreset: Boolean = false,
+    ) {
         if (loadedId != null || _initialized) return
         _initialized = true
         if (alarmId != null && alarmId >= 0) {
@@ -51,6 +56,20 @@ class AlarmEditViewModel @Inject constructor(
                     refreshPreview()
                 }
             }
+        } else if (shabbatPreset) {
+            // Shabbat entry: every Friday, 4 minutes before the location's
+            // shkia, with its own special sound and the candles screen
+            _alarm.value = AlarmEntity(
+                type = AlarmType.ZMAN,
+                zmanId = "SHKIA",
+                offsetMinutes = 4,
+                offsetBefore = true,
+                daysOfWeek = AlarmEntity.FRIDAY_ONLY,
+                shabbatMode = true,
+                label = "כניסת שבת",
+                ringDurationMinutes = 1,
+            )
+            refreshPreview()
         } else {
             _alarm.value = AlarmEntity(
                 type = type,

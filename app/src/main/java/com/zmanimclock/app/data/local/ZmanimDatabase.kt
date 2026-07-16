@@ -13,7 +13,7 @@ import com.zmanimclock.app.feature.chaitables.data.local.ChaiTablesEntity
  */
 @Database(
     entities = [ChaiTablesEntity::class, AlarmEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class ZmanimDatabase : RoomDatabase() {

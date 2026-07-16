@@ -50,10 +50,17 @@ data class AlarmEntity(
     val skipYomTov: Boolean = false,
 
     // Ring
+    val soundEnabled: Boolean = true,  // false = vibrate-only alert
     val soundUri: String? = null,      // null = system default alarm sound
     val volumePercent: Int = 100,      // 10..100, ramp climbs to this target
     val ringDurationMinutes: Int = 5,  // auto-silence (self-snooze) after this
     val vibrate: Boolean = true,
+
+    /**
+     * Shabbat-entry mode: the special Friday alert (default: 4 minutes
+     * before the location's shkia) — candles screen, its own sound.
+     */
+    val shabbatMode: Boolean = false,
 
     // Dismissal
     val dismissChallenge: DismissChallenge = DismissChallenge.NONE,
@@ -71,6 +78,9 @@ data class AlarmEntity(
 
         /** א'-ה'. */
         const val SUNDAY_TO_THURSDAY = 0b0011111
+
+        /** יום שישי בלבד — התראת כניסת שבת. */
+        const val FRIDAY_ONLY = 0b0100000
 
         /** Sunday-first bit for a java.time.DayOfWeek (SUNDAY=bit0 … SATURDAY=bit6). */
         fun bitFor(dayOfWeek: java.time.DayOfWeek): Int =
