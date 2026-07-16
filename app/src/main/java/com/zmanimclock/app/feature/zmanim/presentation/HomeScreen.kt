@@ -31,41 +31,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.zmanimclock.app.feature.alerts.presentation.AddAlertSheet
-import com.zmanimclock.app.feature.alerts.presentation.AlertsViewModel
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 
 /**
- * The daily zmanim list. Each row carries a bell: tap to arm a daily
- * full-screen alert for that zman, X minutes before it (user-chosen in the
- * sheet). A filled bell marks zmanim that already have an active alert.
+ * The daily zmanim list. Each row carries a bell: tap to create a daily
+ * zman-anchored alarm for that zman (opens the alarm editor pre-selected).
+ * A filled bell marks zmanim that already have an active alarm.
  * [ZmanimContent] is stateless — the Claude Design seam.
  */
 @Composable
 fun HomeScreen(
+    onCreateZmanAlarm: (String) -> Unit,
     viewModel: ZmanimViewModel = hiltViewModel(),
-    alertsViewModel: AlertsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val alertedKinds by viewModel.alertedKinds.collectAsStateWithLifecycle()
-    var sheetKind by remember { mutableStateOf<ZmanKind?>(null) }
 
     ZmanimContent(
         state = state,
         alertedKinds = alertedKinds,
-        onBellClick = { kind -> sheetKind = kind },
+        onBellClick = { kind -> onCreateZmanAlarm(kind.name) },
     )
-
-    sheetKind?.let { kind ->
-        AddAlertSheet(
-            initialKind = kind,
-            onConfirm = { draft ->
-                alertsViewModel.addAlert(draft)
-                sheetKind = null
-            },
-            onDismiss = { sheetKind = null },
-        )
-    }
 }
 
 @Composable

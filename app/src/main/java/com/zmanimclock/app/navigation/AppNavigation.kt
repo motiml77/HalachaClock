@@ -10,11 +10,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.zmanimclock.app.feature.alerts.presentation.AlertsScreen
+import androidx.navigation.navArgument
+import com.zmanimclock.app.feature.alarms.data.AlarmType
+import com.zmanimclock.app.feature.alarms.presentation.AlarmEditScreen
+import com.zmanimclock.app.feature.alarms.presentation.AlarmsScreen
 import com.zmanimclock.app.feature.settings.presentation.CityPickerScreen
 import com.zmanimclock.app.feature.settings.presentation.SettingsScreen
 import com.zmanimclock.app.feature.zmanim.presentation.HomeScreen
@@ -52,13 +56,49 @@ fun AppNavigation() {
             startDestination = Screen.Zmanim.route,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Screen.Zmanim.route) { HomeScreen() }
-            composable(Screen.Alerts.route) { AlertsScreen() }
+            composable(Screen.Zmanim.route) {
+                HomeScreen(
+                    onCreateZmanAlarm = { zman ->
+                        navController.navigate("alarm_edit?type=ZMAN&zman=$zman")
+                    },
+                )
+            }
+            composable(Screen.Alarms.route) {
+                AlarmsScreen(
+                    onCreateAlarm = { type ->
+                        navController.navigate("alarm_edit?type=${type.name}")
+                    },
+                    onEditAlarm = { id ->
+                        navController.navigate("alarm_edit?alarmId=$id")
+                    },
+                )
+            }
             composable(Screen.Settings.route) {
                 SettingsScreen(onOpenCityPicker = { navController.navigate("city_picker") })
             }
             composable("city_picker") {
                 CityPickerScreen(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = "alarm_edit?type={type}&alarmId={alarmId}&zman={zman}",
+                arguments = listOf(
+                    navArgument("type") { type = NavType.StringType; defaultValue = "FIXED" },
+                    navArgument("alarmId") { type = NavType.LongType; defaultValue = -1L },
+                    navArgument("zman") { type = NavType.StringType; defaultValue = "" },
+                ),
+            ) { entry ->
+                val args = entry.arguments
+                val type = runCatching {
+                    AlarmType.valueOf(args?.getString("type") ?: "FIXED")
+                }.getOrDefault(AlarmType.FIXED)
+                val alarmId = args?.getLong("alarmId")?.takeIf { it >= 0 }
+                val zman = args?.getString("zman")?.takeIf { it.isNotBlank() }
+                AlarmEditScreen(
+                    type = type,
+                    alarmId = alarmId,
+                    preselectedZman = zman,
+                    onBack = { navController.popBackStack() },
+                )
             }
         }
     }

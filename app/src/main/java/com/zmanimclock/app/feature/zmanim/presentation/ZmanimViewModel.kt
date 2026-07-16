@@ -4,7 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter
 import com.kosherjava.zmanim.hebrewcalendar.JewishDate
-import com.zmanimclock.app.feature.alerts.data.local.AlertDao
+import com.zmanimclock.app.feature.alarms.data.AlarmDao
+import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
@@ -33,13 +34,15 @@ import javax.inject.Inject
 class ZmanimViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val zmanimRepository: ZmanimRepository,
-    alertDao: AlertDao,
+    alarmDao: AlarmDao,
 ) : ViewModel() {
 
-    /** Zman kinds that currently have at least one ACTIVE alert (for the bell markers). */
+    /** Zman kinds that currently have at least one ACTIVE alarm (for the bell markers). */
     val alertedKinds: StateFlow<Set<String>> =
-        alertDao.getActiveAlerts()
-            .map { alerts -> alerts.map { it.zmanId }.toSet() }
+        alarmDao.getActiveAlarms()
+            .map { alarms ->
+                alarms.filter { it.type == AlarmType.ZMAN }.map { it.zmanId }.toSet()
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     data class ZmanRow(

@@ -15,28 +15,39 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
+import com.zmanimclock.app.feature.alarm.MathChallenge
+import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.scheduling.AlarmSoundService
 import com.zmanimclock.app.ui.theme.ZmanimTheme
 
 /**
- * Full-screen ringing UI, shown over the lock screen (launched by the
- * full-screen-intent notification of [AlarmSoundService]).
+ * Full-screen ringing UI over the lock screen.
  *
- * Stateless by design: it only renders the extras it was given and sends
- * dismiss/snooze commands back to the service.
+ * The אישור (acknowledge) button is the primary action. When the alarm has a
+ * math dismiss-challenge, אישור unlocks only after a correct answer (a wrong
+ * one generates a fresh problem). Snooze is NEVER gated — a groggy user must
+ * always have a safe way out.
  */
 class AlarmActivity : ComponentActivity() {
 
@@ -44,10 +55,13 @@ class AlarmActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         turnScreenOnOverLockscreen()
 
-        val title = intent.getStringExtra(AlarmSoundService.EXTRA_TITLE) ?: "זמן הלכתי"
+        val title = intent.getStringExtra(AlarmSoundService.EXTRA_TITLE) ?: "שעון מעורר"
         val timeText = intent.getStringExtra(AlarmSoundService.EXTRA_TIME_TEXT) ?: ""
-        val alertId = intent.getLongExtra(AlarmSoundService.EXTRA_ALERT_ID, -1)
+        val alarmId = intent.getLongExtra(AlarmSoundService.EXTRA_ALARM_ID, -1)
         val snoozeMinutes = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 5)
+        val challenge = intent.getStringExtra(AlarmSoundService.EXTRA_CHALLENGE)
+            ?.let { runCatching { DismissChallenge.valueOf(it) }.getOrNull() }
+            ?: DismissChallenge.NONE
 
         setContent {
             ZmanimTheme {
@@ -55,18 +69,18 @@ class AlarmActivity : ComponentActivity() {
                     title = title,
                     timeText = timeText,
                     snoozeMinutes = snoozeMinutes,
-                    onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, alertId); finish() },
-                    onSnooze = { sendCommand(AlarmSoundService.ACTION_SNOOZE, alertId, snoozeMinutes); finish() },
+                    challenge = challenge,
+                    onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, alarmId); finish() },
+                    onSnooze = { sendCommand(AlarmSoundService.ACTION_SNOOZE, alarmId); finish() },
                 )
             }
         }
     }
 
-    private fun sendCommand(action: String, alertId: Long, snoozeMinutes: Int? = null) {
+    private fun sendCommand(action: String, alarmId: Long) {
         startService(Intent(this, AlarmSoundService::class.java).apply {
             this.action = action
-            putExtra(AlarmSoundService.EXTRA_ALERT_ID, alertId)
-            snoozeMinutes?.let { putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, it) }
+            putExtra(AlarmSoundService.EXTRA_ALARM_ID, alarmId)
         })
     }
 
@@ -90,9 +104,27 @@ private fun AlarmScreen(
     title: String,
     timeText: String,
     snoozeMinutes: Int,
+    challenge: DismissChallenge,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
 ) {
+    var problem by remember { mutableStateOf(MathChallenge.generate(challenge)) }
+    var answerText by remember { mutableStateOf("") }
+    var wrongCount by remember { mutableStateOf(0) }
+
+    fun tryDismiss() {
+        val p = problem
+        if (p == null) {
+            onDismiss()
+        } else if (answerText.toIntOrNull() == p.answer) {
+            onDismiss()
+        } else {
+            wrongCount++
+            answerText = ""
+            problem = MathChallenge.generate(challenge)
+        }
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -104,22 +136,50 @@ private fun AlarmScreen(
             Icon(
                 imageVector = Icons.Filled.Alarm,
                 contentDescription = null,
-                modifier = Modifier.size(96.dp),
+                modifier = Modifier.size(88.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.height(24.dp))
-            Text(text = title, style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(20.dp))
+            Text(text = title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
             if (timeText.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text(text = timeText, style = MaterialTheme.typography.displayLarge)
             }
-            Spacer(Modifier.height(48.dp))
+
+            problem?.let { p ->
+                Spacer(Modifier.height(28.dp))
+                Text(
+                    text = "כדי לכבות — פתור:",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(text = p.text, style = MaterialTheme.typography.headlineLarge)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = answerText,
+                    onValueChange = { v -> if (v.length <= 4 && v.all(Char::isDigit)) answerText = v },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    label = { Text("התשובה") },
+                )
+                if (wrongCount > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "לא נכון — נסה שוב",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(40.dp))
             Row(horizontalArrangement = Arrangement.Center) {
-                // Primary acknowledge — the user confirms they saw the alert
-                Button(onClick = onDismiss) {
+                Button(onClick = ::tryDismiss) {
                     Text("אישור", style = MaterialTheme.typography.titleLarge)
                 }
                 Spacer(Modifier.width(24.dp))
+                // Snooze is intentionally never gated by the challenge
                 OutlinedButton(onClick = onSnooze) {
                     Text("נודניק ($snoozeMinutes ד')")
                 }

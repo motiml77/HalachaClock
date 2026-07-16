@@ -77,13 +77,15 @@ class NotificationHelper @Inject constructor(
         title: String,
         timeText: String,
         snoozeMinutes: Int,
+        challenge: String = "NONE",
     ): android.app.Notification {
         val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(AlarmSoundService.EXTRA_ALERT_ID, alertId)
+            putExtra(AlarmSoundService.EXTRA_ALARM_ID, alertId)
             putExtra(AlarmSoundService.EXTRA_TITLE, title)
             putExtra(AlarmSoundService.EXTRA_TIME_TEXT, timeText)
             putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
+            putExtra(AlarmSoundService.EXTRA_CHALLENGE, challenge)
         }
         val fullScreenPi = PendingIntent.getActivity(
             context,
@@ -134,7 +136,7 @@ class NotificationHelper @Inject constructor(
     ): PendingIntent {
         val intent = Intent(context, AlarmSoundService::class.java).apply {
             this.action = action
-            putExtra(AlarmSoundService.EXTRA_ALERT_ID, alertId)
+            putExtra(AlarmSoundService.EXTRA_ALARM_ID, alertId)
             snoozeMinutes?.let { putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, it) }
         }
         return PendingIntent.getService(
