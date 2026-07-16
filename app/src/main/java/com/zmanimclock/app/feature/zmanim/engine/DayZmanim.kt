@@ -20,8 +20,8 @@ import java.time.LocalDate
  *  - Plag hamincha (Yalkut Yosef) = tzeit (13.5) − 1 hour 15 zmaniyot minutes.
  *  - Tzeit weekday = sunset + 13.5 zmaniyot minutes.
  *  - Tzeit Shabbat = sunset + 40 fixed minutes.
- *  - Rabbeinu Tam = sunset + 72 fixed minutes (per the approved
- *    Zemaneh Yosef implementation, "Rabbenu Tam (Fixed)").
+ *  - Rabbeinu Tam = the earlier of sunset + 72 zmaniyot / + 72 fixed
+ *    minutes ("le-kulah", per the approved Zemaneh Yosef implementation).
  */
 data class DayZmanim(
     val date: LocalDate,

@@ -88,7 +88,13 @@ class MaranZmanimEngine @Inject constructor() {
         // === Night ===
         val tzeit = sunset.plusMillis(zmaniyotMinutes(TZEIT_ZMANIYOT_MINUTES))
         val tzeitShabbat = sunset.plusMillis(Duration.ofMinutes(TZEIT_SHABBAT_FIXED_MINUTES).toMillis())
-        val tzeitRabbeinuTam = sunset.plusMillis(Duration.ofMinutes(RABBEINU_TAM_FIXED_MINUTES).toMillis())
+        // Rabbeinu Tam le-kulah (approved Zemaneh Yosef default, rtKulah=true):
+        // the EARLIER of 72 zmaniyot and 72 fixed minutes after shkia.
+        // Summer (shaah > 60): fixed wins; winter: zmaniyot wins.
+        val tzeitRabbeinuTam = minOf(
+            sunset.plusMillis(zmaniyotMinutes(RABBEINU_TAM_ZMANIYOT_MINUTES)),
+            sunset.plusMillis(Duration.ofMinutes(RABBEINU_TAM_FIXED_MINUTES).toMillis()),
+        )
 
         // Plag hamincha (Yalkut Yosef): one hour and 15 zmaniyot minutes before tzeit
         val plag = tzeit.minusMillis((shaahGra * PLAG_YY_SHAOS_BEFORE_TZEIT).toLong())
@@ -205,12 +211,14 @@ class MaranZmanimEngine @Inject constructor() {
         const val TZEIT_SHABBAT_FIXED_MINUTES = 40L
 
         /**
-         * רבנו תם — 72 FIXED minutes after shkia.
-         * The rebuild plan said "72 zmaniyot", but the approved Zemaneh Yosef
-         * implementation (royzmanim.com, Chazon Yosef mode) shows
-         * "Rabbenu Tam (Fixed)" = sunset + 72 fixed minutes in all verified
-         * cities (2026-07-16) — per the plan's protocol the luach wins.
+         * רבנו תם — the EARLIER of 72 zmaniyot / 72 fixed minutes after shkia
+         * ("RT le-kulah"). Verified against the Zemaneh Yosef source
+         * (ROYZmanim.js getTzetRT, config default rtKulah=true) and against
+         * royzmanim.com output ("Rabbenu Tam (Fixed)" on 2026-07-16, when the
+         * fixed 72 was the earlier one). The old app code (ccdad36) used the
+         * same min() rule.
          */
+        const val RABBEINU_TAM_ZMANIYOT_MINUTES = 72.0
         const val RABBEINU_TAM_FIXED_MINUTES = 72L
 
         /** פלג המנחה (ילקוט יוסף) — hour + 15 zmaniyot minutes before tzeit. */

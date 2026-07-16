@@ -101,12 +101,23 @@ class MaranZmanimEngineTest {
     }
 
     @Test
-    fun `rabbeinu tam is 72 fixed minutes after shkia`() {
+    fun `rabbeinu tam in summer is the fixed 72 (earlier than zmaniyot)`() {
+        // July: shaah > 60 min, so 72 fixed < 72 zmaniyot — the kulah picks fixed
         val day = engine.calculate(jerusalem, testDate)
         assertEquals(
             Duration.ofMinutes(72),
             Duration.between(day.shkia, day.tzeitRabbeinuTam),
         )
+    }
+
+    @Test
+    fun `rabbeinu tam in winter is 72 zmaniyot (earlier than fixed)`() {
+        // January: shaah < 60 min, so 72 zmaniyot < 72 fixed — the kulah picks zmaniyot
+        val day = engine.calculate(jerusalem, LocalDate.of(2026, 1, 15))
+        val gap = Duration.between(day.shkia, day.tzeitRabbeinuTam)
+        assertTrue("winter RT gap was ${gap.toMinutes()} min", gap < Duration.ofMinutes(72))
+        val expected = day.shkia!!.plusMillis(day.shaahZmanisGra!! * 72 / 60)
+        assertCloseMillis(expected, day.tzeitRabbeinuTam!!)
     }
 
     @Test
