@@ -64,6 +64,28 @@ class LuachVerificationTest {
         rabbeinuTam = "20:59", chatzotLayla = "00:44",
     )
 
+    // === אילת (29.558, 34.952) — דרום קיצוני ===
+    @Test
+    fun eilat() = verifyCity(
+        city("Eilat", 29.558, 34.952),
+        alot = "04:27", misheyakir = "04:42", sunrise = "05:51",
+        shmaMga = "08:37", shmaGra = "09:18", tfilaGra = "10:28",
+        chatzot = "12:46", minchaGedola = "13:21", minchaKetana = "16:49",
+        plagYY = "18:31", shkia = "19:41", tzeit = "19:57",
+        rabbeinuTam = "20:53", chatzotLayla = "00:46",
+    )
+
+    // === תל אביב (32.0853, 34.7818) — מישור החוף ===
+    @Test
+    fun telAviv() = verifyCity(
+        city("Tel Aviv", 32.0853, 34.7818),
+        alot = "04:21", misheyakir = "04:36", sunrise = "05:46",
+        shmaMga = "08:34", shmaGra = "09:16", tfilaGra = "10:26",
+        chatzot = "12:47", minchaGedola = "13:22", minchaKetana = "16:53",
+        plagYY = "18:36", shkia = "19:48", tzeit = "20:04",
+        rabbeinuTam = "21:00", chatzotLayla = "00:47",
+    )
+
     // === טבריה (32.789, 35.531) ===
     @Test
     fun tiberias() = verifyCity(

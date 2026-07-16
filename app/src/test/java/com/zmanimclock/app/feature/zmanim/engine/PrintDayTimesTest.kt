@@ -52,5 +52,10 @@ class PrintDayTimesTest {
 
         dump("ירושלים 2026-07-16 — מישור", engine.calculate(jerusalem, date))
         dump("ירושלים 2026-07-16 — הנץ הנראה", engine.calculate(jerusalem, date, visibleSunrise = visible))
+
+        val eilat = EngineLocation("Eilat", 29.558, 34.952, 0.0, "Asia/Jerusalem")
+        val telAviv = EngineLocation("Tel Aviv", 32.0853, 34.7818, 0.0, "Asia/Jerusalem")
+        dump("אילת 2026-07-16 — מישור", engine.calculate(eilat, date))
+        dump("תל אביב 2026-07-16 — מישור", engine.calculate(telAviv, date))
     }
 }
