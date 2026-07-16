@@ -79,9 +79,18 @@ class MetroAreaMapper @Inject constructor() {
         "sao_paulo" to WorldwideMetro("Brazil", 1),       // São Paulo
     )
 
-    fun isIsraeliCity(cityId: String): Boolean = cityId in israeliMetroMap
+    /**
+     * Israeli city ids come in two forms:
+     *  - legacy English ids mapped via [israeliMetroMap]
+     *  - Hebrew ids taken verbatim from the ChaiTables Eretz-Yisroel list
+     *    (419 localities; the id IS a valid cgi_MetroArea value on the
+     *    Hebrew flow of the site — verified 2026-07-16)
+     */
+    fun isIsraeliCity(cityId: String): Boolean =
+        cityId in israeliMetroMap || cityId.any { it in 'א'..'ת' }
 
-    fun getMetroArea(cityId: String): String? = israeliMetroMap[cityId]
+    fun getMetroArea(cityId: String): String? =
+        israeliMetroMap[cityId] ?: cityId.takeIf { id -> id.any { it in 'א'..'ת' } }
 
     /**
      * Detect if coordinates are in Israel (rough bounding box).

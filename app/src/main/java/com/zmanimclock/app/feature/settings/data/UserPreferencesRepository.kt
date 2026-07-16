@@ -20,7 +20,7 @@ import javax.inject.Singleton
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
 
 data class UserPreferences(
-    val cityId: String = "jerusalem",
+    val cityId: String = "ירושלים",
     val cityNameHebrew: String = "ירושלים",
     val cityNameEnglish: String = "Jerusalem",
     val latitude: Double = 31.778,
@@ -63,7 +63,7 @@ class UserPreferencesRepository @Inject constructor(
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
-            cityId = prefs[Keys.CITY_ID] ?: "jerusalem",
+            cityId = prefs[Keys.CITY_ID] ?: "ירושלים",
             cityNameHebrew = prefs[Keys.CITY_NAME_HE] ?: "ירושלים",
             cityNameEnglish = prefs[Keys.CITY_NAME_EN] ?: "Jerusalem",
             latitude = prefs[Keys.LATITUDE] ?: 31.778,

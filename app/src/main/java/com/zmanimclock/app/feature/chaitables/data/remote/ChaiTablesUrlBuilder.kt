@@ -41,7 +41,12 @@ class ChaiTablesUrlBuilder @Inject constructor() {
         sb.appendParam("cgi_yrheb", params.hebrewYear.toString())
         sb.appendParam("cgi_optionheb", "1")
         sb.appendParam("cgi_UserNumber", USER_NUMBER)
-        sb.appendParam("cgi_Language", "English")
+        // Hebrew metro names (the full 419-locality Eretz-Yisroel list) are
+        // only recognized on the Hebrew flow; English names need English.
+        // Verified empirically 2026-07-16: Hebrew metro + Language=English
+        // returns an empty table.
+        val hebrewMetro = params.metroAreaName?.any { it in 'א'..'ת' } == true
+        sb.appendParam("cgi_Language", if (hebrewMetro) "Hebrew" else "English")
         sb.appendParam("cgi_AllowShaving", "OFF")
 
         if (params.isIsrael) {
