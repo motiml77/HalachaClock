@@ -1,17 +1,30 @@
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# Gradle
+.gradle/
+build/
+/app/build/
+/app/release/
+
+# Local configuration (machine-specific)
 local.properties
-/app/build
-/app/release
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+/captures
+
+# Kotlin
+.kotlin/
+
+# Native
+.externalNativeBuild
+.cxx/
+
+# Artifacts & signing
 *.apk
 *.aab
 *.jks
 *.keystore
+
+# Room exported schemas are kept out until stabilized
 /app/schemas
