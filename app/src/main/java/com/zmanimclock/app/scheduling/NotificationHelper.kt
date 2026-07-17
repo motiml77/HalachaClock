@@ -154,7 +154,7 @@ class NotificationHelper @Inject constructor(
         return NotificationCompat.Builder(context, CHANNEL_ALARM)
             .setSmallIcon(R.drawable.ic_stat_zman)
             .setColor(ACCENT)
-            .setContentTitle(if (shabbatMode) "🕯️ $title" else title)
+            .setContentTitle(title)
             .setContentText(
                 when {
                     shabbatMode -> "השקיעה בעוד דקות ספורות — שבת שלום!"

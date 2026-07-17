@@ -62,7 +62,7 @@ class WakeCheckReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setContentIntent(confirmPi)
-            .addAction(0, "אני ער ✓", confirmPi)
+            .addAction(0, "אני ער", confirmPi)
             .build()
         context.getSystemService<NotificationManager>()?.notify(wakeCheckNotifId(alarmId), notification)
     }

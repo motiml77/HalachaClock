@@ -60,7 +60,7 @@
             android:textColor="#D6E2FF"
             android:textSize="16sp"
             android:fontFeatureSettings="tnum"
-            tools:text="⏳ 1:06:32" />
+            tools:text="עוד 1:06:32" />
     </LinearLayout>
 
     <View

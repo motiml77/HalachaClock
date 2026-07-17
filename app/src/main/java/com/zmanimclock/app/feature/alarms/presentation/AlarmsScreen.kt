@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +51,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.ui.theme.AppIcons
 import com.zmanimclock.app.ui.theme.Ext
 import com.zmanimclock.app.ui.theme.ZmanListTimeStyle
 
@@ -215,16 +217,16 @@ private fun AlarmCard(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (alarm.shabbatMode) {
-                    Text("🕯️", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    Icon(
-                        imageVector = if (isZman) Icons.Filled.WbTwilight else Icons.Filled.Alarm,
-                        contentDescription = null,
-                        tint = if (isZman) cs.onTertiaryContainer else cs.primary,
-                        modifier = Modifier.size(19.dp),
-                    )
-                }
+                Icon(
+                    imageVector = when {
+                        alarm.shabbatMode -> AppIcons.Candle
+                        isZman -> Icons.Filled.WbTwilight
+                        else -> Icons.Filled.Alarm
+                    },
+                    contentDescription = null,
+                    tint = if (isZman) cs.onTertiaryContainer else cs.primary,
+                    modifier = Modifier.size(19.dp),
+                )
             }
 
             Column(
@@ -283,10 +285,10 @@ private fun AlarmCard(
 
             IconButton(onClick = { onDelete(alarm) }, modifier = Modifier.size(36.dp)) {
                 Icon(
-                    Icons.Filled.Delete,
+                    Icons.Outlined.DeleteOutline,
                     contentDescription = "מחק לצמיתות",
                     tint = cs.onSurfaceVariant.copy(alpha = contentAlpha),
-                    modifier = Modifier.size(19.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
             // The ✓: active = filled check; inactive = empty circle to tap
@@ -372,7 +374,9 @@ private fun AlarmTypeChooserSheet(
                 onClick = { onChoose(AlarmType.ZMAN) },
             )
             TypeCard(
-                emoji = "🕯️",
+                icon = AppIcons.Candle,
+                iconTint = MaterialTheme.colorScheme.tertiary,
+                iconBg = MaterialTheme.colorScheme.tertiaryContainer,
                 title = "התראת כניסת שבת",
                 subtitle = "כל שישי, 4 דק' לפני השקיעה — מסך נרות וצליל מיוחד",
                 onClick = onChooseShabbat,
@@ -386,7 +390,6 @@ private fun TypeCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     iconTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     iconBg: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primaryContainer,
-    emoji: String? = null,
     title: String,
     subtitle: String,
     highlighted: Boolean = false,
@@ -414,9 +417,8 @@ private fun TypeCard(
                     .background(iconBg, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                when {
-                    icon != null -> Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
-                    emoji != null -> Text(emoji, style = MaterialTheme.typography.headlineSmall)
+                icon?.let {
+                    Icon(it, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
                 }
             }
             Column(modifier = Modifier.padding(horizontal = 14.dp)) {

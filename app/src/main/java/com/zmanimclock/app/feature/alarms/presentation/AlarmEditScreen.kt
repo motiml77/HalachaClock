@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -119,7 +123,16 @@ fun AlarmEditScreen(
             if (alarm.shabbatMode) {
                 Card {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text("🕯️ התראת כניסת שבת", style = MaterialTheme.typography.titleMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                com.zmanimclock.app.ui.theme.AppIcons.Candle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("התראת כניסת שבת", style = MaterialTheme.typography.titleMedium)
+                        }
                         Text(
                             "תופיע בכל יום שישי, ${alarm.offsetMinutes} דק' לפני שקיעת " +
                                 "המקום שלך, עם מסך נרות מיוחד. בחר לה צליל ועוצמה משלה.",
@@ -195,7 +208,16 @@ fun AlarmEditScreen(
                             }
                         }
 
-                        Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
+                        }
                         Slider(
                             value = alarm.volumePercent.toFloat(),
                             onValueChange = { v ->
@@ -397,15 +419,26 @@ private fun ZmanAnchorSection(
 
     preview?.let {
         Card {
-            Text(
-                text = "⏰ $it",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(12.dp),
-            )
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Alarm,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }

@@ -12,10 +12,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AlarmOn
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Card
@@ -116,7 +122,7 @@ fun SettingsContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        Icons.Filled.NotificationsActive,
+                        Icons.Filled.AlarmOn,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
@@ -148,7 +154,7 @@ fun SettingsContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        Icons.Filled.NotificationsActive,
+                        Icons.Filled.Fullscreen,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )
@@ -264,7 +270,15 @@ fun SettingsContent(
                 OutlinedButton(
                     onClick = onRingTest,
                     modifier = Modifier.padding(top = 10.dp),
-                ) { Text("🔔 צלצל בעוד דקה") }
+                ) {
+                    Icon(
+                        Icons.Filled.AlarmOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("צלצל בעוד דקה")
+                }
 
                 if (com.zmanimclock.app.util.OemHelper.isAggressiveOem()) {
                     HorizontalDivider(
@@ -277,7 +291,15 @@ fun SettingsContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    TextButton(onClick = onOpenAutostart) { Text("פתח הגדרות יצרן") }
+                    TextButton(onClick = onOpenAutostart) {
+                        Text("פתח הגדרות יצרן")
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
@@ -285,7 +307,16 @@ fun SettingsContent(
         // About the calculation
         Card {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("שיטת החישוב", style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("שיטת החישוב", style = MaterialTheme.typography.titleMedium)
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "הזמנים מחושבים לפי שיטת מרן — לוח אור החיים / " +

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.CircularProgressIndicator
@@ -228,10 +229,11 @@ private fun ZmanRow(
         ) {
             IconButton(onClick = onBellClick) {
                 Icon(
-                    imageVector = if (hasAlert || row.isNext) {
-                        Icons.Filled.Notifications
-                    } else {
-                        Icons.Outlined.Notifications
+                    // Ringing bell when an alert is armed; outline invites a tap
+                    imageVector = when {
+                        hasAlert -> Icons.Filled.NotificationsActive
+                        row.isNext -> Icons.Filled.Notifications
+                        else -> Icons.Outlined.Notifications
                     },
                     contentDescription = if (hasAlert) "התראה פעילה" else "הוסף התראה",
                     tint = bellTint,

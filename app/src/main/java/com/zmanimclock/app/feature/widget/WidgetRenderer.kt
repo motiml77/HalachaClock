@@ -74,7 +74,7 @@ class WidgetRenderer @Inject constructor(
                 // Chronometer counts DOWN to the zman
                 val base = SystemClock.elapsedRealtime() +
                     (next.second.toEpochMilli() - System.currentTimeMillis())
-                views.setChronometer(R.id.widget_countdown, base, "⏳ %s", true)
+                views.setChronometer(R.id.widget_countdown, base, "עוד %s", true)
                 views.setChronometerCountDown(R.id.widget_countdown, true)
                 views.setViewVisibility(R.id.widget_countdown, View.VISIBLE)
             } else {

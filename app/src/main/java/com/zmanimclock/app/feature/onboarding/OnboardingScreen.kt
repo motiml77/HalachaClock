@@ -26,7 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.AlarmOn
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -110,7 +113,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
         )
 
         PermissionCard(
-            icon = Icons.Filled.Notifications,
+            icon = Icons.Filled.NotificationsActive,
             title = "התראות",
             description = "הצגת התראות הזמנים והשעון המעורר",
             granted = notificationsGranted,
@@ -122,7 +125,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
         )
 
         PermissionCard(
-            icon = Icons.Filled.Alarm,
+            icon = Icons.Filled.AlarmOn,
             title = "אזעקות מדויקות",
             description = "צלצול בשנייה הנכונה — לא באיחור",
             granted = exactAlarmsGranted,
@@ -156,7 +159,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
         // Android 14+: full-screen-intent can be revoked — only shown when needed
         if (Build.VERSION.SDK_INT >= 34 && !fullScreenGranted) {
             PermissionCard(
-                icon = Icons.Filled.Alarm,
+                icon = Icons.Filled.Fullscreen,
                 title = "מסך צלצול מלא",
                 description = "פתיחת מסך ההתראה מעל מסך הנעילה בזמן הצלצול",
                 granted = false,
