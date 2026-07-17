@@ -70,6 +70,7 @@ class AlarmActivity : ComponentActivity() {
         val alarmId = intent.getLongExtra(AlarmSoundService.EXTRA_ALARM_ID, -1)
         val snoozeMinutes = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 5)
         val shabbatMode = intent.getBooleanExtra(AlarmSoundService.EXTRA_SHABBAT, false)
+        val snoozesLeft = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, -1)
         val challenge = intent.getStringExtra(AlarmSoundService.EXTRA_CHALLENGE)
             ?.let { runCatching { DismissChallenge.valueOf(it) }.getOrNull() }
             ?: DismissChallenge.NONE
@@ -82,6 +83,7 @@ class AlarmActivity : ComponentActivity() {
                     title = title,
                     timeText = timeText,
                     snoozeMinutes = snoozeMinutes,
+                    snoozesLeft = snoozesLeft,
                     challenge = challenge,
                     shabbatMode = shabbatMode,
                     onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, alarmId); finish() },
@@ -127,6 +129,7 @@ private fun AlarmScreen(
     title: String,
     timeText: String,
     snoozeMinutes: Int,
+    snoozesLeft: Int,
     challenge: DismissChallenge,
     shabbatMode: Boolean,
     onDismiss: () -> Unit,
@@ -135,6 +138,14 @@ private fun AlarmScreen(
     var problem by remember { mutableStateOf(MathChallenge.generate(challenge)) }
     var answerText by remember { mutableStateOf("") }
     var wrongCount by remember { mutableStateOf(0) }
+
+    // Anti-snooze (B3): hide the snooze button when no snoozes remain — but as
+    // a safety valve reveal it after 60s so a distressed user is never trapped.
+    var safetyElapsed by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60_000); safetyElapsed = true
+    }
+    val showSnooze = snoozesLeft != 0 || safetyElapsed
 
     fun tryDismiss() {
         val p = problem
@@ -265,13 +276,20 @@ private fun AlarmScreen(
             ) {
                 Text("אישור", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.height(14.dp))
-            OutlinedButton(
-                onClick = onSnooze,
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
-            ) {
-                Text("נודניק ($snoozeMinutes ד')")
+            if (showSnooze) {
+                Spacer(Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = onSnooze,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
+                ) {
+                    Text(
+                        when {
+                            snoozesLeft > 0 -> "נודניק ($snoozeMinutes ד' · נשארו $snoozesLeft)"
+                            else -> "נודניק ($snoozeMinutes ד')"
+                        }
+                    )
+                }
             }
         }
     }

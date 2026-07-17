@@ -35,6 +35,12 @@ interface AlarmDao {
     @Query("UPDATE alarms SET isActive = :isActive WHERE id = :id")
     suspend fun setActive(id: Long, isActive: Boolean)
 
+    @Query("UPDATE alarms SET snoozeCount = :count WHERE id = :id")
+    suspend fun setSnoozeCount(id: Long, count: Int)
+
+    @Query("UPDATE alarms SET skipUntilEpochMs = :epochMs WHERE id = :id")
+    suspend fun setSkipUntil(id: Long, epochMs: Long)
+
     @Query("DELETE FROM alarms WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

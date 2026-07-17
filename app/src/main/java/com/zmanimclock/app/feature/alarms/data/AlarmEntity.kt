@@ -66,6 +66,20 @@ data class AlarmEntity(
     val dismissChallenge: DismissChallenge = DismissChallenge.NONE,
     val snoozeMinutes: Int = 5,
 
+    /** Anti-snooze: max snoozes allowed. -1 = unlimited, 0 = no snooze. */
+    val maxSnoozes: Int = -1,
+    /** Snoozes used for the current firing; reset on dismiss/reschedule. */
+    val snoozeCount: Int = 0,
+
+    /** Wake-up check: re-ring after this many minutes unless confirmed. 0 = off. */
+    val wakeCheckMinutes: Int = 0,
+
+    /**
+     * Skip-next: the alarm's next occurrence is suppressed up to this epoch-ms.
+     * Occurrences at or before it are skipped; 0 = not skipping.
+     */
+    val skipUntilEpochMs: Long = 0,
+
     val label: String = "",
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),

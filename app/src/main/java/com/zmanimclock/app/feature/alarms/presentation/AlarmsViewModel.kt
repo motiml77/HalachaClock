@@ -95,6 +95,17 @@ class AlarmsViewModel @Inject constructor(
         }
     }
 
+    /** B2: toggle skip-next for this alarm. */
+    fun toggleSkipNext(alarm: AlarmEntity) {
+        viewModelScope.launch {
+            if (alarm.skipUntilEpochMs > System.currentTimeMillis()) {
+                alarmScheduler.undoSkip(alarm.id)
+            } else {
+                alarmScheduler.skipNext(alarm.id)
+            }
+        }
+    }
+
     private fun requestReschedule() {
         WorkManager.getInstance(context)
             .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())

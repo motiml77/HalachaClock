@@ -141,6 +141,7 @@ class AlarmSoundService : Service() {
                 snoozeMinutes = alarm.snoozeMinutes,
                 challenge = alarm.dismissChallenge.name,
                 shabbatMode = alarm.shabbatMode,
+                snoozesLeft = snoozesLeft(alarm),
             )
         )
 
@@ -193,6 +194,10 @@ class AlarmSoundService : Service() {
         false
     }
 
+    /** -1 = unlimited; otherwise remaining snoozes for this firing. */
+    private fun snoozesLeft(alarm: AlarmEntity): Int =
+        if (alarm.maxSnoozes < 0) -1 else (alarm.maxSnoozes - alarm.snoozeCount).coerceAtLeast(0)
+
     private fun startVibration() {
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             getSystemService<VibratorManager>()?.defaultVibrator
@@ -208,18 +213,30 @@ class AlarmSoundService : Service() {
     }
 
     private fun dismiss() {
-        Log.i(TAG, "Alarm ${alarm?.id} acknowledged")
+        val a = alarm
+        Log.i(TAG, "Alarm ${a?.id} acknowledged")
         stopRinging()
+        if (a != null) {
+            scope.launch { alarmDao.setSnoozeCount(a.id, 0) }
+            // B1: schedule a wake-up check if enabled
+            if (a.wakeCheckMinutes > 0) {
+                WakeCheckReceiver.schedule(this, a.id, a.wakeCheckMinutes)
+            }
+        }
         stopSelf()
     }
 
     private fun snooze() {
-        val a = alarm
-        stopRinging()
-        if (a != null) {
-            alarmScheduler.scheduleSnooze(a.id, a.snoozeMinutes)
-            Log.i(TAG, "Alarm ${a.id} snoozed for ${a.snoozeMinutes} minutes")
+        val a = alarm ?: run { stopRinging(); stopSelf(); return }
+        // B3: enforce the snooze limit (maxSnoozes: -1 = unlimited, 0 = none)
+        if (a.maxSnoozes in 0..a.snoozeCount) {
+            Log.i(TAG, "Alarm ${a.id} snooze limit reached (${a.maxSnoozes}) — ignoring")
+            return // keep ringing; the user must acknowledge
         }
+        stopRinging()
+        scope.launch { alarmDao.setSnoozeCount(a.id, a.snoozeCount + 1) }
+        alarmScheduler.scheduleSnooze(a.id, a.snoozeMinutes)
+        Log.i(TAG, "Alarm ${a.id} snoozed for ${a.snoozeMinutes} min (#${a.snoozeCount + 1})")
         stopSelf()
     }
 
@@ -289,6 +306,7 @@ class AlarmSoundService : Service() {
         const val EXTRA_SNOOZE_MINUTES = "snooze_minutes"
         const val EXTRA_CHALLENGE = "challenge"
         const val EXTRA_SHABBAT = "shabbat_mode"
+        const val EXTRA_SNOOZES_LEFT = "snoozes_left"
 
         private const val VOLUME_STEP = 0.09f
         private const val VOLUME_STEP_INTERVAL_MS = 6_000L // target in ~1 minute

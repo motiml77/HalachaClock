@@ -255,6 +255,44 @@ fun AlarmEditScreen(
                             )
                         }
                     }
+
+                    // B3: snooze limit (anti-snooze)
+                    Text("מספר נודניקים מותר", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(-1 to "ללא הגבלה", 3 to "3", 1 to "1", 0 to "בלי נודניק").forEach { (n, label) ->
+                            FilterChip(
+                                selected = alarm.maxSnoozes == n,
+                                onClick = { viewModel.update { it.copy(maxSnoozes = n) } },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // === Wake-up check (B1) ===
+            SectionTitle("בדיקת ערות")
+            Card {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SwitchRow("בדוק שהתעוררתי אחרי אישור", alarm.wakeCheckMinutes > 0) { on ->
+                        viewModel.update { it.copy(wakeCheckMinutes = if (on) 5 else 0) }
+                    }
+                    if (alarm.wakeCheckMinutes > 0) {
+                        Text(
+                            "אחרי אישור השעון — נשאל שוב בעוד:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(3, 5, 10).forEach { minutes ->
+                                FilterChip(
+                                    selected = alarm.wakeCheckMinutes == minutes,
+                                    onClick = { viewModel.update { it.copy(wakeCheckMinutes = minutes) } },
+                                    label = { Text("$minutes דק'") },
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

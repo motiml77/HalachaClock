@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +69,7 @@ fun AlarmsScreen(
         items = alarms,
         onToggle = viewModel::toggleAlarm,
         onDelete = viewModel::deleteAlarm,
+        onSkipNext = viewModel::toggleSkipNext,
         onAddClick = { showTypeChooser = true },
         onEditAlarm = onEditAlarm,
     )
@@ -92,6 +94,7 @@ fun AlarmsContent(
     items: List<AlarmListItem>,
     onToggle: (AlarmEntity, Boolean) -> Unit,
     onDelete: (AlarmEntity) -> Unit,
+    onSkipNext: (AlarmEntity) -> Unit,
     onAddClick: () -> Unit,
     onEditAlarm: (Long) -> Unit,
 ) {
@@ -124,7 +127,7 @@ fun AlarmsContent(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 items(items, key = { it.alarm.id }) { item ->
-                    AlarmCard(item, onToggle, onDelete, onClick = { onEditAlarm(item.alarm.id) })
+                    AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
                 }
             }
         }
@@ -148,6 +151,7 @@ private fun AlarmCard(
     item: AlarmListItem,
     onToggle: (AlarmEntity, Boolean) -> Unit,
     onDelete: (AlarmEntity) -> Unit,
+    onSkipNext: (AlarmEntity) -> Unit,
     onClick: () -> Unit,
 ) {
     val alarm = item.alarm
@@ -222,6 +226,20 @@ private fun AlarmCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = cs.onSurfaceVariant,
                 )
+                // B2: skip-next toggle (only for active, repeating alarms)
+                if (alarm.isActive && !alarm.isOneTime) {
+                    val skipping = alarm.skipUntilEpochMs > System.currentTimeMillis()
+                    TextButton(
+                        onClick = { onSkipNext(alarm) },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    ) {
+                        Text(
+                            if (skipping) "מדלג על הפעם הבאה — בטל" else "דלג על הפעם הבאה",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (skipping) Ext.colors.accentGold else cs.primary,
+                        )
+                    }
+                }
             }
 
             IconButton(onClick = { onDelete(alarm) }) {

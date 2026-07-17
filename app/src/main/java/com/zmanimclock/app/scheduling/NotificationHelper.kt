@@ -124,6 +124,7 @@ class NotificationHelper @Inject constructor(
         snoozeMinutes: Int,
         challenge: String = "NONE",
         shabbatMode: Boolean = false,
+        snoozesLeft: Int = -1,
     ): android.app.Notification {
         val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -133,6 +134,7 @@ class NotificationHelper @Inject constructor(
             putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
             putExtra(AlarmSoundService.EXTRA_CHALLENGE, challenge)
             putExtra(AlarmSoundService.EXTRA_SHABBAT, shabbatMode)
+            putExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, snoozesLeft)
         }
         val fullScreenPi = PendingIntent.getActivity(
             context,
@@ -143,6 +145,11 @@ class NotificationHelper @Inject constructor(
 
         val dismissPi = servicePendingIntent(alertId, AlarmSoundService.ACTION_DISMISS, 1)
         val snoozePi = servicePendingIntent(alertId, AlarmSoundService.ACTION_SNOOZE, 2, snoozeMinutes)
+        val snoozeLabel = when {
+            snoozesLeft == 0 -> null // no snooze action shown
+            snoozesLeft > 0 -> "נודניק ($snoozeMinutes ד' · נשארו $snoozesLeft)"
+            else -> "נודניק ($snoozeMinutes ד')"
+        }
 
         return NotificationCompat.Builder(context, CHANNEL_ALARM)
             .setSmallIcon(R.drawable.ic_stat_zman)
@@ -163,7 +170,7 @@ class NotificationHelper @Inject constructor(
             .setFullScreenIntent(fullScreenPi, true)
             .setContentIntent(fullScreenPi)
             .addAction(0, "ביטול", dismissPi)
-            .addAction(0, "נודניק ($snoozeMinutes ד')", snoozePi)
+            .apply { snoozeLabel?.let { addAction(0, it, snoozePi) } }
             .build()
     }
 

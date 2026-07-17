@@ -84,6 +84,14 @@
             android:name=".scheduling.StatusNotificationReceiver"
             android:exported="false" />
 
+        <!-- Wake-up check (are you awake?) + its confirm action -->
+        <receiver
+            android:name=".scheduling.WakeCheckReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".scheduling.WakeCheckConfirmReceiver"
+            android:exported="false" />
+
         <!-- Foreground service that owns the ringing alarm -->
         <service
             android:name=".scheduling.AlarmSoundService"

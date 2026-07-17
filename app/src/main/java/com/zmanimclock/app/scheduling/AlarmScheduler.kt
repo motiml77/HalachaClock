@@ -60,8 +60,30 @@ class AlarmScheduler @Inject constructor(
         val alarms = alarmDao.getActiveAlarmsList()
         Log.i(TAG, "Rescheduling ${alarms.size} active alarms")
         alarms.forEach { alarm ->
+            // A fresh occurrence gets a fresh snooze budget (B3)
+            if (alarm.snoozeCount != 0) alarmDao.setSnoozeCount(alarm.id, 0)
             scheduleNextOccurrence(alarm, location, cityId)
         }
+    }
+
+    /** B2: skip the alarm's next occurrence (keeps later repeats). */
+    suspend fun skipNext(alarmId: Long) {
+        val alarm = alarmDao.getAlarmById(alarmId) ?: return
+        val prefs = prefsRepository.preferences.first()
+        val location = prefsRepository.prefsToGeoLocation(prefs)
+        val cityId = if (prefs.useGps) null else prefs.cityId
+        val next = computeNextOccurrence(alarm, location, cityId) ?: return
+        alarmDao.setSkipUntil(alarmId, next.toEpochMilli() + 60_000L)
+        scheduleNextOccurrence(alarm.copy(skipUntilEpochMs = next.toEpochMilli() + 60_000L), location, cityId)
+    }
+
+    suspend fun undoSkip(alarmId: Long) {
+        alarmDao.setSkipUntil(alarmId, 0)
+        val alarm = alarmDao.getAlarmById(alarmId) ?: return
+        val prefs = prefsRepository.preferences.first()
+        val location = prefsRepository.prefsToGeoLocation(prefs)
+        val cityId = if (prefs.useGps) null else prefs.cityId
+        scheduleNextOccurrence(alarm.copy(skipUntilEpochMs = 0), location, cityId)
     }
 
     /** Arm the next occurrence of a single alarm. */
@@ -79,14 +101,15 @@ class AlarmScheduler @Inject constructor(
         arm(alarm, fireTime, zone)
     }
 
-    /** The next fire time of one alarm (no side effects). */
+    /** The next fire time of one alarm (no side effects). Honors skip-next. */
     suspend fun computeNextOccurrence(
         alarm: AlarmEntity,
         location: AppGeoLocation,
         cityId: String?,
     ): Instant? {
         val zone = ZoneId.of(location.timeZone.id)
-        val now = Instant.now()
+        // Skip-next (B2): treat occurrences up to skipUntil as already past
+        val now = maxOf(Instant.now(), Instant.ofEpochMilli(alarm.skipUntilEpochMs))
         return when (alarm.type) {
             AlarmType.FIXED -> AlarmTimeCalculator.nextFixedOccurrence(alarm, zone, now)
             AlarmType.ZMAN -> nextZmanOccurrence(alarm, location, cityId, zone, now)
