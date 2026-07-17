@@ -55,7 +55,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
     }
 
     private suspend fun refresh(context: Context) {
-        val prefs = prefsRepository.preferences.first()
+        val prefs = prefsRepository.schedulingPreferences()
         if (!prefs.persistentNotification) {
             notificationHelper.cancelOngoingStatus()
             return

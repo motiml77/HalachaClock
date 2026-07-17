@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.zmanimclock.app.location.model.AppGeoLocation
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.TimeZone
 import javax.inject.Inject
@@ -42,6 +43,14 @@ data class UserPreferences(
 class UserPreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    /**
+     * Direct-boot shadow (A3): SharedPreferences on device-protected storage
+     * hold the fields the scheduler needs, so alarms can be re-armed after a
+     * reboot BEFORE first unlock (DataStore CE storage is inaccessible then).
+     */
+    private val dpsPrefs = context.createDeviceProtectedStorageContext()
+        .getSharedPreferences("scheduling_shadow", Context.MODE_PRIVATE)
+
     private object Keys {
         val CITY_ID = stringPreferencesKey("city_id")
         val CITY_NAME_HE = stringPreferencesKey("city_name_he")
@@ -79,8 +88,45 @@ class UserPreferencesRepository @Inject constructor(
             use24HourFormat = prefs[Keys.USE_24H] ?: true,
             isFirstLaunch = prefs[Keys.FIRST_LAUNCH] ?: true,
             persistentNotification = prefs[Keys.PERSISTENT_NOTIFICATION] ?: true,
-        )
+        ).also(::mirrorToDps)
     }
+
+    /**
+     * The scheduling-critical prefs, safe to read before first unlock. Tries
+     * the CE DataStore; if the device is still locked (throws), falls back to
+     * the device-protected shadow.
+     */
+    suspend fun schedulingPreferences(): UserPreferences =
+        runCatching { preferences.first() }
+            .getOrElse { readDpsShadow() }
+
+    private fun mirrorToDps(p: UserPreferences) {
+        dpsPrefs.edit()
+            .putString("cityId", p.cityId)
+            .putString("cityNameHe", p.cityNameHebrew)
+            .putString("cityNameEn", p.cityNameEnglish)
+            .putString("lat", p.latitude.toString())
+            .putString("lon", p.longitude.toString())
+            .putString("elev", p.elevation.toString())
+            .putString("tz", p.timeZoneId)
+            .putBoolean("useGps", p.useGps)
+            .putInt("candle", p.candleLightingMinutes)
+            .putBoolean("persistent", p.persistentNotification)
+            .apply()
+    }
+
+    private fun readDpsShadow(): UserPreferences = UserPreferences(
+        cityId = dpsPrefs.getString("cityId", "ירושלים")!!,
+        cityNameHebrew = dpsPrefs.getString("cityNameHe", "ירושלים")!!,
+        cityNameEnglish = dpsPrefs.getString("cityNameEn", "Jerusalem")!!,
+        latitude = dpsPrefs.getString("lat", "31.778")!!.toDouble(),
+        longitude = dpsPrefs.getString("lon", "35.235")!!.toDouble(),
+        elevation = dpsPrefs.getString("elev", "800.0")!!.toDouble(),
+        timeZoneId = dpsPrefs.getString("tz", "Asia/Jerusalem")!!,
+        useGps = dpsPrefs.getBoolean("useGps", false),
+        candleLightingMinutes = dpsPrefs.getInt("candle", 20),
+        persistentNotification = dpsPrefs.getBoolean("persistent", true),
+    )
 
     suspend fun setDefaultCity(
         cityId: String,

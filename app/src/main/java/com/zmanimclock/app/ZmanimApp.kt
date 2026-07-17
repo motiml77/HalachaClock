@@ -42,6 +42,12 @@ class ZmanimApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Direct Boot (A3): before first unlock, WorkManager + credential
+        // storage are unavailable. The directBootAware BootReceiver handles
+        // rescheduling meanwhile; this heavy setup waits for a normal launch.
+        val unlocked = getSystemService(android.os.UserManager::class.java)?.isUserUnlocked ?: true
+        if (!unlocked) return
+
         notificationHelper.createChannels()
         loadPreBundledData()
         schedulePeriodicWork()

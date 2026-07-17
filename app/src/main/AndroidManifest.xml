@@ -49,10 +49,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Full-screen ringing UI, shown over the lock screen -->
+        <!-- Full-screen ringing UI, shown over the lock screen.
+             directBootAware so it can show before first unlock after reboot. -->
         <activity
             android:name=".feature.alarm.presentation.AlarmActivity"
             android:exported="false"
+            android:directBootAware="true"
             android:launchMode="singleInstance"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
@@ -60,12 +62,15 @@
             android:taskAffinity=""
             android:theme="@style/Theme.ZmanimClock" />
 
-        <!-- Re-arm alarms after boot / update / clock or timezone change -->
+        <!-- Re-arm alarms after boot / update / clock or timezone change.
+             LOCKED_BOOT_COMPLETED fires before first unlock (Direct Boot). -->
         <receiver
             android:name=".scheduling.BootReceiver"
             android:exported="true"
-            android:enabled="true">
+            android:enabled="true"
+            android:directBootAware="true">
             <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
@@ -77,7 +82,8 @@
         <!-- Exact-alarm firing point -->
         <receiver
             android:name=".scheduling.AlarmTriggerReceiver"
-            android:exported="false" />
+            android:exported="false"
+            android:directBootAware="true" />
 
         <!-- Persistent "next zman / next alarm" status notification updater -->
         <receiver
@@ -87,15 +93,18 @@
         <!-- Wake-up check (are you awake?) + its confirm action -->
         <receiver
             android:name=".scheduling.WakeCheckReceiver"
-            android:exported="false" />
+            android:exported="false"
+            android:directBootAware="true" />
         <receiver
             android:name=".scheduling.WakeCheckConfirmReceiver"
-            android:exported="false" />
+            android:exported="false"
+            android:directBootAware="true" />
 
         <!-- Foreground service that owns the ringing alarm -->
         <service
             android:name=".scheduling.AlarmSoundService"
             android:exported="false"
+            android:directBootAware="true"
             android:foregroundServiceType="mediaPlayback" />
 
         <!-- Disable default WorkManager initializer (initialized via Hilt) -->

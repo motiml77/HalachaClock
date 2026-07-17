@@ -53,7 +53,7 @@ class AlarmScheduler @Inject constructor(
 
     /** Recompute and arm the next occurrence of every active alarm. */
     suspend fun rescheduleAll() {
-        val prefs = prefsRepository.preferences.first()
+        val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
 
@@ -69,7 +69,7 @@ class AlarmScheduler @Inject constructor(
     /** B2: skip the alarm's next occurrence (keeps later repeats). */
     suspend fun skipNext(alarmId: Long) {
         val alarm = alarmDao.getAlarmById(alarmId) ?: return
-        val prefs = prefsRepository.preferences.first()
+        val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
         val next = computeNextOccurrence(alarm, location, cityId) ?: return
@@ -80,7 +80,7 @@ class AlarmScheduler @Inject constructor(
     suspend fun undoSkip(alarmId: Long) {
         alarmDao.setSkipUntil(alarmId, 0)
         val alarm = alarmDao.getAlarmById(alarmId) ?: return
-        val prefs = prefsRepository.preferences.first()
+        val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
         scheduleNextOccurrence(alarm.copy(skipUntilEpochMs = 0), location, cityId)
@@ -118,7 +118,7 @@ class AlarmScheduler @Inject constructor(
 
     /** The earliest upcoming firing across ALL active alarms (for the status bar). */
     suspend fun nextAlarmOccurrence(): Pair<AlarmEntity, Instant>? {
-        val prefs = prefsRepository.preferences.first()
+        val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
         return alarmDao.getActiveAlarmsList()

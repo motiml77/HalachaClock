@@ -20,11 +20,17 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): ZmanimDatabase =
-        Room.databaseBuilder(context, ZmanimDatabase::class.java, "zmanim.db")
+    fun provideDatabase(@ApplicationContext context: Context): ZmanimDatabase {
+        // Direct Boot (A3): store on device-protected storage so alarms +
+        // visible-sunrise cache are reachable after a reboot BEFORE the user
+        // unlocks the device for the first time. Migrate any old CE db once.
+        val dpsContext = context.createDeviceProtectedStorageContext()
+        runCatching { dpsContext.moveDatabaseFrom(context, "zmanim.db") }
+        return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
             // pre-release: schema still moves; real migrations start at v1.0
             .fallbackToDestructiveMigration()
             .build()
+    }
 
     @Provides
     fun provideChaiTablesDao(database: ZmanimDatabase): ChaiTablesDao =
