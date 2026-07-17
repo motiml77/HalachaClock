@@ -13,14 +13,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.WbTwilight
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,9 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,8 +40,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
@@ -48,6 +51,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.ui.theme.Ext
+import com.zmanimclock.app.ui.theme.ZmanListTimeStyle
 
 private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 
@@ -121,13 +125,25 @@ fun AlarmsContent(
                 )
             }
         } else {
+            // Two categories: wake-up clocks vs halachic-zman alerts
+            val fixed = items.filter { it.alarm.type == AlarmType.FIXED }
+            val zman = items.filter { it.alarm.type == AlarmType.ZMAN }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(items, key = { it.alarm.id }) { item ->
-                    AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
+                if (fixed.isNotEmpty()) {
+                    item(key = "header_fixed") { SectionHeader("שעונים מעוררים", fixed.size) }
+                    items(fixed, key = { it.alarm.id }) { item ->
+                        AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
+                    }
+                }
+                if (zman.isNotEmpty()) {
+                    item(key = "header_zman") { SectionHeader("זמנים הלכתיים", zman.size) }
+                    items(zman, key = { it.alarm.id }) { item ->
+                        AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
+                    }
                 }
             }
         }
@@ -145,7 +161,22 @@ fun AlarmsContent(
     }
 }
 
-/** §6.6 — alarm card: tinted icon container, big time / anchor + live label. */
+/** Category header ("שעונים מעוררים · 3"). */
+@Composable
+private fun SectionHeader(title: String, count: Int) {
+    Text(
+        text = "$title · $count",
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 2.dp),
+    )
+}
+
+/**
+ * Compact alarm card (~76dp → 6+ fit without scrolling).
+ * Inactive alarms stay listed but dimmed; the round ✓ next to the alarm
+ * re-activates (or deactivates) it. Trash deletes permanently.
+ */
 @Composable
 private fun AlarmCard(
     item: AlarmListItem,
@@ -156,39 +187,42 @@ private fun AlarmCard(
 ) {
     val alarm = item.alarm
     val cs = MaterialTheme.colorScheme
-    val ext = Ext.colors
     val isZman = alarm.type == AlarmType.ZMAN
+    val contentAlpha = if (alarm.isActive) 1f else 0.45f
 
     Card(
         modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cs.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (alarm.isActive) cs.surface else cs.surfaceVariant.copy(alpha = 0.6f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (alarm.isActive) 1.dp else 0.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // icon container
+            // Small type icon
             Box(
                 modifier = Modifier
-                    .size(46.dp)
+                    .size(34.dp)
+                    .alpha(contentAlpha)
                     .background(
                         if (isZman) cs.tertiaryContainer else cs.primaryContainer,
-                        RoundedCornerShape(14.dp),
+                        RoundedCornerShape(10.dp),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
                 if (alarm.shabbatMode) {
-                    Text("🕯️", style = MaterialTheme.typography.titleLarge)
+                    Text("🕯️", style = MaterialTheme.typography.bodyMedium)
                 } else {
                     Icon(
                         imageVector = if (isZman) Icons.Filled.WbTwilight else Icons.Filled.Alarm,
                         contentDescription = null,
                         tint = if (isZman) cs.onTertiaryContainer else cs.primary,
-                        modifier = Modifier.size(26.dp),
+                        modifier = Modifier.size(19.dp),
                     )
                 }
             }
@@ -196,63 +230,78 @@ private fun AlarmCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 10.dp)
+                    .alpha(contentAlpha),
             ) {
-                if (isZman) {
+                // Name line (FIXED gets the time inline)
+                val name = alarm.label.ifBlank { defaultAlarmLabel(alarm) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!isZman) {
+                        Text(
+                            text = "%02d:%02d".format(alarm.hour, alarm.minute),
+                            style = ZmanListTimeStyle.copy(fontSize = 22.sp, lineHeight = 24.sp),
+                            color = cs.primary,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Text(
-                        text = zmanAnchorText(alarm),
-                        style = MaterialTheme.typography.titleLarge,
+                        text = name,
+                        style = MaterialTheme.typography.titleSmall,
                         color = cs.onSurface,
-                    )
-                } else {
-                    Text(
-                        text = "%02d:%02d".format(alarm.hour, alarm.minute),
-                        style = MaterialTheme.typography.displaySmall,
-                        color = cs.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // "מחר: 05:15 · בעוד 9 ש' ו-33 דק'" — on EVERY active alarm
                 item.nextFireLabel?.let {
                     Text(
                         text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        // gold family: #7A5E00 on light, #F5C518 on dark
+                        style = MaterialTheme.typography.labelSmall,
                         color = cs.tertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Text(
-                    text = daysText(alarm),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                )
-                // B2: skip-next toggle (only for active, repeating alarms)
-                if (alarm.isActive && !alarm.isOneTime) {
-                    val skipping = alarm.skipUntilEpochMs > System.currentTimeMillis()
-                    TextButton(
-                        onClick = { onSkipNext(alarm) },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                    ) {
+                // Days + inline skip-next (compact, one line)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = daysText(alarm),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    if (alarm.isActive && !alarm.isOneTime) {
+                        val skipping = alarm.skipUntilEpochMs > System.currentTimeMillis()
                         Text(
-                            if (skipping) "מדלג על הפעם הבאה — בטל" else "דלג על הפעם הבאה",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = if (skipping) " · מדלג — בטל" else " · דלג על הבאה",
+                            style = MaterialTheme.typography.labelSmall,
                             color = if (skipping) Ext.colors.accentGold else cs.primary,
+                            modifier = Modifier.clickable { onSkipNext(alarm) },
                         )
                     }
                 }
             }
 
-            IconButton(onClick = { onDelete(alarm) }) {
+            IconButton(onClick = { onDelete(alarm) }, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "מחק",
-                    tint = cs.onSurfaceVariant,
+                    contentDescription = "מחק לצמיתות",
+                    tint = cs.onSurfaceVariant.copy(alpha = contentAlpha),
+                    modifier = Modifier.size(19.dp),
                 )
             }
-            Switch(
-                checked = alarm.isActive,
-                onCheckedChange = { onToggle(alarm, it) },
-            )
+            // The ✓: active = filled check; inactive = empty circle to tap
+            IconButton(
+                onClick = { onToggle(alarm, !alarm.isActive) },
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    imageVector = if (alarm.isActive) Icons.Filled.CheckCircle
+                    else Icons.Outlined.Circle,
+                    contentDescription = if (alarm.isActive) "פעיל — הקש לכיבוי" else "כבוי — הקש להפעלה",
+                    tint = if (alarm.isActive) cs.primary else cs.outline,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
         }
     }
 }

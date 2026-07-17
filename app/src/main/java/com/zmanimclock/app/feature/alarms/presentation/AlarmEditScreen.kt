@@ -296,11 +296,13 @@ fun AlarmEditScreen(
                 }
             }
 
-            // === Label + save ===
+            // === Name + save ===
             OutlinedTextField(
                 value = alarm.label,
                 onValueChange = { v -> viewModel.update { it.copy(label = v) } },
-                label = { Text("תווית (לא חובה)") },
+                label = { Text("שם השעון") },
+                placeholder = { Text(defaultAlarmLabel(alarm)) },
+                supportingText = { Text("ריק = השם המוצע") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

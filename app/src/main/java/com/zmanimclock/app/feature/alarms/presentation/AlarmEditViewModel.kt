@@ -90,7 +90,10 @@ class AlarmEditViewModel @Inject constructor(
 
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
-            alarmDao.insertAlarm(_alarm.value)
+            val a = _alarm.value
+            // Blank name → sensible default ("זמן ק"ש מג"א", "השכמה"…)
+            val toSave = if (a.label.isBlank()) a.copy(label = defaultAlarmLabel(a)) else a
+            alarmDao.insertAlarm(toSave)
             WorkManager.getInstance(context)
                 .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
             onDone()
@@ -115,4 +118,22 @@ class AlarmEditViewModel @Inject constructor(
             }
         }
     }
+}
+
+/**
+ * The name the app suggests for an alarm ("לפי מה שהגיוני"):
+ * zman alerts get the anchor description, wake-ups get "השכמה".
+ */
+fun defaultAlarmLabel(a: AlarmEntity): String = when {
+    a.shabbatMode -> "כניסת שבת"
+    a.type == AlarmType.ZMAN -> {
+        val name = com.zmanimclock.app.feature.zmanim.model.ZmanKind
+            .fromNameOrNull(a.zmanId)?.hebrewName ?: a.zmanId
+        if (a.offsetMinutes == 0) {
+            name
+        } else {
+            "${a.offsetMinutes} דק' ${if (a.offsetBefore) "לפני" else "אחרי"} $name"
+        }
+    }
+    else -> "השכמה"
 }
