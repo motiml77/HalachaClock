@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
@@ -37,6 +38,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -96,13 +100,14 @@ fun AlarmEditScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        val isEditing = alarmId != null && alarmId >= 0
         TopAppBar(
             title = {
                 Text(
                     when {
                         alarm.shabbatMode -> "התראת כניסת שבת"
-                        alarm.type == AlarmType.ZMAN -> "שעון לפי זמן הלכתי"
-                        else -> "שעון מעורר"
+                        isEditing -> "עריכת שעון"
+                        else -> "שעון חדש"
                     }
                 )
             },
@@ -141,6 +146,12 @@ fun AlarmEditScreen(
                         )
                     }
                 }
+            }
+
+            // === Anchor type: fixed clock ↔ halachic zman ===
+            // The Shabbat-entry alert is locked to its zman anchor.
+            if (!alarm.shabbatMode) {
+                AnchorTypeSelector(alarm.type, viewModel::setType)
             }
 
             // === Anchor ===
@@ -339,6 +350,35 @@ fun AlarmEditScreen(
     }
 }
 
+/**
+ * The heart of the "smart anchor" UX: a two-way toggle letting the user pick
+ * whether the alarm rings at a fixed clock time or is pinned to a halachic
+ * zman that shifts every day with the date and location.
+ */
+@Composable
+private fun AnchorTypeSelector(current: AlarmType, onSelect: (AlarmType) -> Unit) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        SegmentedButton(
+            selected = current == AlarmType.FIXED,
+            onClick = { onSelect(AlarmType.FIXED) },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            icon = {
+                Icon(Icons.Filled.Alarm, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            label = { Text("שעה קבועה") },
+        )
+        SegmentedButton(
+            selected = current == AlarmType.ZMAN,
+            onClick = { onSelect(AlarmType.ZMAN) },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            icon = {
+                Icon(Icons.Filled.WbTwilight, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            label = { Text("לפי זמן הלכתי") },
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FixedAnchorSection(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEntity) -> Unit) {
@@ -364,6 +404,11 @@ private fun ZmanAnchorSection(
     update: ((AlarmEntity) -> AlarmEntity) -> Unit,
 ) {
     SectionTitle("לפי איזה זמן?")
+    Text(
+        "הצלצול נקבע ביחס לזמן ההלכתי ומתעדכן אוטומטית בכל יום לפי התאריך והמיקום שלך.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.secondary,
+    )
     var menuOpen by remember { mutableStateOf(false) }
     var customMinutes by remember { mutableStateOf("") }
 

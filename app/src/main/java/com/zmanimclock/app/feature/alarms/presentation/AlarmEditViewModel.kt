@@ -88,6 +88,24 @@ class AlarmEditViewModel @Inject constructor(
         refreshPreview()
     }
 
+    /**
+     * Switch the alarm's anchor between a fixed clock time and a halachic
+     * zman, in place, preserving everything else. Choosing the zman anchor
+     * seeds a sensible default offset (30 דק' לפני) so the user only has to
+     * pick which zman.
+     */
+    fun setType(newType: AlarmType) = update { a ->
+        when {
+            a.type == newType -> a
+            newType == AlarmType.ZMAN -> a.copy(
+                type = AlarmType.ZMAN,
+                offsetMinutes = if (a.offsetMinutes == 0) 30 else a.offsetMinutes,
+                offsetBefore = true,
+            )
+            else -> a.copy(type = AlarmType.FIXED)
+        }
+    }
+
     fun save(onDone: () -> Unit) {
         viewModelScope.launch {
             val a = _alarm.value
