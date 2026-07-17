@@ -128,7 +128,8 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         date: LocalDate,
         now: Instant,
     ): Pair<ZmanKind, Instant>? {
-        val day = zmanimRepository.getDayZmanim(location, cityId, date)
+        // cacheOnly: a receiver must not hit the network (goAsync ~10s budget)
+        val day = zmanimRepository.getDayZmanim(location, cityId, date, cacheOnly = true)
         return ZmanKind.entries
             .mapNotNull { kind -> day.instantOf(kind)?.let { kind to it } }
             .filter { (_, instant) -> instant.isAfter(now) }

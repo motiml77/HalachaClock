@@ -30,8 +30,11 @@ class ZmanimRepository @Inject constructor(
         cityId: String?,
         date: LocalDate,
         candleLightingOffsetMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
+        /** true = no network fetch (receivers / pre-unlock); mishor fallback. */
+        cacheOnly: Boolean = false,
     ): DayZmanim {
-        val visibleSunrise = chaiTables.getVisibleSunrise(location, cityId, date)
+        val visibleSunrise =
+            chaiTables.getVisibleSunrise(location, cityId, date, allowNetwork = !cacheOnly)
         return engine.calculate(
             location = location.toEngineLocation(),
             date = date,

@@ -46,11 +46,16 @@ class ChaiTablesRepository @Inject constructor(
     /**
      * The visible sunrise for [date] at [location], or null when unavailable
      * (no terrain data / fetch failed) — the caller falls back to mishor.
+     *
+     * @param allowNetwork false = cache/metro steps only, no fetch and no
+     *   sentinel write. Used from broadcast receivers (goAsync budget) and
+     *   before user-unlock; the refresh worker completes the cache later.
      */
     suspend fun getVisibleSunrise(
         location: AppGeoLocation,
         cityId: String?,
         date: LocalDate,
+        allowNetwork: Boolean = true,
     ): Instant? {
         val locationKey = metroMapper.computeLocationKey(cityId, location)
         val dayOfYear = date.dayOfYear
@@ -78,6 +83,8 @@ class ChaiTablesRepository @Inject constructor(
         if (count > 0 && dao.getSunrise(locationKey, SENTINEL_DAY)?.sunriseHour == SENTINEL_HOUR) {
             return null
         }
+
+        if (!allowNetwork) return null
 
         // 5. Fetch a full Hebrew year from the network and cache it forever
         Log.i(TAG, "Fetching ChaiTables for $locationKey")

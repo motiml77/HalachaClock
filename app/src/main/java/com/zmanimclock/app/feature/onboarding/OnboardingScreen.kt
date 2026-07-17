@@ -79,6 +79,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
     val notificationsGranted = remember(refreshTick) { hasNotificationPermission(context) }
     val exactAlarmsGranted = remember(refreshTick) { hasExactAlarms(context) }
     val batteryExempt = remember(refreshTick) { isBatteryExempt(context) }
+    val fullScreenGranted = remember(refreshTick) { hasFullScreenIntent(context) }
 
     var askedNotifications by remember { mutableIntStateOf(0) }
     val notifLauncher = rememberLauncherForActivityResult(
@@ -152,6 +153,24 @@ fun OnboardingScreen(onDone: () -> Unit) {
             },
         )
 
+        // Android 14+: full-screen-intent can be revoked — only shown when needed
+        if (Build.VERSION.SDK_INT >= 34 && !fullScreenGranted) {
+            PermissionCard(
+                icon = Icons.Filled.Alarm,
+                title = "מסך צלצול מלא",
+                description = "פתיחת מסך ההתראה מעל מסך הנעילה בזמן הצלצול",
+                granted = false,
+                onGrant = {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                            Uri.parse("package:${context.packageName}"),
+                        )
+                    )
+                },
+            )
+        }
+
         Card {
             Row(
                 modifier = Modifier.padding(14.dp),
@@ -172,7 +191,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        val allGranted = notificationsGranted && exactAlarmsGranted && batteryExempt
+        val allGranted =
+            notificationsGranted && exactAlarmsGranted && batteryExempt && fullScreenGranted
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
             Text(
                 if (allGranted) "הכל מאושר — נתחיל!" else "המשך בכל זאת",
@@ -234,3 +254,8 @@ private fun hasExactAlarms(context: Context): Boolean =
 private fun isBatteryExempt(context: Context): Boolean =
     context.getSystemService<PowerManager>()
         ?.isIgnoringBatteryOptimizations(context.packageName) == true
+
+private fun hasFullScreenIntent(context: Context): Boolean =
+    Build.VERSION.SDK_INT < 34 ||
+        context.getSystemService<android.app.NotificationManager>()
+            ?.canUseFullScreenIntent() == true

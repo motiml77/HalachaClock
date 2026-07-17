@@ -32,7 +32,19 @@ class NotificationHelper @Inject constructor(
 
         const val ALARM_NOTIFICATION_ID = 1001
         const val STATUS_NOTIFICATION_ID = 1002
+
+        /** style-1D primary — notification accent. */
+        private const val ACCENT = 0xFF123A8B.toInt()
     }
+
+    /**
+     * Android 14+ lets the system/user revoke USE_FULL_SCREEN_INTENT. When
+     * revoked, the ringing screen won't auto-open (sound still plays; tapping
+     * the notification opens it) — surfaced in onboarding + settings.
+     */
+    fun canUseFullScreenIntent(): Boolean =
+        android.os.Build.VERSION.SDK_INT < 34 ||
+            context.getSystemService<NotificationManager>()?.canUseFullScreenIntent() == true
 
     /**
      * The persistent status notification: always-visible line with the next
@@ -48,7 +60,8 @@ class NotificationHelper @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_SERVICE)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_zman)
+            .setColor(ACCENT)
             .setContentTitle("הזמן הבא: $nextZmanText")
             .setContentText(nextAlarmText?.let { "השעון הבא: $it" } ?: "אין שעון מעורר פעיל")
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -132,7 +145,8 @@ class NotificationHelper @Inject constructor(
         val snoozePi = servicePendingIntent(alertId, AlarmSoundService.ACTION_SNOOZE, 2, snoozeMinutes)
 
         return NotificationCompat.Builder(context, CHANNEL_ALARM)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_zman)
+            .setColor(ACCENT)
             .setContentTitle(if (shabbatMode) "🕯️ $title" else title)
             .setContentText(
                 when {
@@ -157,7 +171,8 @@ class NotificationHelper @Inject constructor(
     fun showReminder(alertId: Long, title: String, timeText: String, vibrate: Boolean) {
         val manager = context.getSystemService<NotificationManager>() ?: return
         val notification = NotificationCompat.Builder(context, CHANNEL_REMINDER)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_zman)
+            .setColor(ACCENT)
             .setContentTitle(title)
             .setContentText(if (timeText.isNotEmpty()) "בשעה $timeText" else "עכשיו")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

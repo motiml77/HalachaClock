@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -52,18 +53,34 @@ fun SettingsScreen(
     val alarmManager = context.getSystemService<AlarmManager>()
     val exactAlarmsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
         alarmManager?.canScheduleExactAlarms() == true
+    val fullScreenOk = Build.VERSION.SDK_INT < 34 ||
+        context.getSystemService<android.app.NotificationManager>()
+            ?.canUseFullScreenIntent() == true
 
     SettingsContent(
         prefs = prefs,
         exactAlarmsOk = exactAlarmsOk,
+        fullScreenOk = fullScreenOk,
         onCityClick = onOpenCityPicker,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
         onPersistentNotificationChange = viewModel::setPersistentNotification,
+        onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
             }
         },
+        onRequestFullScreen = {
+            if (Build.VERSION.SDK_INT >= 34) {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                        android.net.Uri.parse("package:${context.packageName}"),
+                    )
+                )
+            }
+        },
+        onOpenAutostart = { com.zmanimclock.app.util.OemHelper.openAutostartSettings(context) },
     )
 }
 
@@ -71,10 +88,14 @@ fun SettingsScreen(
 fun SettingsContent(
     prefs: UserPreferences,
     exactAlarmsOk: Boolean,
+    fullScreenOk: Boolean = true,
     onCityClick: () -> Unit,
     onCandleMinutesChange: (Int) -> Unit,
     onPersistentNotificationChange: (Boolean) -> Unit,
+    onRingTest: () -> Unit = {},
     onRequestExactAlarms: () -> Unit,
+    onRequestFullScreen: () -> Unit = {},
+    onOpenAutostart: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -111,6 +132,38 @@ fun SettingsContent(
                         )
                     }
                     TextButton(onClick = onRequestExactAlarms) { Text("אישור") }
+                }
+            }
+        }
+
+        // Full-screen intent health check (Android 14+)
+        if (!fullScreenOk) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.NotificationsActive,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
+                    ) {
+                        Text("נדרשת הרשאת מסך צלצול מלא", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "בלעדיה מסך ההתראה לא ייפתח אוטומטית בזמן הצלצול.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    TextButton(onClick = onRequestFullScreen) { Text("אישור") }
                 }
             }
         }
@@ -196,6 +249,36 @@ fun SettingsContent(
                     checked = prefs.persistentNotification,
                     onCheckedChange = onPersistentNotificationChange,
                 )
+            }
+        }
+
+        // Reliability self-test + OEM guidance (A6)
+        Card {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("בדיקת אמינות", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "ודא שהצלצול עובד אצלך: כבה את המסך אחרי ההקשה.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = onRingTest,
+                    modifier = Modifier.padding(top = 10.dp),
+                ) { Text("🔔 צלצל בעוד דקה") }
+
+                if (com.zmanimclock.app.util.OemHelper.isAggressiveOem()) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                    )
+                    Text(
+                        "במכשירי ${com.zmanimclock.app.util.OemHelper.oemName()} יש לאשר " +
+                            "\"הפעלה אוטומטית\" כדי שהשעון לא ייעצר על ידי המערכת.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = onOpenAutostart) { Text("פתח הגדרות יצרן") }
+                }
             }
         }
 

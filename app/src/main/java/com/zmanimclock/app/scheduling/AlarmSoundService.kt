@@ -151,32 +151,46 @@ class AlarmSoundService : Service() {
     }
 
     private fun startSound(alarm: AlarmEntity) {
-        try {
-            val uri: Uri = alarm.soundUri?.let(Uri::parse)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                ?: return
+        targetVolume = (alarm.volumePercent.coerceIn(10, 100)) / 100f
+        currentVolume = (targetVolume * 0.15f).coerceAtLeast(0.05f)
 
-            targetVolume = (alarm.volumePercent.coerceIn(10, 100)) / 100f
-            currentVolume = (targetVolume * 0.15f).coerceAtLeast(0.05f)
-
-            mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                setDataSource(this@AlarmSoundService, uri)
-                isLooping = true
-                setVolume(currentVolume, currentVolume)
-                prepare()
-                start()
+        // Custom URI first; if it vanished (file deleted / permission lost),
+        // FALL BACK to the system default — a silent alarm is the worst bug.
+        val candidates = listOfNotNull(
+            alarm.soundUri?.let(Uri::parse),
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
+        )
+        for (uri in candidates) {
+            if (tryPlay(uri)) {
+                handler.postDelayed(volumeRampStep, VOLUME_STEP_INTERVAL_MS)
+                return
             }
-            handler.postDelayed(volumeRampStep, VOLUME_STEP_INTERVAL_MS)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start alarm sound", e)
         }
+        Log.e(TAG, "All sound sources failed — vibration only")
+    }
+
+    private fun tryPlay(uri: Uri): Boolean = try {
+        mediaPlayer?.release()
+        mediaPlayer = MediaPlayer().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            setDataSource(this@AlarmSoundService, uri)
+            isLooping = true
+            setVolume(currentVolume, currentVolume)
+            prepare()
+            start()
+        }
+        true
+    } catch (e: Exception) {
+        Log.w(TAG, "Sound source failed: $uri (${e.message})")
+        mediaPlayer?.release()
+        mediaPlayer = null
+        false
     }
 
     private fun startVibration() {
