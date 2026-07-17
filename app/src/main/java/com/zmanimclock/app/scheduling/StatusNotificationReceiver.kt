@@ -93,6 +93,9 @@ class StatusNotificationReceiver : BroadcastReceiver() {
 
         notificationHelper.showOngoingStatus(nextZmanText, nextAlarmText)
 
+        // Zman boundaries also refresh the home-screen widget content
+        com.zmanimclock.app.feature.widget.ZmanWidgetProvider.refresh(context)
+
         // Re-arm this receiver for the moment the display should change
         next?.let { (_, instant) ->
             val am = context.getSystemService<AlarmManager>() ?: return

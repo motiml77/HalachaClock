@@ -107,6 +107,27 @@
             android:directBootAware="true"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- Home-screen widget: selected zmanim + next-zman live countdown -->
+        <receiver
+            android:name=".feature.widget.ZmanWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/zman_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".feature.widget.WidgetConfigActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ZmanimClock">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- Disable default WorkManager initializer (initialized via Hilt) -->
         <provider
             android:name="androidx.startup.InitializationProvider"

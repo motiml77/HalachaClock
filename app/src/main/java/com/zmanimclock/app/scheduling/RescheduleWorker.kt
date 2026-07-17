@@ -26,6 +26,7 @@ class RescheduleWorker @AssistedInject constructor(
         return try {
             alarmScheduler.rescheduleAll()
             StatusNotificationReceiver.ping(applicationContext)
+            com.zmanimclock.app.feature.widget.ZmanWidgetProvider.refresh(applicationContext)
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Reschedule failed", e)
