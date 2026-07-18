@@ -25,6 +25,7 @@ local.properties
 *.aab
 *.jks
 *.keystore
+keystore.properties
 
 # Room exported schemas are kept out until stabilized
 /app/schemas
