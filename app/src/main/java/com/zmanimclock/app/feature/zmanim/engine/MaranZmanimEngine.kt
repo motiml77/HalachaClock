@@ -85,8 +85,16 @@ class MaranZmanimEngine @Inject constructor() {
         // === Morning deadlines ===
         val shmaGra = fromBase(3.0)
         val tfilaGra = fromBase(4.0)
-        val shmaMga = alot.plusMillis((3.0 * shaahMga).toLong())
-        val tfilaMga = alot.plusMillis((4.0 * shaahMga).toLong())
+
+        // MGA — the two shitot the luach prints side by side:
+        //  16.1°: dawn/nightfall at 16.1° actual solar depression on THIS day
+        //         (longer than 72 min in winter/summer, 72 at the equinox);
+        //  72':   dawn/nightfall at 72 fixed clock minutes.
+        // Both use KosherJava's canonical day-of-alos→tzais 3/12 and 4/12.
+        val shmaMga16 = czc.sofZmanShmaMGA16Point1Degrees?.toInstant()
+        val tfilaMga16 = czc.sofZmanTfilaMGA16Point1Degrees?.toInstant()
+        val shmaMga72 = czc.sofZmanShmaMGA72Minutes?.toInstant()
+        val tfilaMga72 = czc.sofZmanTfilaMGA72Minutes?.toInstant()
 
         // === Midday: TRUE solar noon (sun transit) ===
         // Chazon Yosef (ROYZmanim getChatzot === getSunTransit) fixes chatzot at
@@ -111,6 +119,14 @@ class MaranZmanimEngine @Inject constructor() {
 
         // === Night ===
         val tzeit = sunset.plusMillis(zmaniyotMinutes(TZEIT_ZMANIYOT_MINUTES))
+
+        // Tzeit lechumra — Zemaneh Yosef getTzetHumra: how long the sun takes
+        // to reach 5.075° below the horizon ON THE EQUINOX DAY (≈20 min in
+        // Israel), expressed as a fraction of that day's shaah and applied to
+        // the current shaah. Grows to ~24 min midsummer, shrinks in winter.
+        val tzeitLechumra = equinoxDegreeSeasonalFraction(location, date, TZEIT_LECHUMRA_DEGREES)
+            ?.let { fraction -> sunset.plusMillis((fraction * shaahGra).toLong()) }
+
         val tzeitShabbat = sunset.plusMillis(Duration.ofMinutes(TZEIT_SHABBAT_FIXED_MINUTES).toMillis())
         // Rabbeinu Tam le-kulah (approved Zemaneh Yosef default, rtKulah=true):
         // the EARLIER of 72 zmaniyot and 72 fixed minutes after shkia.
@@ -138,9 +154,11 @@ class MaranZmanimEngine @Inject constructor() {
             misheyakir60 = misheyakir60,
             hanetzVisible = visibleSunrise,
             hanetzMishor = mishorSunrise,
-            sofZmanShmaMga = shmaMga,
+            sofZmanShmaMga = shmaMga16,
+            sofZmanShmaMga72 = shmaMga72,
             sofZmanShmaGra = shmaGra,
-            sofZmanTfilaMga = tfilaMga,
+            sofZmanTfilaMga = tfilaMga16,
+            sofZmanTfilaMga72 = tfilaMga72,
             sofZmanTfilaGra = tfilaGra,
             chatzot = chatzot,
             minchaGedola = minchaGedola,
@@ -148,12 +166,36 @@ class MaranZmanimEngine @Inject constructor() {
             plagHaminchaYalkutYosef = plag,
             shkia = sunset,
             tzeitHakochavim = tzeit,
+            tzeitLechumra = tzeitLechumra,
             tzeitShabbat = tzeitShabbat,
             tzeitRabbeinuTam = tzeitRabbeinuTam,
             candleLighting = candleLighting,
             shaahZmanisGra = shaahGra.toLong(),
             shaahZmanisMga = shaahMga.toLong(),
         )
+    }
+
+    /**
+     * The luach's degree→seasonal-minutes calibration (Zemaneh Yosef
+     * durationOfEquinoxDegreeSeasonalHour): on the equinox day (17 March) at
+     * this location, measure how long the sun takes to sink from sunset to
+     * [degrees] below the horizon, and return it as a fraction of that day's
+     * shaah zmanit. The caller multiplies by the current day's shaah.
+     */
+    private fun equinoxDegreeSeasonalFraction(
+        location: EngineLocation,
+        date: LocalDate,
+        degrees: Double,
+    ): Double? {
+        val eq = complexCalendarFor(location, LocalDate.of(date.year, 3, 17))
+        val eqSunrise = eq.seaLevelSunrise?.toInstant() ?: return null
+        val eqSunset = eq.seaLevelSunset?.toInstant() ?: return null
+        val eqTarget = eq.getSunsetOffsetByDegrees(
+            com.kosherjava.zmanim.AstronomicalCalendar.GEOMETRIC_ZENITH + degrees
+        )?.toInstant() ?: return null
+        val eqShaah = Duration.between(eqSunrise, eqSunset).toMillis() / 12.0
+        if (eqShaah <= 0) return null
+        return Duration.between(eqSunset, eqTarget).toMillis() / eqShaah
     }
 
     private fun complexCalendarFor(location: EngineLocation, date: LocalDate): ComplexZmanimCalendar {
@@ -187,8 +229,10 @@ class MaranZmanimEngine @Inject constructor() {
         hanetzVisible = visibleSunrise,
         hanetzMishor = mishorSunrise,
         sofZmanShmaMga = null,
+        sofZmanShmaMga72 = null,
         sofZmanShmaGra = null,
         sofZmanTfilaMga = null,
+        sofZmanTfilaMga72 = null,
         sofZmanTfilaGra = null,
         chatzot = null,
         minchaGedola = null,
@@ -196,6 +240,7 @@ class MaranZmanimEngine @Inject constructor() {
         plagHaminchaYalkutYosef = null,
         shkia = sunset,
         tzeitHakochavim = null,
+        tzeitLechumra = null,
         tzeitShabbat = null,
         tzeitRabbeinuTam = null,
         candleLighting = null,
@@ -228,8 +273,15 @@ class MaranZmanimEngine @Inject constructor() {
         /** מנחה גדולה — fixed minutes after chatzot (machmir vs half-shaah). */
         const val MINCHA_GEDOLA_FIXED_MINUTES = 30L
 
-        /** צאת הכוכבים חול — 13.5 zmaniyot minutes after shkia. */
+        /** צאת הכוכבים חול — 13.5 zmaniyot minutes after shkia (3.7° at the equinox). */
         const val TZEIT_ZMANIYOT_MINUTES = 13.5
+
+        /**
+         * צאת הכוכבים לחומרא — solar depression 5.075° calibrated on the
+         * equinox day (Zemaneh Yosef stringentNightfall; ≈20 min at the
+         * equinox in Israel), scaled by the current shaah zmanit.
+         */
+        const val TZEIT_LECHUMRA_DEGREES = 5.075
 
         /** צאת שבת — 40 fixed minutes after shkia. */
         const val TZEIT_SHABBAT_FIXED_MINUTES = 40L

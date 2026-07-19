@@ -37,7 +37,7 @@ class PrintComparisonTablesTest {
         fun f(i: Instant?): String = i?.atZone(zone)?.format(fmt) ?: ""
 
         println("CSV_START")
-        println("city,date,alot,misheyakir60,netz_mishor,shma_mga,shma_gra,tfila_mga,tfila_gra,chatzot,mincha_gedola,mincha_ketana,plag_yy,shkia,tzeit,tzeit_shabbat,rt,shaah_sec")
+        println("city,date,alot,misheyakir60,netz_mishor,shma_mga16,shma_mga72,shma_gra,tfila_mga16,tfila_mga72,tfila_gra,chatzot,mincha_gedola,mincha_ketana,plag_yy,shkia,tzeit,tzeit_lechumra,tzeit_shabbat,rt,shaah_sec")
         for (city in cities) {
             for (date in dates) {
                 val d = engine.calculate(city, date)
@@ -45,11 +45,11 @@ class PrintComparisonTablesTest {
                     listOf(
                         city.name, date.toString(),
                         f(d.alotHashachar), f(d.misheyakir60), f(d.hanetzMishor),
-                        f(d.sofZmanShmaMga), f(d.sofZmanShmaGra),
-                        f(d.sofZmanTfilaMga), f(d.sofZmanTfilaGra),
+                        f(d.sofZmanShmaMga), f(d.sofZmanShmaMga72), f(d.sofZmanShmaGra),
+                        f(d.sofZmanTfilaMga), f(d.sofZmanTfilaMga72), f(d.sofZmanTfilaGra),
                         f(d.chatzot), f(d.minchaGedola), f(d.minchaKetana),
                         f(d.plagHaminchaYalkutYosef), f(d.shkia),
-                        f(d.tzeitHakochavim), f(d.tzeitShabbat), f(d.tzeitRabbeinuTam),
+                        f(d.tzeitHakochavim), f(d.tzeitLechumra), f(d.tzeitShabbat), f(d.tzeitRabbeinuTam),
                         (d.shaahZmanisGra?.let { it / 1000 } ?: "").toString(),
                     ).joinToString(",")
                 )
