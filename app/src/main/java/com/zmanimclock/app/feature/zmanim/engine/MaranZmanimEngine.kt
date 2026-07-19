@@ -118,14 +118,21 @@ class MaranZmanimEngine @Inject constructor() {
         val minchaKetana = fromBase(9.5)
 
         // === Night ===
+        // Regular tzeit hakochavim — 13.5 zmaniyot minutes after shkia
+        // (¾ mil; Maran Rav Ovadia's primary weekday tzeit). Equal to a 3.7°
+        // solar depression at the equinox; expressed seasonally so it tracks
+        // the day length. Zemaneh Yosef getTzet() in Ohr HaChaim / fixedMil
+        // mode = sunset + fixedToSeasonal(13m30s) — identical.
         val tzeit = sunset.plusMillis(zmaniyotMinutes(TZEIT_ZMANIYOT_MINUTES))
 
-        // Tzeit lechumra — Zemaneh Yosef getTzetHumra: how long the sun takes
-        // to reach 5.075° below the horizon ON THE EQUINOX DAY (≈20 min in
-        // Israel), expressed as a fraction of that day's shaah and applied to
-        // the current shaah. Grows to ~24 min midsummer, shrinks in winter.
-        val tzeitLechumra = equinoxDegreeSeasonalFraction(location, date, TZEIT_LECHUMRA_DEGREES)
-            ?.let { fraction -> sunset.plusMillis((fraction * shaahGra).toLong()) }
+        // Tzeit lechumra — THREE MEDIUM STARS, the tzeit most people actually
+        // see: the true solar depression of 6.2° below the horizon on THIS
+        // day (Peninei Halacha: ≈25.5 min at the equinox, 28 in deep winter,
+        // 29.5 midsummer on a level horizon). A real astronomical angle, so
+        // it self-corrects for every date and latitude — no seasonal scaling.
+        val tzeitLechumra = czc.getSunsetOffsetByDegrees(
+            com.kosherjava.zmanim.AstronomicalCalendar.GEOMETRIC_ZENITH + TZEIT_LECHUMRA_DEGREES
+        )?.toInstant()
 
         val tzeitShabbat = sunset.plusMillis(Duration.ofMinutes(TZEIT_SHABBAT_FIXED_MINUTES).toMillis())
         // Rabbeinu Tam le-kulah (approved Zemaneh Yosef default, rtKulah=true):
@@ -173,29 +180,6 @@ class MaranZmanimEngine @Inject constructor() {
             shaahZmanisGra = shaahGra.toLong(),
             shaahZmanisMga = shaahMga.toLong(),
         )
-    }
-
-    /**
-     * The luach's degree→seasonal-minutes calibration (Zemaneh Yosef
-     * durationOfEquinoxDegreeSeasonalHour): on the equinox day (17 March) at
-     * this location, measure how long the sun takes to sink from sunset to
-     * [degrees] below the horizon, and return it as a fraction of that day's
-     * shaah zmanit. The caller multiplies by the current day's shaah.
-     */
-    private fun equinoxDegreeSeasonalFraction(
-        location: EngineLocation,
-        date: LocalDate,
-        degrees: Double,
-    ): Double? {
-        val eq = complexCalendarFor(location, LocalDate.of(date.year, 3, 17))
-        val eqSunrise = eq.seaLevelSunrise?.toInstant() ?: return null
-        val eqSunset = eq.seaLevelSunset?.toInstant() ?: return null
-        val eqTarget = eq.getSunsetOffsetByDegrees(
-            com.kosherjava.zmanim.AstronomicalCalendar.GEOMETRIC_ZENITH + degrees
-        )?.toInstant() ?: return null
-        val eqShaah = Duration.between(eqSunrise, eqSunset).toMillis() / 12.0
-        if (eqShaah <= 0) return null
-        return Duration.between(eqSunset, eqTarget).toMillis() / eqShaah
     }
 
     private fun complexCalendarFor(location: EngineLocation, date: LocalDate): ComplexZmanimCalendar {
@@ -277,11 +261,13 @@ class MaranZmanimEngine @Inject constructor() {
         const val TZEIT_ZMANIYOT_MINUTES = 13.5
 
         /**
-         * צאת הכוכבים לחומרא — solar depression 5.075° calibrated on the
-         * equinox day (Zemaneh Yosef stringentNightfall; ≈20 min at the
-         * equinox in Israel), scaled by the current shaah zmanit.
+         * צאת הכוכבים לחומרא — three medium stars: a TRUE 6.2° solar
+         * depression on the actual day (Peninei Halacha; ≈25.5 min at the
+         * equinox, 28 in deep winter, 29.5 midsummer in Israel). This is the
+         * tzeit most people can genuinely see three medium stars, used for
+         * stringencies (motzei Shabbat / end of a fast in some communities).
          */
-        const val TZEIT_LECHUMRA_DEGREES = 5.075
+        const val TZEIT_LECHUMRA_DEGREES = 6.2
 
         /** צאת שבת — 40 fixed minutes after shkia. */
         const val TZEIT_SHABBAT_FIXED_MINUTES = 40L
