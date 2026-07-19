@@ -1,9 +1,14 @@
 package com.zmanimclock.app.feature.settings.presentation
 
+import android.Manifest
 import android.app.AlarmManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,6 +61,25 @@ fun SettingsScreen(
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    // Enabling the persistent status line is pointless without notification
+    // permission — request it, then turn the pref on only once granted.
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) viewModel.setPersistentNotification(true) }
+
+    fun onPersistentToggle(enabled: Boolean) {
+        val needsPerm = enabled &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        if (needsPerm) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.setPersistentNotification(enabled)
+        }
+    }
+
     val alarmManager = context.getSystemService<AlarmManager>()
     val exactAlarmsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
         alarmManager?.canScheduleExactAlarms() == true
@@ -69,7 +93,7 @@ fun SettingsScreen(
         fullScreenOk = fullScreenOk,
         onCityClick = onOpenCityPicker,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
-        onPersistentNotificationChange = viewModel::setPersistentNotification,
+        onPersistentNotificationChange = ::onPersistentToggle,
         onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -320,7 +344,10 @@ fun SettingsContent(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "הזמנים מחושבים לפי שיטת מרן — לוח אור החיים / " +
-                        "חזון יוסף (הרב יצחק יוסף), על בסיס הנץ הנראה מטבלאות חי.",
+                        "חזון יוסף (הרב יצחק יוסף): שעות זמניות לפי היום " +
+                        "המישורי (זריחה–שקיעה בגובה פני הים), וחצות בנקודת " +
+                        "מעבר השמש. הנץ הנראה מטבלאות חי מוצג לתפילת ותיקין " +
+                        "ומשמש לשעונים המכוונים להנץ.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )

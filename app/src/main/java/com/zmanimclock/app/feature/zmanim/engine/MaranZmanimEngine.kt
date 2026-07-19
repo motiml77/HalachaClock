@@ -20,10 +20,12 @@ import javax.inject.Singleton
  * city-by-city against moreshet-maran.com and the "Chazon Yosef" mode of
  * royzmanim.com.
  *
- * THE CENTRAL RULE: the base of the day ("netz") is the VISIBLE sunrise
- * (ChaiTables) when available — not the astronomical/mishor sunrise. All
- * sunrise-anchored times (alot, misheyakir, sof zman shma/tfila, chatzot,
- * and the shaah zmanit itself) follow the visible netz.
+ * THE CENTRAL RULE: the seasonal-hour grid (shaah zmanit and every zman
+ * derived from it — alot, misheyakir, sof zman shma/tfila, mincha, plag,
+ * tzeit) runs on the SEA-LEVEL (mishor) day, sunrise→sunset, exactly like
+ * the luach ("Sunrise (Sea Level)" on royzmanim.com). Chatzot is the sun's
+ * transit. The VISIBLE sunrise (ChaiTables) serves vatikin only: it is the
+ * displayed הנץ הנראה and the anchor of netz alarms — never the grid base.
  */
 @Singleton
 class MaranZmanimEngine @Inject constructor() {
@@ -48,14 +50,24 @@ class MaranZmanimEngine @Inject constructor() {
         val mishorSunrise: Instant? = czc.seaLevelSunrise?.toInstant()
         val sunset: Instant? = czc.seaLevelSunset?.toInstant()
 
-        // === The base of the day: visible netz first, mishor fallback ===
-        val baseSunrise: Instant? = visibleSunrise ?: mishorSunrise
+        // === THE ROOT PRINCIPLE: the seasonal-hour grid runs on the SEA-LEVEL
+        // (mishor) day — sunrise to sunset — NEVER on the visible netz.
+        //
+        // Chazon Yosef / Zemaneh Yosef (royzmanim.com shows "Sunrise (Sea
+        // Level)"; its GRA shaah = mishor day / 12): terrain delays what the
+        // eye sees, not the halachic day. The VISIBLE netz (ChaiTables) is the
+        // vatikin davening time — displayed as הנץ הנראה and used for
+        // netz-anchored alarms via instantOf(HANETZ) — but it must not stretch
+        // or shift the shaah zmanit. Using it as the grid base skewed every
+        // sunrise-anchored zman in hill towns (Karnei Shomron: netz +12 min →
+        // shma GRA +9, chatzot +5), while sunset-anchored zmanim stayed right.
+        val baseSunrise: Instant? = mishorSunrise ?: visibleSunrise
 
         if (baseSunrise == null || sunset == null) {
             return emptyDay(location, date, visibleSunrise != null, mishorSunrise, visibleSunrise, sunset)
         }
 
-        // Shaah zmanit (GRA): the day from netz to shkia divided by 12
+        // Shaah zmanit (GRA): the mishor day divided by 12
         val dayMillis = Duration.between(baseSunrise, sunset).toMillis()
         val shaahGra = dayMillis / 12.0
         // Shaah zmanit (MGA-72 zmaniyot): day extended by 72 zmaniyot minutes
@@ -76,8 +88,20 @@ class MaranZmanimEngine @Inject constructor() {
         val shmaMga = alot.plusMillis((3.0 * shaahMga).toLong())
         val tfilaMga = alot.plusMillis((4.0 * shaahMga).toLong())
 
-        // === Midday ===
-        val chatzot = fromBase(6.0)
+        // === Midday: TRUE solar noon (sun transit) ===
+        // Chazon Yosef (ROYZmanim getChatzot === getSunTransit) fixes chatzot at
+        // the sun's meridian crossing — an independent astronomical event, NOT
+        // "netz + 6 seasonal hours". With the sea-level netz the midpoint equals
+        // the transit, but the VISIBLE netz is asymmetric (terrain delays only
+        // sunrise), so netz+6 drifts off true chatzot — e.g. Karnei Shomron
+        // showed 12:51 instead of the correct 12:46. Anchor to the mishor
+        // sunrise↔sunset midpoint (= solar noon); fall back to netz+6 only if
+        // the mishor sunrise is unavailable.
+        val chatzot: Instant = czc.sunTransit?.toInstant()
+            ?: mishorSunrise?.let {
+                Instant.ofEpochMilli((it.toEpochMilli() + sunset.toEpochMilli()) / 2)
+            }
+            ?: fromBase(6.0)
         // Mincha gedola: 30 fixed minutes after chatzot, or half a shaah zmanit
         // after chatzot — whichever is LATER (the machmir position of the luach)
         val minchaGedolaFixed = chatzot.plusMillis(Duration.ofMinutes(MINCHA_GEDOLA_FIXED_MINUTES).toMillis())

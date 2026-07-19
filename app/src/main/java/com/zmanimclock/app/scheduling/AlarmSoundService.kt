@@ -79,14 +79,49 @@ class AlarmSoundService : Service() {
         snooze()
     }
 
+    private var previewMode = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> start(intent.getLongExtra(EXTRA_ALARM_ID, -1))
+            ACTION_PREVIEW -> startPreview(intent)
             ACTION_DISMISS -> dismiss()
             ACTION_SNOOZE -> snooze()
             else -> stopSelf()
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * Item I — ring a transient alarm built straight from the editor's current
+     * settings, no DB and no scheduling. The full ringing screen opens so the
+     * user can hear the real volume/sound and feel the vibration; the math
+     * challenge is intentionally skipped so a preview is always easy to stop.
+     */
+    private fun startPreview(intent: Intent) {
+        previewMode = true
+        val transient = AlarmEntity(
+            id = PREVIEW_ID,
+            type = AlarmType.FIXED,
+            soundEnabled = intent.getBooleanExtra(EXTRA_PREVIEW_SOUND_ENABLED, true),
+            soundUri = intent.getStringExtra(EXTRA_PREVIEW_SOUND_URI),
+            volumePercent = intent.getIntExtra(EXTRA_PREVIEW_VOLUME, 100),
+            vibrate = intent.getBooleanExtra(EXTRA_PREVIEW_VIBRATE, true),
+            ringDurationMinutes = 1, // a preview never rings longer than a minute
+            shabbatMode = intent.getBooleanExtra(EXTRA_PREVIEW_SHABBAT, false),
+            dismissChallenge = com.zmanimclock.app.feature.alarms.data.DismissChallenge.NONE,
+            maxSnoozes = 0,
+            label = intent.getStringExtra(EXTRA_PREVIEW_TITLE) ?: "תצוגה מקדימה",
+        )
+        alarm = transient
+        goForeground(
+            notificationHelper.buildAlarmNotification(
+                alertId = PREVIEW_ID, title = titleOf(transient), timeText = "",
+                snoozeMinutes = 0, shabbatMode = transient.shabbatMode, snoozesLeft = 0,
+            )
+        )
+        acquireWakeLock()
+        ring(transient)
     }
 
     private fun start(alarmId: Long) {
@@ -213,6 +248,10 @@ class AlarmSoundService : Service() {
     }
 
     private fun dismiss() {
+        if (previewMode) {
+            Log.i(TAG, "Preview dismissed")
+            stopRinging(); stopSelf(); return
+        }
         val a = alarm
         Log.i(TAG, "Alarm ${a?.id} acknowledged")
         stopRinging()
@@ -227,6 +266,9 @@ class AlarmSoundService : Service() {
     }
 
     private fun snooze() {
+        if (previewMode) { // a preview self-silences instead of snoozing
+            stopRinging(); stopSelf(); return
+        }
         val a = alarm ?: run { stopRinging(); stopSelf(); return }
         // B3: enforce the snooze limit (maxSnoozes: -1 = unlimited, 0 = none)
         if (a.maxSnoozes in 0..a.snoozeCount) {
@@ -297,8 +339,19 @@ class AlarmSoundService : Service() {
         private const val TAG = "AlarmSoundService"
 
         const val ACTION_START = "com.zmanimclock.app.alarm.START"
+        const val ACTION_PREVIEW = "com.zmanimclock.app.alarm.PREVIEW"
         const val ACTION_DISMISS = "com.zmanimclock.app.alarm.DISMISS"
         const val ACTION_SNOOZE = "com.zmanimclock.app.alarm.SNOOZE"
+
+        /** Sentinel id for the transient preview alarm (item I). */
+        const val PREVIEW_ID = -100L
+
+        const val EXTRA_PREVIEW_SOUND_ENABLED = "preview_sound_enabled"
+        const val EXTRA_PREVIEW_SOUND_URI = "preview_sound_uri"
+        const val EXTRA_PREVIEW_VOLUME = "preview_volume"
+        const val EXTRA_PREVIEW_VIBRATE = "preview_vibrate"
+        const val EXTRA_PREVIEW_SHABBAT = "preview_shabbat"
+        const val EXTRA_PREVIEW_TITLE = "preview_title"
 
         const val EXTRA_ALARM_ID = "alarm_id"
         const val EXTRA_TITLE = "title"

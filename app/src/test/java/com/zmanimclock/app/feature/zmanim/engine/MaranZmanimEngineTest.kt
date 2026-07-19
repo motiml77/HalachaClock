@@ -35,18 +35,27 @@ class MaranZmanimEngineTest {
     }
 
     @Test
-    fun `visible sunrise becomes the base of the day`() {
+    fun `visible sunrise is vatikin-only - the grid does NOT move with it`() {
+        // THE ROOT PRINCIPLE (found via Karnei Shomron, netz +12 min): terrain
+        // delays what the eye sees, not the halachic day. The visible netz is
+        // displayed and anchors netz alarms, but the shaah-zmanit grid stays
+        // on the sea-level day exactly as the luach computes it.
         val mishorDay = engine.calculate(jerusalem, testDate)
-        val visible = mishorDay.hanetzMishor!!.plusSeconds(180) // netz 3 min after mishor
+        val visible = mishorDay.hanetzMishor!!.plusSeconds(720) // netz 12 min late
         val day = engine.calculate(jerusalem, testDate, visibleSunrise = visible)
 
         assertTrue(day.basedOnVisibleSunrise)
         assertEquals(visible, day.hanetzVisible)
-        // Sof zman shma must move together with the visible netz
-        assertEquals(
-            Duration.between(mishorDay.sofZmanShmaGra, day.sofZmanShmaGra).seconds > 0,
-            true,
-        )
+        // The entire grid must be IDENTICAL to the mishor-only day
+        assertEquals(mishorDay.shaahZmanisGra, day.shaahZmanisGra)
+        assertEquals(mishorDay.alotHashachar, day.alotHashachar)
+        assertEquals(mishorDay.misheyakir60, day.misheyakir60)
+        assertEquals(mishorDay.sofZmanShmaGra, day.sofZmanShmaGra)
+        assertEquals(mishorDay.sofZmanShmaMga, day.sofZmanShmaMga)
+        assertEquals(mishorDay.chatzot, day.chatzot)
+        assertEquals(mishorDay.minchaGedola, day.minchaGedola)
+        assertEquals(mishorDay.plagHaminchaYalkutYosef, day.plagHaminchaYalkutYosef)
+        assertEquals(mishorDay.tzeitHakochavim, day.tzeitHakochavim)
     }
 
     @Test
@@ -71,10 +80,14 @@ class MaranZmanimEngineTest {
     }
 
     @Test
-    fun `chatzot is base plus 6 shaos`() {
+    fun `chatzot is solar noon (transit), approx the mishor midpoint`() {
+        // Chazon Yosef (ROYZmanim getChatzot === getSunTransit): chatzot is the
+        // sun's meridian crossing, an independent astronomical event — NOT
+        // netz + 6 seasonal hours. For the sea-level day it's within a few
+        // seconds of the sunrise↔sunset midpoint (equation-of-time asymmetry).
         val day = engine.calculate(jerusalem, testDate)
-        val expected = day.hanetzMishor!!.plusMillis(day.shaahZmanisGra!! * 6)
-        assertCloseMillis(expected, day.chatzot!!)
+        val midpoint = day.hanetzMishor!!.plusMillis(day.shaahZmanisGra!! * 6)
+        assertCloseMillis(midpoint, day.chatzot!!, toleranceMillis = 60_000)
     }
 
     @Test

@@ -31,4 +31,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-post the persistent status line on every open — defense-in-depth
+        // if an aggressive OEM removed the ongoing notification after a kill.
+        com.zmanimclock.app.scheduling.StatusNotificationReceiver.ping(this)
+    }
 }

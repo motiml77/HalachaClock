@@ -10,6 +10,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.scheduling.AlarmScheduler
+import com.zmanimclock.app.scheduling.AlarmSoundService
 import com.zmanimclock.app.scheduling.RescheduleWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -75,7 +76,6 @@ class AlarmEditViewModel @Inject constructor(
                 type = type,
                 zmanId = preselectedZman ?: "HANETZ",
                 offsetMinutes = if (type == AlarmType.ZMAN) 30 else 0,
-                skipShabbat = type == AlarmType.ZMAN,
             )
             refreshPreview()
         }
@@ -104,6 +104,49 @@ class AlarmEditViewModel @Inject constructor(
             )
             else -> a.copy(type = AlarmType.FIXED)
         }
+    }
+
+    /**
+     * Item I — "תצוגה מקדימה לשעון": ring right now, exactly as this alarm
+     * would, using the current (possibly unsaved) sound/volume/vibrate/screen
+     * settings. Runs through the real [AlarmSoundService] preview path so the
+     * user hears the true volume and sees the real ringing screen; it never
+     * touches the database or the schedule.
+     */
+    fun previewAlarm() {
+        val a = _alarm.value
+        val title = a.label.ifBlank { defaultAlarmLabel(a) }
+
+        // 1) The sound/vibration/ramp via the real service (preview path).
+        val svc = android.content.Intent(context, AlarmSoundService::class.java).apply {
+            action = AlarmSoundService.ACTION_PREVIEW
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_SOUND_ENABLED, a.soundEnabled)
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_SOUND_URI, a.soundUri)
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_VOLUME, a.volumePercent)
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_VIBRATE, a.vibrate)
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_SHABBAT, a.shabbatMode)
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_TITLE, title)
+        }
+        androidx.core.content.ContextCompat.startForegroundService(context, svc)
+
+        // 2) The full designed ringing screen — launched directly so it shows
+        //    even while the editor is in the foreground (no math gate for a
+        //    preview; אישור stops it). PREVIEW_ID routes dismiss to the
+        //    service's preview branch.
+        val screen = android.content.Intent(
+            context,
+            com.zmanimclock.app.feature.alarm.presentation.AlarmActivity::class.java,
+        ).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(AlarmSoundService.EXTRA_ALARM_ID, AlarmSoundService.PREVIEW_ID)
+            putExtra(AlarmSoundService.EXTRA_TITLE, title)
+            putExtra(AlarmSoundService.EXTRA_TIME_TEXT, "")
+            putExtra(AlarmSoundService.EXTRA_SHABBAT, a.shabbatMode)
+            putExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, 0)
+            putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 0)
+        }
+        context.startActivity(screen)
     }
 
     fun save(onDone: () -> Unit) {

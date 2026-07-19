@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -37,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -46,7 +48,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -99,29 +100,39 @@ fun AlarmEditScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        val isEditing = alarmId != null && alarmId >= 0
-        TopAppBar(
-            title = {
-                Text(
-                    when {
-                        alarm.shabbatMode -> "התראת כניסת שבת"
-                        isEditing -> "עריכת שעון"
-                        else -> "שעון חדש"
-                    }
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
-                }
-            },
-        )
+    val isEditing = alarmId != null && alarmId >= 0
+    // From a zman-list bell the anchor is fixed to that zman — no toggle shown.
+    val showAnchorToggle = !alarm.shabbatMode && preselectedZman == null
+
+    // The WHOLE screen scrolls — the header travels with the content, no
+    // pinned app bar (matches every standard app).
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
+            }
+            Text(
+                text = when {
+                    alarm.shabbatMode -> "התראת כניסת שבת"
+                    isEditing -> "עריכת שעון"
+                    else -> "שעון חדש"
+                },
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -148,9 +159,20 @@ fun AlarmEditScreen(
                 }
             }
 
+            // Name — chosen at the TOP of the page (item G)
+            OutlinedTextField(
+                value = alarm.label,
+                onValueChange = { v -> viewModel.update { it.copy(label = v) } },
+                label = { Text("שם השעון") },
+                placeholder = { Text(defaultAlarmLabel(alarm)) },
+                supportingText = { Text("ריק = השם המוצע") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             // === Anchor type: fixed clock ↔ halachic zman ===
-            // The Shabbat-entry alert is locked to its zman anchor.
-            if (!alarm.shabbatMode) {
+            // Hidden when the anchor is locked (Shabbat alert / zman-list bell).
+            if (showAnchorToggle) {
                 AnchorTypeSelector(alarm.type, viewModel::setType)
             }
 
@@ -238,25 +260,59 @@ fun AlarmEditScreen(
                         )
                     }
 
-                    Text("משך התראה", style = MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(1, 5, 10).forEach { minutes ->
-                            FilterChip(
-                                selected = alarm.ringDurationMinutes == minutes,
-                                onClick = { viewModel.update { it.copy(ringDurationMinutes = minutes) } },
-                                label = { Text("$minutes דק'") },
-                            )
+                    Text(
+                        "משך הצלצול: ${alarm.ringDurationMinutes} דקות",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Slider(
+                        value = alarm.ringDurationMinutes.toFloat(),
+                        onValueChange = { v ->
+                            viewModel.update { it.copy(ringDurationMinutes = v.toInt().coerceIn(1, 30)) }
+                        },
+                        valueRange = 1f..30f,
+                        steps = 28,
+                    )
+                }
+            }
+
+            // === Snooze — its own section, OFF by default (items D+E) ===
+            SectionTitle("נודניק")
+            Card {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SwitchRow("אפשר נודניק", alarm.maxSnoozes != 0) { on ->
+                        viewModel.update { it.copy(maxSnoozes = if (on) -1 else 0) }
+                    }
+                    if (alarm.maxSnoozes != 0) {
+                        Text("כל כמה דקות", style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(5, 10, 15).forEach { minutes ->
+                                FilterChip(
+                                    selected = alarm.snoozeMinutes == minutes,
+                                    onClick = { viewModel.update { it.copy(snoozeMinutes = minutes) } },
+                                    label = { Text("$minutes דק'") },
+                                )
+                            }
+                        }
+                        Text("מספר פעמים מותר", style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(-1 to "ללא הגבלה", 3 to "3", 1 to "1").forEach { (n, label) ->
+                                FilterChip(
+                                    selected = alarm.maxSnoozes == n,
+                                    onClick = { viewModel.update { it.copy(maxSnoozes = n) } },
+                                    label = { Text(label) },
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // === Dismissal ===
-            SectionTitle("כיבוי ההתראה")
+            // === Math challenge to dismiss — separate section (item D) ===
+            SectionTitle("תרגיל חשבון לכיבוי")
             Card {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SwitchRow(
-                        "תרגיל חשבון לכיבוי",
+                        "דרוש תרגיל חשבון כדי לכבות",
                         alarm.dismissChallenge != DismissChallenge.NONE,
                     ) { on ->
                         viewModel.update {
@@ -276,28 +332,6 @@ fun AlarmEditScreen(
                                     label = { Text(label) },
                                 )
                             }
-                        }
-                    }
-                    Text("נודניק", style = MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(5, 10, 15).forEach { minutes ->
-                            FilterChip(
-                                selected = alarm.snoozeMinutes == minutes,
-                                onClick = { viewModel.update { it.copy(snoozeMinutes = minutes) } },
-                                label = { Text("$minutes דק'") },
-                            )
-                        }
-                    }
-
-                    // B3: snooze limit (anti-snooze)
-                    Text("מספר נודניקים מותר", style = MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(-1 to "ללא הגבלה", 3 to "3", 1 to "1", 0 to "בלי נודניק").forEach { (n, label) ->
-                            FilterChip(
-                                selected = alarm.maxSnoozes == n,
-                                onClick = { viewModel.update { it.copy(maxSnoozes = n) } },
-                                label = { Text(label) },
-                            )
                         }
                     }
                 }
@@ -329,15 +363,20 @@ fun AlarmEditScreen(
                 }
             }
 
-            // === Name + save ===
-            OutlinedTextField(
-                value = alarm.label,
-                onValueChange = { v -> viewModel.update { it.copy(label = v) } },
-                label = { Text("שם השעון") },
-                placeholder = { Text(defaultAlarmLabel(alarm)) },
-                supportingText = { Text("ריק = השם המוצע") },
-                singleLine = true,
+            // === Preview this alarm exactly as it will ring (item I) ===
+            OutlinedButton(
+                onClick = { viewModel.previewAlarm() },
                 modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("תצוגה מקדימה לשעון")
+            }
+            Text(
+                "הדגמה חיה של מסך הצלצול — עם הצליל, העוצמה והרטט שבחרת. " +
+                    "כדי לעצור, הקש \"אישור\" במסך שייפתח.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
             )
 
             Button(
@@ -530,7 +569,6 @@ private fun DaysSelector(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEnti
                 label = { Text("א'-ה'") },
             )
         }
-        SwitchRow("דלג בשבת", alarm.skipShabbat) { v -> update { it.copy(skipShabbat = v) } }
         SwitchRow("דלג ביום טוב", alarm.skipYomTov) { v -> update { it.copy(skipYomTov = v) } }
     }
 }

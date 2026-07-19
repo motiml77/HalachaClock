@@ -97,6 +97,49 @@ class LuachVerificationTest {
         rabbeinuTam = "20:58", chatzotLayla = "00:44",
     )
 
+    // === קרני שומרון (32.1667, 35.0833) — hill town, visible netz +12 min ===
+    // THE ROOT-PRINCIPLE REGRESSION. Reference captured 2026-07-19 from
+    // royzmanim.com/calendar?lat=32.1667&long=35.0833&elevation=0.
+    // The REAL ChaiTables visible netz for that day (05:58:27, asset day 200)
+    // is fed into the engine — and the whole grid must still match the
+    // luach's sea-level values. Before the fix this drifted: shma GRA 09:25
+    // instead of 09:16, chatzot 12:51 instead of 12:46.
+    @Test
+    fun karneiShomronGridIgnoresVisibleNetz() {
+        val ksDate = LocalDate.of(2026, 7, 19)
+        val location = city("Karnei Shomron", 32.1667, 35.0833)
+        val visibleNetz = ksDate.atTime(LocalTime.of(5, 58, 27)).atZone(zone).toInstant()
+        val day = engine.calculate(location, ksDate, visibleSunrise = visibleNetz)
+
+        fun checkAt(zman: String, expectedLocal: String, actual: Instant?, nextDay: Boolean = false) {
+            assertTrue("קרני שומרון/$zman: engine returned null", actual != null)
+            val expectedDate = if (nextDay) ksDate.plusDays(1) else ksDate
+            val expected = expectedDate.atTime(LocalTime.parse(expectedLocal)).atZone(zone).toInstant()
+            val diff = Duration.between(expected, actual).abs()
+            assertTrue(
+                "קרני שומרון/$zman: expected ~$expectedLocal but engine gave " +
+                    "${actual!!.atZone(zone).toLocalTime()} (off by ${diff.toMinutes()}m)",
+                diff <= Duration.ofMinutes(2),
+            )
+        }
+
+        checkAt("עלות השחר", "04:22", day.alotHashachar)
+        checkAt("משיכיר", "04:37", day.misheyakir60)
+        checkAt("הנץ מישור", "05:46", day.hanetzMishor)
+        checkAt("הנץ הנראה", "05:58", day.hanetzVisible) // vatikin layer intact
+        checkAt("סוזק\"ש מג\"א", "08:34", day.sofZmanShmaMga)
+        checkAt("סוזק\"ש גר\"א", "09:16", day.sofZmanShmaGra)
+        checkAt("סו\"ז ברכות ק\"ש", "10:26", day.sofZmanTfilaGra)
+        checkAt("חצות", "12:46", day.chatzot)
+        checkAt("מנחה גדולה", "13:21", day.minchaGedola)
+        checkAt("מנחה קטנה", "16:51", day.minchaKetana)
+        checkAt("פלג ילקו\"י", "18:34", day.plagHaminchaYalkutYosef)
+        checkAt("שקיעה", "19:45", day.shkia)
+        checkAt("צאת הכוכבים", "20:01", day.tzeitHakochavim)
+        checkAt("רבנו תם", "20:57", day.tzeitRabbeinuTam)
+        checkAt("חצות לילה", "00:46", day.chatzotLayla, nextDay = true)
+    }
+
     @Suppress("LongParameterList")
     private fun verifyCity(
         location: EngineLocation,

@@ -66,8 +66,8 @@ data class AlarmEntity(
     val dismissChallenge: DismissChallenge = DismissChallenge.NONE,
     val snoozeMinutes: Int = 5,
 
-    /** Anti-snooze: max snoozes allowed. -1 = unlimited, 0 = no snooze. */
-    val maxSnoozes: Int = -1,
+    /** Anti-snooze: max snoozes allowed. -1 = unlimited, 0 = no snooze (default). */
+    val maxSnoozes: Int = 0,
     /** Snoozes used for the current firing; reset on dismiss/reschedule. */
     val snoozeCount: Int = 0,
 
