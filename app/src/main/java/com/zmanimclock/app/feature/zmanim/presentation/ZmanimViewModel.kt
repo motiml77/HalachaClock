@@ -9,7 +9,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
-import com.zmanimclock.app.feature.zmanim.model.instantOf
+import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,9 +100,7 @@ class ZmanimViewModel @Inject constructor(
             val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
             val now = Instant.now()
 
-            val timed = ZmanKind.entries
-                .mapNotNull { kind -> day.instantOf(kind)?.let { kind to it } }
-                .sortedBy { (_, instant) -> instant }
+            val timed = day.relevantTimedZmanim(today)
             val next = timed.firstOrNull { (_, instant) -> instant.isAfter(now) }
 
             _uiState.value = UiState(

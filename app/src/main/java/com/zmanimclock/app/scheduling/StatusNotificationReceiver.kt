@@ -11,7 +11,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
-import com.zmanimclock.app.feature.zmanim.model.instantOf
+import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,8 +133,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
     ): Pair<ZmanKind, Instant>? {
         // cacheOnly: a receiver must not hit the network (goAsync ~10s budget)
         val day = zmanimRepository.getDayZmanim(location, cityId, date, cacheOnly = true)
-        return ZmanKind.entries
-            .mapNotNull { kind -> day.instantOf(kind)?.let { kind to it } }
+        return day.relevantTimedZmanim(date)
             .filter { (_, instant) -> instant.isAfter(now) }
             .minByOrNull { (_, instant) -> instant }
     }

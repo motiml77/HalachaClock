@@ -1,7 +1,12 @@
 package com.zmanimclock.app.feature.zmanim.model
 
+import com.kosherjava.zmanim.hebrewcalendar.JewishCalendar
 import com.zmanimclock.app.feature.zmanim.engine.DayZmanim
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.GregorianCalendar
 
 /**
  * Stable identifiers for alert-able zmanim. Alert rows store [name], so these
@@ -34,6 +39,35 @@ enum class ZmanKind(val hebrewName: String) {
     companion object {
         fun fromNameOrNull(name: String): ZmanKind? = entries.firstOrNull { it.name == name }
     }
+}
+
+/**
+ * The zmanim to actually SHOW/rank for [date] at this location — sorted by
+ * time. Day-specific zmanim are hidden when they are meaningless:
+ *  - הדלקת נרות only on erev Shabbat (Friday) / erev Yom Tov.
+ *  - צאת שבת only on Shabbat itself / a Yom Tov that is assur bemelacha.
+ * Everything else shows every day. This is the single source of truth used
+ * by the home screen, the status notification and the widget so "הזמן הבא"
+ * never points at candle-lighting in the middle of the week.
+ */
+fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>> {
+    val zone = ZoneId.of(location.timeZoneId)
+    val jc = JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone))).apply { inIsrael = true }
+    val isErevShabbatOrChag =
+        date.dayOfWeek == DayOfWeek.FRIDAY || jc.isErevYomTov || jc.isErevYomTovSheni
+    val isShabbatOrChag =
+        date.dayOfWeek == DayOfWeek.SATURDAY || jc.isYomTovAssurBemelacha
+
+    return ZmanKind.entries
+        .filter { kind ->
+            when (kind) {
+                ZmanKind.CANDLE_LIGHTING -> isErevShabbatOrChag
+                ZmanKind.TZEIT_SHABBAT -> isShabbatOrChag
+                else -> true
+            }
+        }
+        .mapNotNull { kind -> instantOf(kind)?.let { kind to it } }
+        .sortedBy { (_, instant) -> instant }
 }
 
 /** The concrete time of [kind] on this day (visible-netz-based when available). */

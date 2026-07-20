@@ -2,6 +2,8 @@ package com.zmanimclock.app.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zmanimclock.app.data.local.ZmanimDatabase
 import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.chaitables.data.local.ChaiTablesDao
@@ -27,9 +29,25 @@ object AppModule {
         val dpsContext = context.createDeviceProtectedStorageContext()
         runCatching { dpsContext.moveDatabaseFrom(context, "zmanim.db") }
         return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
-            // pre-release: schema still moves; real migrations start at v1.0
+            // v4→v5: ring duration moved from whole minutes to seconds — keep
+            // the user's existing alarms by converting minutes×60 in place.
+            .addMigrations(MIGRATION_4_5)
+            // any other pre-release schema jump still resets cleanly
             .fallbackToDestructiveMigration()
             .build()
+    }
+
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE alarms ADD COLUMN ringDurationSeconds INTEGER NOT NULL DEFAULT 60"
+            )
+            // Clamp to the new 10..180s range; a 5-min default becomes 180 (3 min cap)
+            db.execSQL(
+                "UPDATE alarms SET ringDurationSeconds = " +
+                    "MIN(180, MAX(10, ringDurationMinutes * 60))"
+            )
+        }
     }
 
     @Provides

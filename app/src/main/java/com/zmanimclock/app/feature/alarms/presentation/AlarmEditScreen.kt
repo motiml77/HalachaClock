@@ -261,16 +261,18 @@ fun AlarmEditScreen(
                     }
 
                     Text(
-                        "משך הצלצול: ${alarm.ringDurationMinutes} דקות",
+                        "משך הצלצול: ${formatRingDuration(alarm.ringDurationSeconds)}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Slider(
-                        value = alarm.ringDurationMinutes.toFloat(),
+                        // 10s … 3 min, in 5-second steps
+                        value = alarm.ringDurationSeconds.toFloat(),
                         onValueChange = { v ->
-                            viewModel.update { it.copy(ringDurationMinutes = v.toInt().coerceIn(1, 30)) }
+                            val snapped = (Math.round(v / 5f) * 5).coerceIn(10, 180)
+                            viewModel.update { it.copy(ringDurationSeconds = snapped) }
                         },
-                        valueRange = 1f..30f,
-                        steps = 28,
+                        valueRange = 10f..180f,
+                        steps = 33,
                     )
                 }
             }
@@ -588,6 +590,14 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = onChange)
     }
+}
+
+/** "40 שניות" / "דקה" / "1:30 דקות" / "3 דקות". */
+private fun formatRingDuration(seconds: Int): String = when {
+    seconds < 60 -> "$seconds שניות"
+    seconds == 60 -> "דקה"
+    seconds % 60 == 0 -> "${seconds / 60} דקות"
+    else -> "%d:%02d דקות".format(seconds / 60, seconds % 60)
 }
 
 private fun soundTitle(context: android.content.Context, uriString: String): String =

@@ -56,7 +56,7 @@ class SettingsViewModel @Inject constructor(
                     minute = fire.minute,
                     daysOfWeek = 0, // one-time
                     label = "בדיקת צלצול",
-                    ringDurationMinutes = 1,
+                    ringDurationSeconds = 60,
                 )
             )
             WorkManager.getInstance(context)

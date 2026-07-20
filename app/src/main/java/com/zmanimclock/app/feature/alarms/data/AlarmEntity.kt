@@ -53,7 +53,9 @@ data class AlarmEntity(
     val soundEnabled: Boolean = true,  // false = vibrate-only alert
     val soundUri: String? = null,      // null = system default alarm sound
     val volumePercent: Int = 100,      // 10..100, ramp climbs to this target
-    val ringDurationMinutes: Int = 5,  // auto-silence (self-snooze) after this
+    @Deprecated("Superseded by ringDurationSeconds") val ringDurationMinutes: Int = 1,
+    /** Auto-silence (self-snooze) after this many seconds. 10..180 (max 3 min). */
+    val ringDurationSeconds: Int = 60,
     val vibrate: Boolean = true,
 
     /**

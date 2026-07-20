@@ -14,6 +14,7 @@ import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
+import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.LocalDate
@@ -55,13 +56,12 @@ class WidgetRenderer @Inject constructor(
         val dayToday = zmanimRepository.getDayZmanim(location, cityId, today, cacheOnly = true)
         val dayTomorrow = zmanimRepository.getDayZmanim(location, cityId, today.plusDays(1), cacheOnly = true)
 
-        // Next zman across today→tomorrow
-        val next = ZmanKind.entries
-            .mapNotNull { k -> dayToday.instantOf(k)?.let { k to it } }
+        // Next zman across today→tomorrow (candle-lighting/tzeit-Shabbat only
+        // surface on their relevant days — never mid-week)
+        val next = dayToday.relevantTimedZmanim(today)
             .filter { it.second.isAfter(now) }
             .minByOrNull { it.second }
-            ?: ZmanKind.entries
-                .mapNotNull { k -> dayTomorrow.instantOf(k)?.let { k to it } }
+            ?: dayTomorrow.relevantTimedZmanim(today.plusDays(1))
                 .minByOrNull { it.second }
 
         for (id in ids) {

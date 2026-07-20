@@ -68,7 +68,7 @@ class AlarmEditViewModel @Inject constructor(
                 daysOfWeek = AlarmEntity.FRIDAY_ONLY,
                 shabbatMode = true,
                 label = "כניסת שבת",
-                ringDurationMinutes = 1,
+                ringDurationSeconds = 60,
             )
             refreshPreview()
         } else {

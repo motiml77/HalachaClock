@@ -60,6 +60,8 @@ class AlarmSoundService : Service() {
     private var alarm: AlarmEntity? = null
     private var currentVolume = 0f
     private var targetVolume = 1f
+    /** System ALARM-stream level before we forced it up, to restore on stop. */
+    private var savedAlarmVolume: Int? = null
 
     private val volumeRampStep = object : Runnable {
         override fun run() {
@@ -107,7 +109,7 @@ class AlarmSoundService : Service() {
             soundUri = intent.getStringExtra(EXTRA_PREVIEW_SOUND_URI),
             volumePercent = intent.getIntExtra(EXTRA_PREVIEW_VOLUME, 100),
             vibrate = intent.getBooleanExtra(EXTRA_PREVIEW_VIBRATE, true),
-            ringDurationMinutes = 1, // a preview never rings longer than a minute
+            ringDurationSeconds = 30, // a preview never rings longer than 30s
             shabbatMode = intent.getBooleanExtra(EXTRA_PREVIEW_SHABBAT, false),
             dismissChallenge = com.zmanimclock.app.feature.alarms.data.DismissChallenge.NONE,
             maxSnoozes = 0,
@@ -182,11 +184,18 @@ class AlarmSoundService : Service() {
 
         if (alarm.soundEnabled) startSound(alarm)
         if (alarm.vibrate) startVibration()
-        handler.postDelayed(autoSilence, alarm.ringDurationMinutes.coerceIn(1, 30) * 60_000L)
+        handler.postDelayed(autoSilence, alarm.ringDurationSeconds.coerceIn(10, 180) * 1_000L)
         Log.i(TAG, "Ringing alarm ${alarm.id} ('${titleOf(alarm)}')")
     }
 
     private fun startSound(alarm: AlarmEntity) {
+        // CRITICAL: force the system ALARM stream up to the chosen level.
+        // The alarm stream is independent of the ringer, but if the phone is
+        // on vibrate/silent its ALARM volume is often left at 0 — then a
+        // MediaPlayer scalar has nothing to amplify and the alarm is silent.
+        // Raising it here makes the alarm audible regardless of ringer mode.
+        forceAlarmStreamVolume(alarm.volumePercent)
+
         targetVolume = (alarm.volumePercent.coerceIn(10, 100)) / 100f
         currentVolume = (targetVolume * 0.15f).coerceAtLeast(0.05f)
 
@@ -227,6 +236,29 @@ class AlarmSoundService : Service() {
         mediaPlayer?.release()
         mediaPlayer = null
         false
+    }
+
+    /**
+     * Raise the system ALARM stream so the alarm is heard even on vibrate.
+     * Saves the previous level so [restoreAlarmStreamVolume] can put it back
+     * when the alarm stops — we don't want to permanently change the setting.
+     */
+    private fun forceAlarmStreamVolume(volumePercent: Int) {
+        val am = getSystemService<android.media.AudioManager>() ?: return
+        runCatching {
+            val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+            if (savedAlarmVolume == null) savedAlarmVolume =
+                am.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+            val target = (max * volumePercent.coerceIn(10, 100) / 100).coerceAtLeast(1)
+            am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, target, 0)
+        }
+    }
+
+    private fun restoreAlarmStreamVolume() {
+        val prev = savedAlarmVolume ?: return
+        savedAlarmVolume = null
+        val am = getSystemService<android.media.AudioManager>() ?: return
+        runCatching { am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, prev, 0) }
     }
 
     /** -1 = unlimited; otherwise remaining snoozes for this firing. */
@@ -292,6 +324,7 @@ class AlarmSoundService : Service() {
         mediaPlayer = null
         vibrator?.cancel()
         vibrator = null
+        restoreAlarmStreamVolume()
     }
 
     private fun acquireWakeLock() {
