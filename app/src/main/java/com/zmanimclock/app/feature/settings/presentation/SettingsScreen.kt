@@ -86,11 +86,21 @@ fun SettingsScreen(
     val fullScreenOk = Build.VERSION.SDK_INT < 34 ||
         context.getSystemService<android.app.NotificationManager>()
             ?.canUseFullScreenIntent() == true
+    val overlayOk = Settings.canDrawOverlays(context)
 
     SettingsContent(
         prefs = prefs,
         exactAlarmsOk = exactAlarmsOk,
         fullScreenOk = fullScreenOk,
+        overlayOk = overlayOk,
+        onRequestOverlay = {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:${context.packageName}"),
+                )
+            )
+        },
         onCityClick = onOpenCityPicker,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
         onPersistentNotificationChange = ::onPersistentToggle,
@@ -119,6 +129,8 @@ fun SettingsContent(
     prefs: UserPreferences,
     exactAlarmsOk: Boolean,
     fullScreenOk: Boolean = true,
+    overlayOk: Boolean = true,
+    onRequestOverlay: () -> Unit = {},
     onCityClick: () -> Unit,
     onCandleMinutesChange: (Int) -> Unit,
     onPersistentNotificationChange: (Boolean) -> Unit,
@@ -194,6 +206,40 @@ fun SettingsContent(
                         )
                     }
                     TextButton(onClick = onRequestFullScreen) { Text("אישור") }
+                }
+            }
+        }
+
+        // Draw-over-apps health check: without it the ringing screen can't
+        // take over while the phone is unlocked and in use
+        if (!overlayOk) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.Fullscreen,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp),
+                    ) {
+                        Text("מסך צלצול מעל הכל", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "אשר \"הצגה מעל אפליקציות\" — כדי שמסך ההתראה ייפתח " +
+                                "גם כשהטלפון בשימוש.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    TextButton(onClick = onRequestOverlay) { Text("אישור") }
                 }
             }
         }

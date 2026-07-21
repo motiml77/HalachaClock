@@ -83,6 +83,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
     val exactAlarmsGranted = remember(refreshTick) { hasExactAlarms(context) }
     val batteryExempt = remember(refreshTick) { isBatteryExempt(context) }
     val fullScreenGranted = remember(refreshTick) { hasFullScreenIntent(context) }
+    val overlayGranted = remember(refreshTick) { Settings.canDrawOverlays(context) }
 
     var askedNotifications by remember { mutableIntStateOf(0) }
     val notifLauncher = rememberLauncherForActivityResult(
@@ -107,7 +108,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
         Text("ברוכים הבאים לשעון זמנים", style = MaterialTheme.typography.headlineMedium)
         Text(
             "כדי שההתראות והשעונים יעבדו תמיד — בזמן, גם כשהמסך כבוי — " +
-                "נאשר שלוש הרשאות:",
+                "נאשר כמה הרשאות:",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
@@ -156,6 +157,23 @@ fun OnboardingScreen(onDone: () -> Unit) {
             },
         )
 
+        // Draw-over-apps: the ringing screen can take over even while the
+        // phone is unlocked and in use (without it — heads-up notification)
+        PermissionCard(
+            icon = Icons.Filled.Fullscreen,
+            title = "מסך צלצול מעל הכל",
+            description = "מסך ההתראה ייפתח גם באמצע שימוש בטלפון",
+            granted = overlayGranted,
+            onGrant = {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}"),
+                    )
+                )
+            },
+        )
+
         // Android 14+: full-screen-intent can be revoked — only shown when needed
         if (Build.VERSION.SDK_INT >= 34 && !fullScreenGranted) {
             PermissionCard(
@@ -194,8 +212,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        val allGranted =
-            notificationsGranted && exactAlarmsGranted && batteryExempt && fullScreenGranted
+        val allGranted = notificationsGranted && exactAlarmsGranted &&
+            batteryExempt && fullScreenGranted && overlayGranted
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
             Text(
                 if (allGranted) "הכל מאושר — נתחיל!" else "המשך בכל זאת",

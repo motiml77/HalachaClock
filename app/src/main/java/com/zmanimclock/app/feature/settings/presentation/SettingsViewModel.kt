@@ -16,6 +16,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -48,7 +49,13 @@ class SettingsViewModel @Inject constructor(
      */
     fun ringInAMinute() {
         viewModelScope.launch {
-            val fire = LocalDateTime.now().plusMinutes(1)
+            // Wall-clock must be taken in the CITY's zone — the scheduler
+            // resolves hour/minute there. With the device on another zone the
+            // test alarm landed a day away instead of one minute from now.
+            val zone = java.time.ZoneId.of(
+                prefsRepository.preferences.first().timeZoneId
+            )
+            val fire = LocalDateTime.now(zone).plusMinutes(1)
             alarmDao.insertAlarm(
                 AlarmEntity(
                     type = AlarmType.FIXED,

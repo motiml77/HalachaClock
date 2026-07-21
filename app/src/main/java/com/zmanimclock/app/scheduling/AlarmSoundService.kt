@@ -77,8 +77,22 @@ class AlarmSoundService : Service() {
     }
 
     private val autoSilence = Runnable {
-        Log.i(TAG, "Ring duration elapsed — self-snoozing")
-        snooze()
+        // Ring duration elapsed. NEVER route through snooze() here: with the
+        // "no snooze" default, the snooze-limit gate blocked this path and the
+        // alarm rang forever. If snoozing is still permitted, auto-snooze
+        // (classic missed-alarm behavior); otherwise stop outright — the
+        // duration the user set is final.
+        val a = alarm
+        val canSnooze = a != null && !previewMode &&
+            a.maxSnoozes != 0 && (a.maxSnoozes < 0 || a.snoozeCount < a.maxSnoozes)
+        if (canSnooze) {
+            Log.i(TAG, "Ring duration elapsed — auto-snoozing")
+            snooze()
+        } else {
+            Log.i(TAG, "Ring duration elapsed — stopping")
+            stopRinging()
+            stopSelf()
+        }
     }
 
     private var previewMode = false
@@ -182,6 +196,27 @@ class AlarmSoundService : Service() {
             )
         )
 
+        // Open the ringing screen DIRECTLY. The notification's full-screen
+        // intent only auto-opens when the screen is off/locked — with the
+        // phone unlocked and in use, Android demotes it to a heads-up, so the
+        // alarm never covered the screen. A direct start from this foreground
+        // service (triggered by a setAlarmClock PendingIntent) covers every
+        // state; if an OEM blocks it, the FSI notification stays as fallback.
+        runCatching {
+            startActivity(
+                Intent(this, com.zmanimclock.app.feature.alarm.presentation.AlarmActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra(EXTRA_ALARM_ID, alarm.id)
+                    putExtra(EXTRA_TITLE, titleOf(alarm))
+                    putExtra(EXTRA_TIME_TEXT, timeTextOf(alarm))
+                    putExtra(EXTRA_SNOOZE_MINUTES, alarm.snoozeMinutes)
+                    putExtra(EXTRA_CHALLENGE, alarm.dismissChallenge.name)
+                    putExtra(EXTRA_SHABBAT, alarm.shabbatMode)
+                    putExtra(EXTRA_SNOOZES_LEFT, snoozesLeft(alarm))
+                }
+            )
+        }.onFailure { Log.w(TAG, "Direct full-screen start blocked: ${it.message}") }
+
         if (alarm.soundEnabled) startSound(alarm)
         if (alarm.vibrate) startVibration()
         handler.postDelayed(autoSilence, alarm.ringDurationSeconds.coerceIn(10, 180) * 1_000L)
@@ -196,8 +231,13 @@ class AlarmSoundService : Service() {
         // Raising it here makes the alarm audible regardless of ringer mode.
         forceAlarmStreamVolume(alarm.volumePercent)
 
-        targetVolume = (alarm.volumePercent.coerceIn(10, 100)) / 100f
-        currentVolume = (targetVolume * 0.15f).coerceAtLeast(0.05f)
+        // The chosen loudness lives ONLY in the stream level above. The
+        // MediaPlayer scalar just implements the gentle ramp, always ending
+        // at 1.0 — previously the percent was applied twice (stream × scalar),
+        // which made the volume slider feel like it did nothing.
+        // A preview skips the ramp so the user hears the true loudness now.
+        targetVolume = 1f
+        currentVolume = if (previewMode) 1f else 0.2f
 
         // Custom URI first; if it vanished (file deleted / permission lost),
         // FALL BACK to the system default — a silent alarm is the worst bug.
@@ -394,7 +434,9 @@ class AlarmSoundService : Service() {
         const val EXTRA_SHABBAT = "shabbat_mode"
         const val EXTRA_SNOOZES_LEFT = "snoozes_left"
 
-        private const val VOLUME_STEP = 0.09f
-        private const val VOLUME_STEP_INTERVAL_MS = 6_000L // target in ~1 minute
+        // Ramp 0.2 → 1.0 in ~20s (ring durations are now 10s–3min, so the old
+        // one-minute ramp meant short alarms never reached full loudness)
+        private const val VOLUME_STEP = 0.1f
+        private const val VOLUME_STEP_INTERVAL_MS = 2_500L
     }
 }
