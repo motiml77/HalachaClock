@@ -66,6 +66,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import kotlinx.coroutines.launch
 
 private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 
@@ -177,14 +178,20 @@ fun AlarmEditScreen(
             }
 
             // === Anchor ===
-            when (alarm.type) {
-                AlarmType.FIXED -> FixedAnchorSection(alarm, viewModel::update)
-                AlarmType.ZMAN -> ZmanAnchorSection(alarm, zmanPreview, viewModel::update)
-            }
+            // The Shabbat-entry alert is FIXED — 4 minutes before shkia,
+            // every Friday. No zman picker, no offset, no day selection:
+            // the info card above says it all; only sound/volume/name are
+            // customizable.
+            if (!alarm.shabbatMode) {
+                when (alarm.type) {
+                    AlarmType.FIXED -> FixedAnchorSection(alarm, viewModel::update)
+                    AlarmType.ZMAN -> ZmanAnchorSection(alarm, zmanPreview, viewModel::update)
+                }
 
-            // === Repeat days ===
-            SectionTitle("באילו ימים?")
-            DaysSelector(alarm, viewModel::update)
+                // === Repeat days ===
+                SectionTitle("באילו ימים?")
+                DaysSelector(alarm, viewModel::update)
+            }
 
             // === Sound & volume ===
             SectionTitle("צליל ורטט")
@@ -210,6 +217,12 @@ fun AlarmEditScreen(
                     }
 
                     if (alarm.soundEnabled) {
+                        // Six quick ringtone picks — tap selects + previews
+                        QuickRingtonePicker(
+                            selectedUri = alarm.soundUri,
+                            onSelect = { uri -> viewModel.update { it.copy(soundUri = uri) } },
+                        )
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -229,10 +242,7 @@ fun AlarmEditScreen(
                         ) {
                             Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                                Text(
-                                    if (alarm.shabbatMode) "צליל מיוחד לכניסת שבת" else "צליל",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
+                                Text("עוד צלילים…", style = MaterialTheme.typography.bodyLarge)
                                 Text(
                                     text = alarm.soundUri?.let { soundTitle(context, it) } ?: "ברירת מחדל",
                                     style = MaterialTheme.typography.bodySmall,
@@ -589,6 +599,63 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/**
+ * Six quick ringtone choices from the device's built-in ALARM sounds —
+ * tap = select + short audible preview (auto-stops after a few seconds).
+ * "עוד צלילים…" below opens the full system picker for everything else.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun QuickRingtonePicker(
+    selectedUri: String?,
+    onSelect: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val tones = remember {
+        runCatching {
+            val rm = RingtoneManager(context).apply { setType(RingtoneManager.TYPE_ALARM) }
+            val cursor = rm.cursor
+            buildList {
+                while (cursor.moveToNext() && size < 6) {
+                    add(
+                        cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX) to
+                            rm.getRingtoneUri(cursor.position).toString()
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+    if (tones.isEmpty()) return
+
+    var playing by remember { mutableStateOf<android.media.Ringtone?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { runCatching { playing?.stop() } }
+    }
+
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tones.forEach { (title, uri) ->
+            FilterChip(
+                selected = selectedUri == uri,
+                onClick = {
+                    onSelect(uri)
+                    scope.launch {
+                        runCatching { playing?.stop() }
+                        val r = RingtoneManager.getRingtone(context, Uri.parse(uri))
+                        playing = r
+                        runCatching { r?.play() }
+                        kotlinx.coroutines.delay(4_000)
+                        if (playing == r) runCatching { r?.stop() }
+                    }
+                },
+                label = { Text(title, maxLines = 1) },
+            )
+        }
     }
 }
 
