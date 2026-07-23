@@ -8,6 +8,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
+import com.zmanimclock.app.feature.zmanim.model.FastDays
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -53,6 +54,9 @@ class ZmanimViewModel @Inject constructor(
         val isPast: Boolean,
     )
 
+    /** Bottom banner on fast days / erev a 25-hour fast (start & end times). */
+    data class FastBanner(val title: String, val line: String)
+
     data class UiState(
         val loading: Boolean = true,
         val locationName: String = "",
@@ -65,6 +69,7 @@ class ZmanimViewModel @Inject constructor(
         /** Short countdown, e.g. "1:06". */
         val countdown: String? = null,
         val rows: List<ZmanRow> = emptyList(),
+        val fastBanner: FastBanner? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -121,8 +126,53 @@ class ZmanimViewModel @Inject constructor(
                         isPast = instant.isBefore(now),
                     )
                 },
+                fastBanner = fastBanner(today, zone, day, timeFormat),
             )
         }
+    }
+
+    /**
+     * The bottom fast banner. Times are the day's own zmanim, so they stay
+     * correct for every year and every city:
+     *  - a minor fast today: "מעלות השחר X עד צאת הכוכבים Y (לחומרא Z)"
+     *  - a 25-hour fast today: exit time only (entry was yesterday's sunset)
+     *  - erev a 25-hour fast: "הצום מתחיל הערב בשקיעה X"
+     */
+    private fun fastBanner(
+        today: LocalDate,
+        zone: ZoneId,
+        day: com.zmanimclock.app.feature.zmanim.engine.DayZmanim,
+        fmt: DateTimeFormatter,
+    ): FastBanner? {
+        fun f(i: Instant?): String? = i?.let { fmt.format(it.atZone(zone)) }
+
+        val fastToday = FastDays.fastOn(today, zone)
+        if (fastToday != null) {
+            // Fast exit is ALWAYS the default tzeit (6.2° — three medium
+            // stars), per the user's ruling; Yom Kippur ends like Shabbat.
+            val end = if (fastToday.endsLikeShabbat) day.tzeitShabbat else day.tzeitLechumra
+            val endText = f(end) ?: return null
+            val line = buildString {
+                if (fastToday.startsEveningBefore) {
+                    append("הצום יוצא ב־$endText")
+                } else {
+                    val start = f(day.alotHashachar)
+                    if (start != null) append("מעלות השחר $start ")
+                    append("עד צאת הכוכבים $endText")
+                }
+            }
+            return FastBanner(title = "היום: ${fastToday.name}", line = line)
+        }
+
+        val fastTomorrow = FastDays.fastOn(today.plusDays(1), zone)
+        if (fastTomorrow?.startsEveningBefore == true) {
+            val shkia = f(day.shkia) ?: return null
+            return FastBanner(
+                title = "הערב: ${fastTomorrow.name}",
+                line = "הצום מתחיל הערב בשקיעה $shkia",
+            )
+        }
+        return null
     }
 
     private fun hebrewDate(date: LocalDate, zone: ZoneId): String {

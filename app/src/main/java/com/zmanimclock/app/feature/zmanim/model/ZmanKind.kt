@@ -30,8 +30,11 @@ enum class ZmanKind(val hebrewName: String) {
     MINCHA_KETANA("מנחה קטנה"),
     PLAG_HAMINCHA("פלג המנחה"),
     SHKIA("שקיעה"),
-    TZEIT_HAKOCHAVIM("צאת הכוכבים"),
-    TZEIT_LECHUMRA("צאת הכוכבים לחומרא"),
+    // Naming per the user's ruling: the DEFAULT tzeit shown is the 6.2° one
+    // (three medium stars); the 13.5-zmaniyot Geonim time is the kulah.
+    // Enum names are persisted in alarms — only the labels change.
+    TZEIT_HAKOCHAVIM("צאת הכוכבים לקולא"),
+    TZEIT_LECHUMRA("צאת הכוכבים"),
     TZEIT_SHABBAT("צאת שבת"),
     TZEIT_RABBEINU_TAM("רבנו תם"),
     CANDLE_LIGHTING("הדלקת נרות");

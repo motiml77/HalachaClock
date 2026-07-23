@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NoFood
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.WbSunny
@@ -73,7 +74,7 @@ fun ZmanimContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         NextHero(state)
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.weight(1f)) {
             items(state.rows, key = { it.kind.name }) { row ->
                 ZmanRow(
                     row = row,
@@ -81,6 +82,41 @@ fun ZmanimContent(
                     onBellClick = { onBellClick(row.kind) },
                 )
             }
+        }
+        state.fastBanner?.let { FastBannerCard(it) }
+    }
+}
+
+/** Fast-day notice pinned under the list — entry/exit times of the fast. */
+@Composable
+private fun FastBannerCard(banner: ZmanimViewModel.FastBanner) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .background(cs.tertiaryContainer, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.NoFood,
+            contentDescription = null,
+            tint = cs.onTertiaryContainer,
+            modifier = Modifier.size(26.dp),
+        )
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(
+                text = banner.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = cs.onTertiaryContainer,
+            )
+            Text(
+                text = banner.line,
+                style = MaterialTheme.typography.bodyMedium,
+                color = cs.onTertiaryContainer,
+            )
         }
     }
 }
