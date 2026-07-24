@@ -70,9 +70,8 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         // Next zman: first upcoming today, else tomorrow's first
         val next = nextZman(location, cityId, LocalDate.now(zone), now)
             ?: nextZman(location, cityId, LocalDate.now(zone).plusDays(1), now)
-        val nextZmanText = next?.let { (kind, instant) ->
-            "${kind.hebrewName} · ${timeFmt.format(instant.atZone(zone))}"
-        } ?: "—"
+        val zmanName = next?.first?.shortName ?: "—"
+        val zmanTime = next?.let { (_, instant) -> timeFmt.format(instant.atZone(zone)) } ?: ""
 
         // Next armed alarm
         val nextAlarm = alarmScheduler.nextAlarmOccurrence()
@@ -91,7 +90,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
             "$time · $what"
         }
 
-        notificationHelper.showOngoingStatus(nextZmanText, nextAlarmText)
+        notificationHelper.showOngoingStatus(zmanName, zmanTime, nextAlarmText)
 
         // Zman boundaries also refresh the home-screen widget content
         com.zmanimclock.app.feature.widget.ZmanWidgetProvider.refresh(context)

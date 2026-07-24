@@ -127,24 +127,29 @@ fun AlarmsContent(
                 )
             }
         } else {
-            // Two categories: wake-up clocks vs halachic-zman alerts
-            val fixed = items.filter { it.alarm.type == AlarmType.FIXED }
-            val zman = items.filter { it.alarm.type == AlarmType.ZMAN }
+            // Grouped by WHEN the next ring falls, sorted by time inside each
+            // group so it's clear what's coming and in what order.
+            val groups = listOf(
+                FireBucket.TODAY to "היום",
+                FireBucket.TOMORROW to "מחר",
+                FireBucket.LATER to "שבוע הבא",
+                FireBucket.OFF to "כבויים",
+            )
+            val byBucket = items.groupBy { it.bucket }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (fixed.isNotEmpty()) {
-                    item(key = "header_fixed") { SectionHeader("שעונים מעוררים", fixed.size) }
-                    items(fixed, key = { it.alarm.id }) { item ->
-                        AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
-                    }
-                }
-                if (zman.isNotEmpty()) {
-                    item(key = "header_zman") { SectionHeader("זמנים הלכתיים", zman.size) }
-                    items(zman, key = { it.alarm.id }) { item ->
-                        AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
+                groups.forEach { (bucket, title) ->
+                    val group = byBucket[bucket].orEmpty().sortedWith(
+                        compareBy({ it.nextFireEpochMs ?: Long.MAX_VALUE }, { it.alarm.id })
+                    )
+                    if (group.isNotEmpty()) {
+                        item(key = "header_$bucket") { SectionHeader(title, group.size) }
+                        items(group, key = { it.alarm.id }) { item ->
+                            AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
+                        }
                     }
                 }
             }

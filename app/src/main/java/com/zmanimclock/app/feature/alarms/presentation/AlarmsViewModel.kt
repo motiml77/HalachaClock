@@ -23,8 +23,19 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-/** One alarm + its computed next-fire label ("מחר: 05:15" / "היום: 06:30"). */
-data class AlarmListItem(val alarm: AlarmEntity, val nextFireLabel: String?)
+/** When the alarm's next ring falls — drives the list's grouping tags. */
+enum class FireBucket { TODAY, TOMORROW, LATER, OFF }
+
+/**
+ * One alarm + its computed next fire: a label ("היום: 06:30 · בעוד…"), the
+ * absolute instant (to sort within a group) and the [FireBucket] it lands in.
+ */
+data class AlarmListItem(
+    val alarm: AlarmEntity,
+    val nextFireLabel: String?,
+    val nextFireEpochMs: Long?,
+    val bucket: FireBucket,
+)
 
 @HiltViewModel
 class AlarmsViewModel @Inject constructor(
@@ -44,26 +55,49 @@ class AlarmsViewModel @Inject constructor(
 
     val alarms: StateFlow<List<AlarmListItem>> =
         kotlinx.coroutines.flow.combine(alarmDao.getAllAlarms(), minuteTicker) { list, _ ->
-            list.map { AlarmListItem(it, nextFireLabel(it)) }
+            list.map { computeItem(it) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private suspend fun nextFireLabel(alarm: AlarmEntity): String? {
-        if (!alarm.isActive) return null
+    private suspend fun computeItem(alarm: AlarmEntity): AlarmListItem {
+        if (!alarm.isActive) return AlarmListItem(alarm, null, null, FireBucket.OFF)
         return runCatching {
             val prefs = prefsRepository.preferences.first()
             val location = prefsRepository.prefsToGeoLocation(prefs)
             val cityId = if (prefs.useGps) null else prefs.cityId
             val zone = ZoneId.of(prefs.timeZoneId)
-            val fire = alarmScheduler.computeNextOccurrence(alarm, location, cityId) ?: return null
+            val fire = alarmScheduler.computeNextOccurrence(alarm, location, cityId)
+                ?: return AlarmListItem(alarm, null, null, FireBucket.OFF)
             val local = fire.atZone(zone)
-            val day = when (local.toLocalDate()) {
-                LocalDate.now(zone) -> "היום"
-                LocalDate.now(zone).plusDays(1) -> "מחר"
-                else -> DateTimeFormatter.ofPattern("dd/MM").format(local)
+            val today = LocalDate.now(zone)
+            val bucket = when (local.toLocalDate()) {
+                today -> FireBucket.TODAY
+                today.plusDays(1) -> FireBucket.TOMORROW
+                else -> FireBucket.LATER
+            }
+            // Later alarms name their weekday so "שבוע הבא" stays concrete
+            val day = when (bucket) {
+                FireBucket.TODAY -> "היום"
+                FireBucket.TOMORROW -> "מחר"
+                else -> hebrewWeekday(local.dayOfWeek)
             }
             val time = DateTimeFormatter.ofPattern("HH:mm").format(local)
-            "$day: $time · ${remainingText(fire)}"
-        }.getOrNull()
+            AlarmListItem(
+                alarm = alarm,
+                nextFireLabel = "$day: $time · ${remainingText(fire)}",
+                nextFireEpochMs = fire.toEpochMilli(),
+                bucket = bucket,
+            )
+        }.getOrElse { AlarmListItem(alarm, null, null, FireBucket.OFF) }
+    }
+
+    private fun hebrewWeekday(d: java.time.DayOfWeek): String = when (d) {
+        java.time.DayOfWeek.SUNDAY -> "יום א'"
+        java.time.DayOfWeek.MONDAY -> "יום ב'"
+        java.time.DayOfWeek.TUESDAY -> "יום ג'"
+        java.time.DayOfWeek.WEDNESDAY -> "יום ד'"
+        java.time.DayOfWeek.THURSDAY -> "יום ה'"
+        java.time.DayOfWeek.FRIDAY -> "יום ו'"
+        java.time.DayOfWeek.SATURDAY -> "שבת"
     }
 
     /** "בעוד 9 ש' ו-33 דק'" — the user always sees how far the alarm is. */

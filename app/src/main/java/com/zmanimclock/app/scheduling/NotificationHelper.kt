@@ -51,7 +51,7 @@ class NotificationHelper @Inject constructor(
      * zman of the day and the next armed alarm. Silent, ongoing, updates in
      * place (no re-alert).
      */
-    fun showOngoingStatus(nextZmanText: String, nextAlarmText: String?) {
+    fun showOngoingStatus(zmanName: String, zmanTime: String, nextAlarmText: String?) {
         val manager = context.getSystemService<NotificationManager>() ?: return
         val contentIntent = PendingIntent.getActivity(
             context,
@@ -59,11 +59,28 @@ class NotificationHelper @Inject constructor(
             Intent(context, com.zmanimclock.app.MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        // Title: "הזמן הבא: " + BOLD(name) + " · time"
+        val title = android.text.SpannableStringBuilder("הזמן הבא: ")
+        val nameStart = title.length
+        title.append(zmanName)
+        title.setSpan(
+            android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+            nameStart, title.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        if (zmanTime.isNotEmpty()) title.append(" · $zmanTime")
+        // Second line: a touch smaller than the title
+        val body = android.text.SpannableString(
+            nextAlarmText?.let { "השעון הבא: $it" } ?: "אין שעון מעורר פעיל"
+        )
+        body.setSpan(
+            android.text.style.RelativeSizeSpan(0.85f),
+            0, body.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
         val notification = NotificationCompat.Builder(context, CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_stat_zman)
             .setColor(ACCENT)
-            .setContentTitle("הזמן הבא: $nextZmanText")
-            .setContentText(nextAlarmText?.let { "השעון הבא: $it" } ?: "אין שעון מעורר פעיל")
+            .setContentTitle(title)
+            .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setOngoing(true)

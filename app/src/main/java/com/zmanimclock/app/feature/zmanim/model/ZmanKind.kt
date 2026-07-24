@@ -14,17 +14,22 @@ import java.util.GregorianCalendar
  *
  * [hebrewName] is used in notifications; screens localize via resources.
  */
-enum class ZmanKind(val hebrewName: String) {
+/**
+ * [hebrewName] is the full list label (with the shita qualifier);
+ * [shortName] is the compact display used in notifications — no degree or
+ * minute suffixes, per the user's preference.
+ */
+enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) {
     CHATZOT_LAYLA("חצות לילה"),
     ALOT_HASHACHAR("עלות השחר"),
     MISHEYAKIR("משיכיר"),
     HANETZ("הנץ החמה"),
-    SOF_ZMAN_SHMA_MGA("ק\"ש מג\"א 16.1°"),
-    SOF_ZMAN_SHMA_MGA_72("ק\"ש מג\"א 72'"),
-    SOF_ZMAN_SHMA_GRA("סוף זמן ק\"ש גר\"א"),
-    SOF_ZMAN_TFILA_MGA("תפילה מג\"א 16.1°"),
-    SOF_ZMAN_TFILA_MGA_72("תפילה מג\"א 72'"),
-    SOF_ZMAN_TFILA_GRA("סוף זמן תפילה גר\"א"),
+    SOF_ZMAN_SHMA_MGA("ק\"ש מג\"א 16.1°", "ק\"ש מג\"א"),
+    SOF_ZMAN_SHMA_MGA_72("ק\"ש מג\"א 72'", "ק\"ש מג\"א"),
+    SOF_ZMAN_SHMA_GRA("סוף זמן ק\"ש גר\"א", "ק\"ש גר\"א"),
+    SOF_ZMAN_TFILA_MGA("תפילה מג\"א 16.1°", "תפילה מג\"א"),
+    SOF_ZMAN_TFILA_MGA_72("תפילה מג\"א 72'", "תפילה מג\"א"),
+    SOF_ZMAN_TFILA_GRA("סוף זמן תפילה גר\"א", "תפילה גר\"א"),
     CHATZOT("חצות היום"),
     MINCHA_GEDOLA("מנחה גדולה"),
     MINCHA_KETANA("מנחה קטנה"),
