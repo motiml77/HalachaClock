@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,9 +39,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -49,11 +54,13 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,13 +112,11 @@ fun AlarmEditScreen(
     // From a zman-list bell the anchor is fixed to that zman — no toggle shown.
     val showAnchorToggle = !alarm.shabbatMode && preselectedZman == null
 
-    // The WHOLE screen scrolls — the header travels with the content, no
-    // pinned app bar (matches every standard app).
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
+    val tabs = listOf("בסיסי", "צליל", "כיבוי")
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Header sits above the tabs; the tab content scrolls under it
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -131,102 +136,143 @@ fun AlarmEditScreen(
             )
         }
 
+        // Three tabs, grouped by the question each answers:
+        //  בסיסי — WHEN does it ring (name, anchor, days)
+        //  צליל  — HOW does it ring (mode, tone, volume, duration, preview)
+        //  כיבוי — how does it STOP (snooze, math challenge, wake check)
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { Text(title, style = MaterialTheme.typography.titleSmall) },
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (alarm.shabbatMode) {
-                Card {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                com.zmanimclock.app.ui.theme.AppIcons.Candle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("התראת כניסת שבת", style = MaterialTheme.typography.titleMedium)
+            when (selectedTab) {
+                // ===================== בסיסי =====================
+                0 -> {
+                    if (alarm.shabbatMode) {
+                        SettingsGroup {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    com.zmanimclock.app.ui.theme.AppIcons.Candle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "כל יום שישי, ${alarm.offsetMinutes} דק' לפני שקיעת המקום שלך — " +
+                                        "מסך נרות וצליל משלה.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
-                        Text(
-                            "תופיע בכל יום שישי, ${alarm.offsetMinutes} דק' לפני שקיעת " +
-                                "המקום שלך, עם מסך נרות מיוחד. בחר לה צליל ועוצמה משלה.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                }
-            }
-
-            // Name — chosen at the TOP of the page (item G)
-            OutlinedTextField(
-                value = alarm.label,
-                onValueChange = { v -> viewModel.update { it.copy(label = v) } },
-                label = { Text("שם השעון") },
-                placeholder = { Text(defaultAlarmLabel(alarm)) },
-                supportingText = { Text("ריק = השם המוצע") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // === Anchor type: fixed clock ↔ halachic zman ===
-            // Hidden when the anchor is locked (Shabbat alert / zman-list bell).
-            if (showAnchorToggle) {
-                AnchorTypeSelector(alarm.type, viewModel::setType)
-            }
-
-            // === Anchor ===
-            // The Shabbat-entry alert is FIXED — 4 minutes before shkia,
-            // every Friday. No zman picker, no offset, no day selection:
-            // the info card above says it all; only sound/volume/name are
-            // customizable.
-            if (!alarm.shabbatMode) {
-                when (alarm.type) {
-                    AlarmType.FIXED -> FixedAnchorSection(alarm, viewModel::update)
-                    AlarmType.ZMAN -> ZmanAnchorSection(alarm, zmanPreview, viewModel::update)
-                }
-
-                // === Repeat days ===
-                SectionTitle("באילו ימים?")
-                DaysSelector(alarm, viewModel::update)
-            }
-
-            // === Sound & volume ===
-            SectionTitle("צליל ורטט")
-            Card {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Ring mode: sound+vibrate / sound only / vibrate only
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = alarm.soundEnabled && alarm.vibrate,
-                            onClick = { viewModel.update { it.copy(soundEnabled = true, vibrate = true) } },
-                            label = { Text("צלצול ורטט") },
-                        )
-                        FilterChip(
-                            selected = alarm.soundEnabled && !alarm.vibrate,
-                            onClick = { viewModel.update { it.copy(soundEnabled = true, vibrate = false) } },
-                            label = { Text("צלצול בלבד") },
-                        )
-                        FilterChip(
-                            selected = !alarm.soundEnabled,
-                            onClick = { viewModel.update { it.copy(soundEnabled = false, vibrate = true) } },
-                            label = { Text("רטט בלבד") },
-                        )
                     }
 
-                    if (alarm.soundEnabled) {
-                        // Six quick ringtone picks — tap selects + previews
-                        QuickRingtonePicker(
-                            selectedUri = alarm.soundUri,
-                            onSelect = { uri -> viewModel.update { it.copy(soundUri = uri) } },
-                        )
+                    OutlinedTextField(
+                        value = alarm.label,
+                        onValueChange = { v -> viewModel.update { it.copy(label = v) } },
+                        label = { Text("שם השעון") },
+                        placeholder = { Text(defaultAlarmLabel(alarm)) },
+                        supportingText = { Text("ריק = השם המוצע") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                    )
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
+                    if (showAnchorToggle) {
+                        Box(modifier = Modifier.padding(horizontal = 12.dp)) {
+                            AnchorTypeSelector(alarm.type, viewModel::setType)
+                        }
+                    }
+
+                    if (!alarm.shabbatMode) {
+                        SettingsGroup {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                when (alarm.type) {
+                                    AlarmType.FIXED -> FixedAnchorSection(alarm, viewModel::update)
+                                    AlarmType.ZMAN -> ZmanAnchorSection(alarm, zmanPreview, viewModel::update)
+                                }
+                            }
+                        }
+
+                        SettingsGroup {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                SectionTitle("באילו ימים?")
+                                Spacer(Modifier.height(10.dp))
+                                DaysSelector(alarm, viewModel::update)
+                            }
+                        }
+                    }
+                }
+
+                // ===================== צליל =====================
+                1 -> {
+                    SettingsGroup {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text("אופן ההתראה", style = MaterialTheme.typography.titleSmall)
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = alarm.soundEnabled && alarm.vibrate,
+                                    onClick = { viewModel.update { it.copy(soundEnabled = true, vibrate = true) } },
+                                    label = { Text("צלצול ורטט") },
+                                )
+                                FilterChip(
+                                    selected = alarm.soundEnabled && !alarm.vibrate,
+                                    onClick = { viewModel.update { it.copy(soundEnabled = true, vibrate = false) } },
+                                    label = { Text("צלצול בלבד") },
+                                )
+                                FilterChip(
+                                    selected = !alarm.soundEnabled,
+                                    onClick = { viewModel.update { it.copy(soundEnabled = false, vibrate = true) } },
+                                    label = { Text("רטט בלבד") },
+                                )
+                            }
+                        }
+
+                        if (alarm.soundEnabled) {
+                            GroupDivider()
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text("צליל", style = MaterialTheme.typography.titleSmall)
+                                Spacer(Modifier.height(10.dp))
+                                QuickRingtonePicker(
+                                    selectedUri = alarm.soundUri,
+                                    onSelect = { uri -> viewModel.update { it.copy(soundUri = uri) } },
+                                )
+                            }
+
+                            GroupDivider()
+                            SettingRow(
+                                title = "עוד צלילים…",
+                                subtitle = alarm.soundUri?.let { soundTitle(context, it) } ?: "ברירת מחדל",
+                                leading = {
+                                    Icon(
+                                        Icons.Filled.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                onClick = {
                                     val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
                                         putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
                                         putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "בחר צליל")
@@ -238,167 +284,251 @@ fun AlarmEditScreen(
                                     }
                                     ringtoneLauncher.launch(intent)
                                 },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
-                                Text("עוד צלילים…", style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    text = alarm.soundUri?.let { soundTitle(context, it) } ?: "ברירת מחדל",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                )
-                            }
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.VolumeUp,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp),
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
+
+                            GroupDivider()
+                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.VolumeUp,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
+                                }
+                                Slider(
+                                    value = alarm.volumePercent.toFloat(),
+                                    onValueChange = { v ->
+                                        viewModel.update { it.copy(volumePercent = v.toInt().coerceIn(10, 100)) }
+                                    },
+                                    valueRange = 10f..100f,
+                                )
+                            }
                         }
-                        Slider(
-                            value = alarm.volumePercent.toFloat(),
-                            onValueChange = { v ->
-                                viewModel.update { it.copy(volumePercent = v.toInt().coerceIn(10, 100)) }
-                            },
-                            valueRange = 10f..100f,
-                        )
+
+                        GroupDivider()
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                            Text(
+                                "משך הצלצול: ${formatRingDuration(alarm.ringDurationSeconds)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Slider(
+                                // 10s … 3 min, in 5-second steps
+                                value = alarm.ringDurationSeconds.toFloat(),
+                                onValueChange = { v ->
+                                    val snapped = (Math.round(v / 5f) * 5).coerceIn(10, 180)
+                                    viewModel.update { it.copy(ringDurationSeconds = snapped) }
+                                },
+                                valueRange = 10f..180f,
+                                steps = 33,
+                            )
+                        }
                     }
 
+                    OutlinedButton(
+                        onClick = { viewModel.previewAlarm() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("תצוגה מקדימה לשעון")
+                    }
                     Text(
-                        "משך הצלצול: ${formatRingDuration(alarm.ringDurationSeconds)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Slider(
-                        // 10s … 3 min, in 5-second steps
-                        value = alarm.ringDurationSeconds.toFloat(),
-                        onValueChange = { v ->
-                            val snapped = (Math.round(v / 5f) * 5).coerceIn(10, 180)
-                            viewModel.update { it.copy(ringDurationSeconds = snapped) }
-                        },
-                        valueRange = 10f..180f,
-                        steps = 33,
+                        "הדגמה חיה של מסך הצלצול — עם הצליל, העוצמה והרטט שבחרת. " +
+                            "כדי לעצור, הקש \"אישור\" במסך שייפתח.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
-            }
 
-            // === Snooze — its own section, OFF by default (items D+E) ===
-            SectionTitle("נודניק")
-            Card {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SwitchRow("אפשר נודניק", alarm.maxSnoozes != 0) { on ->
-                        viewModel.update { it.copy(maxSnoozes = if (on) -1 else 0) }
-                    }
-                    if (alarm.maxSnoozes != 0) {
-                        Text("כל כמה דקות", style = MaterialTheme.typography.bodyMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(5, 10, 15).forEach { minutes ->
-                                FilterChip(
-                                    selected = alarm.snoozeMinutes == minutes,
-                                    onClick = { viewModel.update { it.copy(snoozeMinutes = minutes) } },
-                                    label = { Text("$minutes דק'") },
-                                )
+                // ===================== כיבוי =====================
+                else -> {
+                    SettingsGroup {
+                        SwitchSettingRow(
+                            title = "נודניק",
+                            subtitle = if (alarm.maxSnoozes == 0) "כבוי" else "אפשר לדחות את הצלצול",
+                            checked = alarm.maxSnoozes != 0,
+                        ) { on -> viewModel.update { it.copy(maxSnoozes = if (on) -1 else 0) } }
+
+                        if (alarm.maxSnoozes != 0) {
+                            GroupDivider()
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text("כל כמה דקות", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf(5, 10, 15).forEach { minutes ->
+                                        FilterChip(
+                                            selected = alarm.snoozeMinutes == minutes,
+                                            onClick = { viewModel.update { it.copy(snoozeMinutes = minutes) } },
+                                            label = { Text("$minutes דק'") },
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                Text("מספר פעמים מותר", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf(-1 to "ללא הגבלה", 3 to "3", 1 to "1").forEach { (n, label) ->
+                                        FilterChip(
+                                            selected = alarm.maxSnoozes == n,
+                                            onClick = { viewModel.update { it.copy(maxSnoozes = n) } },
+                                            label = { Text(label) },
+                                        )
+                                    }
+                                }
                             }
                         }
-                        Text("מספר פעמים מותר", style = MaterialTheme.typography.bodyMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(-1 to "ללא הגבלה", 3 to "3", 1 to "1").forEach { (n, label) ->
-                                FilterChip(
-                                    selected = alarm.maxSnoozes == n,
-                                    onClick = { viewModel.update { it.copy(maxSnoozes = n) } },
-                                    label = { Text(label) },
-                                )
+                    }
+
+                    SettingsGroup {
+                        SwitchSettingRow(
+                            title = "תרגיל חשבון לכיבוי",
+                            subtitle = "כדי לכבות צריך לפתור תרגיל",
+                            checked = alarm.dismissChallenge != DismissChallenge.NONE,
+                        ) { on ->
+                            viewModel.update {
+                                it.copy(dismissChallenge = if (on) DismissChallenge.MATH_EASY else DismissChallenge.NONE)
+                            }
+                        }
+                        if (alarm.dismissChallenge != DismissChallenge.NONE) {
+                            GroupDivider()
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                listOf(
+                                    DismissChallenge.MATH_EASY to "קל",
+                                    DismissChallenge.MATH_MEDIUM to "בינוני",
+                                    DismissChallenge.MATH_HARD to "קשה",
+                                ).forEach { (level, label) ->
+                                    FilterChip(
+                                        selected = alarm.dismissChallenge == level,
+                                        onClick = { viewModel.update { it.copy(dismissChallenge = level) } },
+                                        label = { Text(label) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsGroup {
+                        SwitchSettingRow(
+                            title = "בדיקת ערות",
+                            subtitle = "נשאל שוב אחרי שכיבית, לוודא שקמת",
+                            checked = alarm.wakeCheckMinutes > 0,
+                        ) { on -> viewModel.update { it.copy(wakeCheckMinutes = if (on) 5 else 0) } }
+
+                        if (alarm.wakeCheckMinutes > 0) {
+                            GroupDivider()
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text("נשאל שוב בעוד", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf(3, 5, 10).forEach { minutes ->
+                                        FilterChip(
+                                            selected = alarm.wakeCheckMinutes == minutes,
+                                            onClick = { viewModel.update { it.copy(wakeCheckMinutes = minutes) } },
+                                            label = { Text("$minutes דק'") },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
+        }
 
-            // === Math challenge to dismiss — separate section (item D) ===
-            SectionTitle("תרגיל חשבון לכיבוי")
-            Card {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SwitchRow(
-                        "דרוש תרגיל חשבון כדי לכבות",
-                        alarm.dismissChallenge != DismissChallenge.NONE,
-                    ) { on ->
-                        viewModel.update {
-                            it.copy(dismissChallenge = if (on) DismissChallenge.MATH_EASY else DismissChallenge.NONE)
-                        }
-                    }
-                    if (alarm.dismissChallenge != DismissChallenge.NONE) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                DismissChallenge.MATH_EASY to "קל",
-                                DismissChallenge.MATH_MEDIUM to "בינוני",
-                                DismissChallenge.MATH_HARD to "קשה",
-                            ).forEach { (level, label) ->
-                                FilterChip(
-                                    selected = alarm.dismissChallenge == level,
-                                    onClick = { viewModel.update { it.copy(dismissChallenge = level) } },
-                                    label = { Text(label) },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // === Wake-up check (B1) ===
-            SectionTitle("בדיקת ערות")
-            Card {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SwitchRow("בדוק שהתעוררתי אחרי אישור", alarm.wakeCheckMinutes > 0) { on ->
-                        viewModel.update { it.copy(wakeCheckMinutes = if (on) 5 else 0) }
-                    }
-                    if (alarm.wakeCheckMinutes > 0) {
-                        Text(
-                            "אחרי אישור השעון — נשאל שוב בעוד:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(3, 5, 10).forEach { minutes ->
-                                FilterChip(
-                                    selected = alarm.wakeCheckMinutes == minutes,
-                                    onClick = { viewModel.update { it.copy(wakeCheckMinutes = minutes) } },
-                                    label = { Text("$minutes דק'") },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // === Preview this alarm exactly as it will ring (item I) ===
-            OutlinedButton(
-                onClick = { viewModel.previewAlarm() },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("תצוגה מקדימה לשעון")
-            }
-            Text(
-                "הדגמה חיה של מסך הצלצול — עם הצליל, העוצמה והרטט שבחרת. " +
-                    "כדי לעצור, הקש \"אישור\" במסך שייפתח.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-
+        // Save stays reachable from every tab
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            shadowElevation = 8.dp,
+        ) {
             Button(
                 onClick = { viewModel.save(onBack) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
                 Text("שמירה", style = MaterialTheme.typography.titleMedium)
             }
         }
     }
+}
+
+/** A rounded surface holding rows that are separated by [GroupDivider]. */
+@Composable
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+    ) {
+        Column(content = content)
+    }
+}
+
+/** Hairline between rows of a group — inset, so it reads as a separator. */
+@Composable
+private fun GroupDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 14.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+    )
+}
+
+/** Title (+ optional subtitle) row, optionally tappable, with a leading icon. */
+@Composable
+private fun SettingRow(
+    title: String,
+    subtitle: String? = null,
+    leading: @Composable (() -> Unit)? = null,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        leading?.let { it(); Spacer(Modifier.width(12.dp)) }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            subtitle?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        trailing?.invoke()
+    }
+}
+
+/** [SettingRow] whose trailing control is a switch; the whole row toggles. */
+@Composable
+private fun SwitchSettingRow(
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    SettingRow(
+        title = title,
+        subtitle = subtitle,
+        onClick = { onChange(!checked) },
+        trailing = { Switch(checked = checked, onCheckedChange = onChange) },
+    )
 }
 
 /**

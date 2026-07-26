@@ -33,6 +33,8 @@ enum class FireBucket { TODAY, TOMORROW, LATER, OFF }
 data class AlarmListItem(
     val alarm: AlarmEntity,
     val nextFireLabel: String?,
+    /** "HH:mm" of the next ring — the headline time for zman alarms. */
+    val nextFireTime: String?,
     val nextFireEpochMs: Long?,
     val bucket: FireBucket,
 )
@@ -59,14 +61,14 @@ class AlarmsViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private suspend fun computeItem(alarm: AlarmEntity): AlarmListItem {
-        if (!alarm.isActive) return AlarmListItem(alarm, null, null, FireBucket.OFF)
+        if (!alarm.isActive) return AlarmListItem(alarm, null, null, null, FireBucket.OFF)
         return runCatching {
             val prefs = prefsRepository.preferences.first()
             val location = prefsRepository.prefsToGeoLocation(prefs)
             val cityId = if (prefs.useGps) null else prefs.cityId
             val zone = ZoneId.of(prefs.timeZoneId)
             val fire = alarmScheduler.computeNextOccurrence(alarm, location, cityId)
-                ?: return AlarmListItem(alarm, null, null, FireBucket.OFF)
+                ?: return AlarmListItem(alarm, null, null, null, FireBucket.OFF)
             val local = fire.atZone(zone)
             val today = LocalDate.now(zone)
             val bucket = when (local.toLocalDate()) {
@@ -83,11 +85,12 @@ class AlarmsViewModel @Inject constructor(
             val time = DateTimeFormatter.ofPattern("HH:mm").format(local)
             AlarmListItem(
                 alarm = alarm,
-                nextFireLabel = "$day: $time · ${remainingText(fire)}",
+                nextFireLabel = "$day · ${remainingText(fire)}",
+                nextFireTime = time,
                 nextFireEpochMs = fire.toEpochMilli(),
                 bucket = bucket,
             )
-        }.getOrElse { AlarmListItem(alarm, null, null, FireBucket.OFF) }
+        }.getOrElse { AlarmListItem(alarm, null, null, null, FireBucket.OFF) }
     }
 
     private fun hebrewWeekday(d: java.time.DayOfWeek): String = when (d) {

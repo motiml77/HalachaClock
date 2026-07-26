@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -197,9 +200,17 @@ private fun AlarmCard(
     val isZman = alarm.type == AlarmType.ZMAN
     val contentAlpha = if (alarm.isActive) 1f else 0.45f
 
+    // Accent stripe identifies the alarm's kind at a glance, in our palette:
+    // navy = wake-up clock, gold = halachic zman, candle-gold = Shabbat entry.
+    val accent = when {
+        alarm.shabbatMode -> Ext.colors.accentGold
+        isZman -> cs.tertiary
+        else -> cs.primary
+    }
+
     Card(
         modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (alarm.isActive) cs.surface else cs.surfaceVariant.copy(alpha = 0.6f),
         ),
@@ -208,57 +219,59 @@ private fun AlarmCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Small type icon
+            // Full-height colour stripe on the leading (right, RTL) edge
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .alpha(contentAlpha)
-                    .background(
-                        if (isZman) cs.tertiaryContainer else cs.primaryContainer,
-                        RoundedCornerShape(10.dp),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = when {
-                        alarm.shabbatMode -> AppIcons.Candle
-                        isZman -> Icons.Filled.WbTwilight
-                        else -> Icons.Filled.Alarm
-                    },
-                    contentDescription = null,
-                    tint = if (isZman) cs.onTertiaryContainer else cs.primary,
-                    modifier = Modifier.size(19.dp),
-                )
-            }
+                    .width(5.dp)
+                    .fillMaxHeight()
+                    .background(accent.copy(alpha = contentAlpha)),
+            )
 
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 10.dp)
+                    .padding(start = 8.dp, end = 12.dp, top = 10.dp, bottom = 10.dp)
                     .alpha(contentAlpha),
             ) {
-                // Name line (FIXED gets the time inline)
-                val name = alarm.label.ifBlank { defaultAlarmLabel(alarm) }
+                // Name first — the clearest identifier
+                Text(
+                    text = alarm.label.ifBlank { defaultAlarmLabel(alarm) },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = cs.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                // Time, large — zman alarms show the computed next fire time
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!isZman) {
-                        Text(
-                            text = "%02d:%02d".format(alarm.hour, alarm.minute),
-                            style = ZmanListTimeStyle.copy(fontSize = 22.sp, lineHeight = 24.sp),
-                            color = cs.primary,
+                    if (isZman) {
+                        Icon(
+                            imageVector = if (alarm.shabbatMode) AppIcons.Candle
+                            else Icons.Filled.WbTwilight,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(18.dp),
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(6.dp))
                     }
                     Text(
-                        text = name,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = cs.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        text = if (isZman) (item.nextFireTime ?: "--:--")
+                        else "%02d:%02d".format(alarm.hour, alarm.minute),
+                        style = ZmanListTimeStyle.copy(fontSize = 26.sp, lineHeight = 28.sp),
+                        color = cs.primary,
                     )
                 }
+                // Detail lines: schedule, then the countdown
+                Text(
+                    text = daysText(alarm),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1,
+                )
                 item.nextFireLabel?.let {
                     Text(
                         text = it,
@@ -268,46 +281,39 @@ private fun AlarmCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // Days + inline skip-next (compact, one line)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (alarm.isActive && !alarm.isOneTime) {
+                    val skipping = alarm.skipUntilEpochMs > System.currentTimeMillis()
                     Text(
-                        text = daysText(alarm),
+                        text = if (skipping) "מדלג על הבאה — בטל" else "דלג על הבאה",
                         style = MaterialTheme.typography.labelSmall,
-                        color = cs.onSurfaceVariant,
-                        maxLines = 1,
+                        color = if (skipping) Ext.colors.accentGold else cs.primary,
+                        modifier = Modifier.clickable { onSkipNext(alarm) },
                     )
-                    if (alarm.isActive && !alarm.isOneTime) {
-                        val skipping = alarm.skipUntilEpochMs > System.currentTimeMillis()
-                        Text(
-                            text = if (skipping) " · מדלג — בטל" else " · דלג על הבאה",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (skipping) Ext.colors.accentGold else cs.primary,
-                            modifier = Modifier.clickable { onSkipNext(alarm) },
-                        )
-                    }
                 }
             }
 
-            IconButton(onClick = { onDelete(alarm) }, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Outlined.DeleteOutline,
-                    contentDescription = "מחק לצמיתות",
-                    tint = cs.onSurfaceVariant.copy(alpha = contentAlpha),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            // The ✓: active = filled check; inactive = empty circle to tap
-            IconButton(
-                onClick = { onToggle(alarm, !alarm.isActive) },
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = if (alarm.isActive) Icons.Filled.CheckCircle
-                    else Icons.Outlined.Circle,
-                    contentDescription = if (alarm.isActive) "פעיל — הקש לכיבוי" else "כבוי — הקש להפעלה",
-                    tint = if (alarm.isActive) cs.primary else cs.outline,
-                    modifier = Modifier.size(26.dp),
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // The ✓: active = filled check; inactive = empty circle to tap
+                IconButton(
+                    onClick = { onToggle(alarm, !alarm.isActive) },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = if (alarm.isActive) Icons.Filled.CheckCircle
+                        else Icons.Outlined.Circle,
+                        contentDescription = if (alarm.isActive) "פעיל — הקש לכיבוי" else "כבוי — הקש להפעלה",
+                        tint = if (alarm.isActive) cs.primary else cs.outline,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+                IconButton(onClick = { onDelete(alarm) }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Outlined.DeleteOutline,
+                        contentDescription = "מחק לצמיתות",
+                        tint = cs.onSurfaceVariant.copy(alpha = contentAlpha),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }
