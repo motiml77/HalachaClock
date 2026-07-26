@@ -28,7 +28,14 @@ class NotificationHelper @Inject constructor(
     companion object {
         const val CHANNEL_ALARM = "zmanim_alarm"
         const val CHANNEL_REMINDER = "zmanim_reminder"
-        const val CHANNEL_SERVICE = "zmanim_service"
+
+        /**
+         * Status-line channel. A channel's settings are immutable once created,
+         * so the id is versioned: bumping it recreates the channel with the
+         * lock-screen visibility below on devices that already had v1.
+         */
+        const val CHANNEL_SERVICE = "zmanim_status_v2"
+        private const val CHANNEL_SERVICE_LEGACY = "zmanim_service"
 
         const val ALARM_NOTIFICATION_ID = 1001
         const val STATUS_NOTIFICATION_ID = 1002
@@ -59,30 +66,31 @@ class NotificationHelper @Inject constructor(
             Intent(context, com.zmanimclock.app.MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        // Title: "הזמן הבא: " + BOLD(name) + " · time"
-        val title = android.text.SpannableStringBuilder("הזמן הבא: ")
-        val nameStart = title.length
-        title.append(zmanName)
-        title.setSpan(
-            android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
-            nameStart, title.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-        )
-        if (zmanTime.isNotEmpty()) title.append(" · $zmanTime")
-        // Second line: a touch smaller than the title
-        val body = android.text.SpannableString(
-            nextAlarmText?.let { "השעון הבא: $it" } ?: "אין שעון מעורר פעיל"
-        )
-        body.setSpan(
-            android.text.style.RelativeSizeSpan(0.85f),
-            0, body.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-        )
+        // A CUSTOM view guarantees the zman name is bold on every OEM skin —
+        // the standard title slot is rendered in regular weight by several
+        // skins, and partial StyleSpans get stripped. DecoratedCustomViewStyle
+        // keeps the system icon/header chrome around our two lines.
+        val body = nextAlarmText?.let { "השעון הבא: $it" } ?: "אין שעון מעורר פעיל"
+        val content = android.widget.RemoteViews(context.packageName, R.layout.notification_status).apply {
+            setTextViewText(R.id.status_zman_name, zmanName)
+            setTextViewText(R.id.status_zman_time, zmanTime)
+            setTextViewText(R.id.status_next_alarm, body)
+        }
         val notification = NotificationCompat.Builder(context, CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_stat_zman)
             .setColor(ACCENT)
-            .setContentTitle(title)
+            .setSubText("הזמן הבא")
+            // Plain title/text kept as the fallback for surfaces that ignore
+            // custom views (some lock screens, Wear, Android Auto)
+            .setContentTitle(if (zmanTime.isNotEmpty()) "$zmanName · $zmanTime" else zmanName)
             .setContentText(body)
+            .setCustomContentView(content)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
+            // Full content on the lock screen — readable the moment the screen
+            // wakes, without unlocking
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
@@ -120,12 +128,17 @@ class NotificationHelper @Inject constructor(
 
         val service = NotificationChannel(
             CHANNEL_SERVICE,
-            "שירות רקע",
+            "שורת הזמן הבא",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "שירותי רקע של האפליקציה"
+            description = "הזמן ההלכתי הבא והשעון המעורר הבא — קבוע בהתראות ובמסך הנעילה"
+            // Show the full line on the lock screen, not "תוכן מוסתר"
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+            setShowBadge(false)
         }
 
+        // Retire the v1 status channel so upgraders don't keep its settings
+        runCatching { manager.deleteNotificationChannel(CHANNEL_SERVICE_LEGACY) }
         manager.createNotificationChannels(listOf(alarm, reminder, service))
     }
 

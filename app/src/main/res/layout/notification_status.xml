@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Custom layout for the persistent "next zman" status notification.
+  A custom view is used (rather than the standard title/text slots) so the
+  zman NAME is guaranteed bold on every OEM skin — several skins render
+  notification titles in regular weight and strip partial StyleSpans.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layoutDirection="rtl"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/status_zman_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="?android:attr/textColorPrimary"
+            tools:ignore="MissingPrefix" />
+
+        <TextView
+            android:id="@+id/status_zman_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:fontFeatureSettings="tnum"
+            android:textColor="?android:attr/textColorPrimary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/status_next_alarm"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="?android:attr/textColorSecondary" />
+</LinearLayout>
