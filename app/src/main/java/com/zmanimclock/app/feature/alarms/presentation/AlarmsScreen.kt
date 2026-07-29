@@ -141,7 +141,10 @@ fun AlarmsContent(
             val byBucket = items.groupBy { it.bucket }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                // bottom inset clears the FAB so the last card stays tappable
+                contentPadding = PaddingValues(
+                    start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 groups.forEach { (bucket, title) ->
@@ -316,15 +319,6 @@ private fun AlarmCard(
                 }
             }
         }
-    }
-}
-
-private fun zmanAnchorText(alarm: AlarmEntity): String {
-    val name = ZmanKind.fromNameOrNull(alarm.zmanId)?.hebrewName ?: alarm.zmanId
-    return if (alarm.offsetMinutes == 0) {
-        name
-    } else {
-        "${alarm.offsetMinutes} דק' ${if (alarm.offsetBefore) "לפני" else "אחרי"} $name"
     }
 }
 

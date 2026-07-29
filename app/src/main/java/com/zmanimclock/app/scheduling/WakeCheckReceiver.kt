@@ -28,11 +28,14 @@ class WakeCheckReceiver : BroadcastReceiver() {
 
         ensureChannel(context)
 
-        // Arm the re-ring (full alarm pipeline) in RE_RING_MINUTES
+        // Arm the re-ring (full alarm pipeline) in RE_RING_MINUTES.
+        // Its own request-code slot: sharing the scheduler's slot made this
+        // re-ring REPLACE the alarm's next occurrence, and cancelling it on
+        // "אני ער" then left the alarm completely unarmed.
         val am = context.getSystemService<AlarmManager>() ?: return
         val reRingPi = PendingIntent.getBroadcast(
             context,
-            alarmId.toInt(),
+            AlarmScheduler.requestCode(alarmId, AlarmScheduler.SLOT_WAKE_CHECK),
             Intent(context, AlarmTriggerReceiver::class.java)
                 .putExtra(AlarmTriggerReceiver.EXTRA_ALARM_ID, alarmId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -115,9 +118,10 @@ class WakeCheckConfirmReceiver : BroadcastReceiver() {
         val alarmId = intent.getLongExtra(WakeCheckReceiver.EXTRA_ALARM_ID, -1)
         if (alarmId < 0) return
         val am = context.getSystemService<AlarmManager>()
+        // Cancel ONLY the wake-check slot — never the alarm's own occurrence
         val reRingPi = PendingIntent.getBroadcast(
             context,
-            alarmId.toInt(),
+            AlarmScheduler.requestCode(alarmId, AlarmScheduler.SLOT_WAKE_CHECK),
             Intent(context, AlarmTriggerReceiver::class.java)
                 .putExtra(AlarmTriggerReceiver.EXTRA_ALARM_ID, alarmId),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
@@ -125,5 +129,12 @@ class WakeCheckConfirmReceiver : BroadcastReceiver() {
         reRingPi?.let { am?.cancel(it) }
         context.getSystemService<NotificationManager>()
             ?.cancel(WakeCheckReceiver.wakeCheckNotifId(alarmId))
+        // Belt and braces: re-arm the normal schedule in case anything above
+        // ever disturbs it.
+        runCatching {
+            androidx.work.WorkManager.getInstance(context).enqueue(
+                androidx.work.OneTimeWorkRequestBuilder<RescheduleWorker>().build()
+            )
+        }
     }
 }

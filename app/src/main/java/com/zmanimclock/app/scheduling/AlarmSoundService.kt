@@ -52,7 +52,24 @@ class AlarmSoundService : Service() {
     @Inject lateinit var alarmDao: AlarmDao
 
     private val handler = Handler(Looper.getMainLooper())
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /**
+     * An uncaught throw here would kill the process WHILE THE ALARM RINGS —
+     * the worst possible moment. SupervisorJob alone does not swallow
+     * exceptions, so an explicit handler is required.
+     */
+    private val ringErrorHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        Log.e(TAG, "Uncaught error in alarm pipeline — keeping the ring alive", e)
+    }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + ringErrorHandler)
+
+    /**
+     * Outlives the service. dismiss()/snooze() call stopSelf() immediately
+     * after persisting the snooze counter; on [scope] that write would be
+     * cancelled by onDestroy before it reached Room, making the snooze budget
+     * unreliable. These writes must survive the service.
+     */
+    private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + ringErrorHandler)
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -144,6 +161,10 @@ class AlarmSoundService : Service() {
         if (alarmId < 0) {
             stopSelf(); return
         }
+        // A real alarm always leaves preview mode — otherwise a live preview
+        // service would make the real alarm take the preview code paths
+        // (no snooze, no wake-check, no reschedule).
+        previewMode = false
         // startForegroundService() gives us ~5s to call startForeground —
         // post a placeholder IMMEDIATELY (before any DB work), otherwise a
         // slow query or a deleted alarm crashes with
@@ -156,17 +177,25 @@ class AlarmSoundService : Service() {
         )
         acquireWakeLock()
         scope.launch {
-            val loaded = alarmDao.getAlarmById(alarmId)
+            val loaded = runCatching { alarmDao.getAlarmById(alarmId) }
+                .onFailure { Log.e(TAG, "Alarm lookup failed for $alarmId", it) }
+                .getOrNull()
             if (loaded == null) {
                 Log.w(TAG, "Alarm $alarmId vanished"); stopSelf(); return@launch
             }
             alarm = loaded
             ring(loaded)
-            // One-time alarms are spent once they ring
-            if (loaded.isOneTime) alarmDao.setActive(loaded.id, false)
-            // Re-arm the chain for every other active alarm (incl. this one's next day)
-            WorkManager.getInstance(this@AlarmSoundService)
-                .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+            // Everything past this point is bookkeeping — it must never be
+            // able to take the ringing alarm down with it.
+            runCatching {
+                if (loaded.isOneTime) alarmDao.setActive(loaded.id, false)
+            }.onFailure { Log.e(TAG, "Failed to deactivate one-time alarm", it) }
+            runCatching {
+                // WorkManager lives in credential-encrypted storage, so this
+                // is unavailable before the first unlock after a reboot.
+                WorkManager.getInstance(this@AlarmSoundService)
+                    .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+            }.onFailure { Log.e(TAG, "Reschedule enqueue failed", it) }
         }
     }
 
@@ -246,15 +275,25 @@ class AlarmSoundService : Service() {
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
         )
-        for (uri in candidates) {
-            if (tryPlay(uri)) {
+        // Off the main thread: a slow content:// ringtone provider must not
+        // ANR the service that is currently ringing.
+        scope.launch {
+            val played = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                candidates.firstOrNull { tryPlay(it) }
+            }
+            if (played != null) {
                 handler.postDelayed(volumeRampStep, VOLUME_STEP_INTERVAL_MS)
-                return
+            } else {
+                Log.e(TAG, "All sound sources failed — vibration only")
             }
         }
-        Log.e(TAG, "All sound sources failed — vibration only")
     }
 
+    /**
+     * NOTE: setDataSource/prepare touch a content:// provider and can block;
+     * callers run this off the main thread (see [startSound]) so a slow
+     * ringtone provider cannot ANR the ringing service.
+     */
     private fun tryPlay(uri: Uri): Boolean = try {
         mediaPlayer?.release()
         mediaPlayer = MediaPlayer().apply {
@@ -328,7 +367,7 @@ class AlarmSoundService : Service() {
         Log.i(TAG, "Alarm ${a?.id} acknowledged")
         stopRinging()
         if (a != null) {
-            scope.launch { alarmDao.setSnoozeCount(a.id, 0) }
+            persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, 0) } }
             // B1: schedule a wake-up check if enabled
             if (a.wakeCheckMinutes > 0) {
                 WakeCheckReceiver.schedule(this, a.id, a.wakeCheckMinutes)
@@ -348,7 +387,7 @@ class AlarmSoundService : Service() {
             return // keep ringing; the user must acknowledge
         }
         stopRinging()
-        scope.launch { alarmDao.setSnoozeCount(a.id, a.snoozeCount + 1) }
+        persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, a.snoozeCount + 1) } }
         alarmScheduler.scheduleSnooze(a.id, a.snoozeMinutes)
         Log.i(TAG, "Alarm ${a.id} snoozed for ${a.snoozeMinutes} min (#${a.snoozeCount + 1})")
         stopSelf()

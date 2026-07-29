@@ -170,16 +170,49 @@ class ChaiTablesRepository @Inject constructor(
         dao.deleteForLocation(metroMapper.computeLocationKey(cityId, location))
     }
 
-    /** Combine a cached local time-of-day with the real date in the location's zone. */
+    /**
+     * Combine a cached local time-of-day with the real date in the location's
+     * zone.
+     *
+     * ChaiTables is fetched with DST ON, so the stored wall-clock time carries
+     * the DST offset that was in force on the SOURCE date. Reusing that string
+     * verbatim in a year whose DST boundary moved shifts הנץ הנראה by a full
+     * hour on the days between the two boundaries. Correct for it by shifting
+     * the wall clock by the difference between the target and source offsets —
+     * the underlying solar moment is what the table actually encodes.
+     *
+     * Values are also range-validated: a malformed parse used to reach
+     * LocalTime.of and throw DateTimeException up through the zmanim call
+     * chain (crashing the alarm editor's preview).
+     */
     private fun instantFromEntry(
         entry: ChaiTablesEntity,
         date: LocalDate,
         location: AppGeoLocation,
     ): Instant? {
         if (entry.sunriseHour < 0) return null // sentinel
+        if (entry.sunriseHour !in 0..23 ||
+            entry.sunriseMinute !in 0..59 ||
+            entry.sunriseSecond !in 0..59
+        ) {
+            return null // corrupt row — fall back to the astronomical sunrise
+        }
         val zone = ZoneId.of(location.timeZone.id)
-        val time = LocalTime.of(entry.sunriseHour, entry.sunriseMinute, entry.sunriseSecond)
-        return date.atTime(time).atZone(zone).toInstant()
+        val stored = LocalTime.of(entry.sunriseHour, entry.sunriseMinute, entry.sunriseSecond)
+
+        val corrected = runCatching {
+            val rules = zone.rules
+            val sourceYear = Instant.ofEpochMilli(entry.fetchedAt).atZone(zone).year
+            val sourceDate = LocalDate.ofYearDay(
+                sourceYear,
+                entry.dayOfYear.coerceIn(1, if (LocalDate.of(sourceYear, 1, 1).isLeapYear) 366 else 365),
+            )
+            val sourceOffset = rules.getOffset(sourceDate.atTime(stored))
+            val targetOffset = rules.getOffset(date.atTime(stored))
+            stored.plusSeconds((targetOffset.totalSeconds - sourceOffset.totalSeconds).toLong())
+        }.getOrDefault(stored)
+
+        return date.atTime(corrected).atZone(zone).toInstant()
     }
 
     private fun hebrewYearFor(date: LocalDate): Int {

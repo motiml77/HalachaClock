@@ -16,7 +16,7 @@
     <string name="minutes_before">%d דקות לפני</string>
     <string name="minutes_after">%d דקות אחרי</string>
     <string name="info">מידע</string>
-    <string name="widget_description">מציג את 3 הזמנים ההלכתיים הקרובים</string>
+    <string name="widget_description">מציג את הזמנים ההלכתיים שבחרת ואת הזמן הבא</string>
 
     <!-- Categories -->
     <string name="category_night">לילה</string>

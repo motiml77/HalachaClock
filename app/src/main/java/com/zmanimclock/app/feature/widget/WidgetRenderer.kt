@@ -53,8 +53,15 @@ class WidgetRenderer @Inject constructor(
         val now = Instant.now()
         val today = LocalDate.now(zone)
 
-        val dayToday = zmanimRepository.getDayZmanim(location, cityId, today, cacheOnly = true)
-        val dayTomorrow = zmanimRepository.getDayZmanim(location, cityId, today.plusDays(1), cacheOnly = true)
+        // Honour the user's candle-lighting offset (Jerusalem 40 min etc.)
+        val candle = prefs.candleLightingMinutes.toLong()
+        val dayToday = zmanimRepository.getDayZmanim(
+            location, cityId, today, cacheOnly = true, candleLightingOffsetMinutes = candle,
+        )
+        val dayTomorrow = zmanimRepository.getDayZmanim(
+            location, cityId, today.plusDays(1), cacheOnly = true,
+            candleLightingOffsetMinutes = candle,
+        )
 
         // Next zman across today→tomorrow (candle-lighting/tzeit-Shabbat only
         // surface on their relevant days — never mid-week)

@@ -13,6 +13,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
+import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
 import com.zmanimclock.app.location.model.AppGeoLocation
@@ -47,6 +48,21 @@ class AlarmScheduler @Inject constructor(
 ) {
     companion object {
         private const val TAG = "AlarmScheduler"
+
+        /**
+         * PendingIntent request-code slots. AlarmManager keys pending alarms
+         * by PendingIntent equality, and equality IGNORES extras — so every
+         * purpose must get its own request code or one silently replaces (and
+         * cancelling one silently disarms) the other.
+         *   0 — the alarm's regular next occurrence
+         *   1 — a snooze re-ring
+         *   8 — the wake-check re-ring (see WakeCheckReceiver)
+         */
+        const val SLOT_MAIN = 0
+        const val SLOT_SNOOZE = 1
+        const val SLOT_WAKE_CHECK = 8
+
+        fun requestCode(alarmId: Long, slot: Int): Int = alarmId.toInt() * 10 + slot
     }
 
     private val alarmManager: AlarmManager? = context.getSystemService()
@@ -60,9 +76,16 @@ class AlarmScheduler @Inject constructor(
         val alarms = alarmDao.getActiveAlarmsList()
         Log.i(TAG, "Rescheduling ${alarms.size} active alarms")
         alarms.forEach { alarm ->
-            // A fresh occurrence gets a fresh snooze budget (B3)
-            if (alarm.snoozeCount != 0) alarmDao.setSnoozeCount(alarm.id, 0)
-            scheduleNextOccurrence(alarm, location, cityId)
+            // Isolate each alarm: one bad row (missing zman, bad city data…) must
+            // never stop every later alarm from being armed.
+            runCatching {
+                // A fresh occurrence gets a fresh snooze budget (B3)
+                if (alarm.snoozeCount != 0) alarmDao.setSnoozeCount(alarm.id, 0)
+                scheduleNextOccurrence(
+                    alarm, location, cityId,
+                    candleLightingMinutes = prefs.candleLightingMinutes.toLong(),
+                )
+            }.onFailure { Log.e(TAG, "Failed to schedule alarm ${alarm.id}", it) }
         }
     }
 
@@ -91,11 +114,17 @@ class AlarmScheduler @Inject constructor(
         alarm: AlarmEntity,
         location: AppGeoLocation,
         cityId: String?,
+        candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
     ) {
         val zone = ZoneId.of(location.timeZone.id)
-        val fireTime = computeNextOccurrence(alarm, location, cityId)
+        val fireTime = computeNextOccurrence(
+            alarm, location, cityId, candleLightingMinutes = candleLightingMinutes,
+        )
         if (fireTime == null) {
-            Log.w(TAG, "No occurrence for alarm ${alarm.id} within lookahead")
+            // Disarm rather than leaving a stale alarm armed from a previous
+            // configuration — otherwise it fires at the OLD time.
+            Log.w(TAG, "No occurrence for alarm ${alarm.id} within lookahead — disarming")
+            cancelAlarm(alarm.id)
             return
         }
         arm(alarm, fireTime, zone)
@@ -106,24 +135,30 @@ class AlarmScheduler @Inject constructor(
         alarm: AlarmEntity,
         location: AppGeoLocation,
         cityId: String?,
+        cacheOnly: Boolean = false,
+        candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
     ): Instant? {
         val zone = ZoneId.of(location.timeZone.id)
         // Skip-next (B2): treat occurrences up to skipUntil as already past
         val now = maxOf(Instant.now(), Instant.ofEpochMilli(alarm.skipUntilEpochMs))
         return when (alarm.type) {
             AlarmType.FIXED -> AlarmTimeCalculator.nextFixedOccurrence(alarm, zone, now)
-            AlarmType.ZMAN -> nextZmanOccurrence(alarm, location, cityId, zone, now)
+            AlarmType.ZMAN ->
+                nextZmanOccurrence(alarm, location, cityId, zone, now, cacheOnly, candleLightingMinutes)
         }
     }
 
     /** The earliest upcoming firing across ALL active alarms (for the status bar). */
-    suspend fun nextAlarmOccurrence(): Pair<AlarmEntity, Instant>? {
+    suspend fun nextAlarmOccurrence(cacheOnly: Boolean = false): Pair<AlarmEntity, Instant>? {
         val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
         return alarmDao.getActiveAlarmsList()
             .mapNotNull { alarm ->
-                computeNextOccurrence(alarm, location, cityId)?.let { alarm to it }
+                computeNextOccurrence(
+                    alarm, location, cityId, cacheOnly,
+                    prefs.candleLightingMinutes.toLong(),
+                )?.let { alarm to it }
             }
             .minByOrNull { (_, fire) -> fire }
     }
@@ -131,20 +166,21 @@ class AlarmScheduler @Inject constructor(
     /** Compute the next firing of a snoozed alarm. */
     fun scheduleSnooze(alarmId: Long, snoozeMinutes: Int) {
         val fireTime = Instant.now().plusSeconds(snoozeMinutes * 60L)
-        val pi = triggerPendingIntent(alarmId)
-        setExact(fireTime.toEpochMilli(), pi)
+        // Own slot: a snooze must never replace the alarm's next occurrence
+        setExact(fireTime.toEpochMilli(), triggerPendingIntent(alarmId, SLOT_SNOOZE))
         Log.i(TAG, "Snoozed alarm $alarmId for $snoozeMinutes minutes")
     }
 
+    /** Cancels every slot of this alarm (main occurrence, snooze, wake-check). */
     fun cancelAlarm(alarmId: Long) {
-        val intent = Intent(context, AlarmTriggerReceiver::class.java)
-        val pi = PendingIntent.getBroadcast(
-            context,
-            alarmId.toInt(),
-            intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
-        )
-        pi?.let { alarmManager?.cancel(it) }
+        listOf(SLOT_MAIN, SLOT_SNOOZE, SLOT_WAKE_CHECK).forEach { slot ->
+            PendingIntent.getBroadcast(
+                context,
+                requestCode(alarmId, slot),
+                Intent(context, AlarmTriggerReceiver::class.java),
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            )?.let { alarmManager?.cancel(it) }
+        }
     }
 
     /** The zman instant an alarm points at, for a given date (UI preview too). */
@@ -153,9 +189,15 @@ class AlarmScheduler @Inject constructor(
         location: AppGeoLocation,
         cityId: String?,
         date: LocalDate,
+        cacheOnly: Boolean = false,
+        candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
     ): Instant? {
         val kind = ZmanKind.fromNameOrNull(alarm.zmanId) ?: return null
-        val day = zmanimRepository.getDayZmanim(location, cityId, date)
+        val day = zmanimRepository.getDayZmanim(
+            location, cityId, date,
+            cacheOnly = cacheOnly,
+            candleLightingOffsetMinutes = candleLightingMinutes,
+        )
         val zmanTime = day.instantOf(kind) ?: return null
         val offset = alarm.offsetMinutes * 60_000L
         return if (alarm.offsetBefore) zmanTime.minusMillis(offset) else zmanTime.plusMillis(offset)
@@ -169,11 +211,15 @@ class AlarmScheduler @Inject constructor(
         cityId: String?,
         zone: ZoneId,
         now: Instant,
+        cacheOnly: Boolean,
+        candleLightingMinutes: Long,
     ): Instant? {
         var date = LocalDate.now(zone)
         repeat(AlarmTimeCalculator.MAX_LOOKAHEAD_DAYS) {
             if (AlarmTimeCalculator.isDayAllowed(alarm, date, zone)) {
-                val fire = zmanInstantFor(alarm, location, cityId, date)
+                val fire = zmanInstantFor(
+                    alarm, location, cityId, date, cacheOnly, candleLightingMinutes,
+                )
                 if (fire != null && fire.isAfter(now)) return fire
             }
             date = date.plusDays(1)
@@ -207,10 +253,10 @@ class AlarmScheduler @Inject constructor(
         }
     }
 
-    private fun triggerPendingIntent(alarmId: Long): PendingIntent =
+    private fun triggerPendingIntent(alarmId: Long, slot: Int = SLOT_MAIN): PendingIntent =
         PendingIntent.getBroadcast(
             context,
-            alarmId.toInt(),
+            requestCode(alarmId, slot),
             Intent(context, AlarmTriggerReceiver::class.java).apply {
                 putExtra(AlarmTriggerReceiver.EXTRA_ALARM_ID, alarmId)
             },

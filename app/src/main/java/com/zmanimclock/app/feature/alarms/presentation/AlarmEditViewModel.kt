@@ -153,7 +153,36 @@ class AlarmEditViewModel @Inject constructor(
         viewModelScope.launch {
             val a = _alarm.value
             // Blank name → sensible default ("זמן ק"ש מג"א", "השכמה"…)
-            val toSave = if (a.label.isBlank()) a.copy(label = defaultAlarmLabel(a)) else a
+            val edited = if (a.label.isBlank()) a.copy(label = defaultAlarmLabel(a)) else a
+
+            // insertAlarm REPLACEs the whole row, so writing the snapshot the
+            // editor opened with would clobber anything that changed while it
+            // was open (the alarm rang and bumped snoozeCount, the user toggled
+            // it off from the list, a skip was set…). Re-read the row and copy
+            // only the fields this screen actually edits.
+            val current = if (edited.id != 0L) alarmDao.getAlarmById(edited.id) else null
+            val toSave = current?.copy(
+                type = edited.type,
+                hour = edited.hour,
+                minute = edited.minute,
+                zmanId = edited.zmanId,
+                offsetMinutes = edited.offsetMinutes,
+                offsetBefore = edited.offsetBefore,
+                daysOfWeek = edited.daysOfWeek,
+                skipShabbat = edited.skipShabbat,
+                skipYomTov = edited.skipYomTov,
+                soundEnabled = edited.soundEnabled,
+                soundUri = edited.soundUri,
+                volumePercent = edited.volumePercent,
+                ringDurationSeconds = edited.ringDurationSeconds,
+                vibrate = edited.vibrate,
+                dismissChallenge = edited.dismissChallenge,
+                snoozeMinutes = edited.snoozeMinutes,
+                maxSnoozes = edited.maxSnoozes,
+                wakeCheckMinutes = edited.wakeCheckMinutes,
+                label = edited.label,
+            ) ?: edited
+
             alarmDao.insertAlarm(toSave)
             WorkManager.getInstance(context)
                 .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())

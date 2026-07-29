@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The alarms database lives in DEVICE-PROTECTED storage (for Direct Boot) and
+  is therefore never included in backup/transfer. Restoring the credential
+  storage on its own would bring back "first launch done" and the settings
+  while the alarms table is empty, so the user would silently lose every alarm
+  AND never see onboarding again. Exclude that state so a restored device
+  starts clean and walks through setup.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/" />
+        <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    </device-transfer>
+</data-extraction-rules>

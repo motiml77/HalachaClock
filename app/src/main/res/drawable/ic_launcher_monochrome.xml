@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Monochrome layer for the themed launcher icon (Android 13+).
+  MUST be a 108x108 viewport with the glyph confined to the central ~66dp
+  safe zone — reusing the 24dp status-bar vector stretched the clock across
+  the whole canvas and the launcher mask cut off its bells.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="1.15" android:scaleY="1.15"
+        android:translateX="40.2" android:translateY="40.2"
+        android:pivotX="0" android:pivotY="0">
+        <!-- alarm clock glyph, 24-unit artwork centred in the safe zone -->
+        <path android:fillColor="#000000"
+            android:pathData="M12,4c-4.97,0 -9,4.03 -9,9s4.03,9 9,9 9,-4.03 9,-9 -4.03,-9 -9,-9zM12.5,13.25l3.15,1.87 -0.75,1.23 -3.9,-2.35L11,8h1.5v5.25z" />
+        <path android:fillColor="#000000"
+            android:pathData="M5.34,1.63l1.28,1.53 -3.07,2.57 -1.28,-1.53zM17.38,1.63l3.07,2.57 -1.28,1.53 -3.07,-2.57z" />
+    </group>
+</vector>

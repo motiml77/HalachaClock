@@ -85,6 +85,14 @@ class ZmanimViewModel @Inject constructor(
         viewModelScope.launch {
             prefsRepository.preferences.collect { refresh() }
         }
+        // …and every minute, so the countdown, the next-zman highlight and the
+        // date never freeze for the lifetime of the screen.
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(60_000)
+                refresh()
+            }
+        }
     }
 
     fun refresh() {

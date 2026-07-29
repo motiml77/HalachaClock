@@ -68,13 +68,17 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
         // Next zman: first upcoming today, else tomorrow's first
-        val next = nextZman(location, cityId, LocalDate.now(zone), now)
-            ?: nextZman(location, cityId, LocalDate.now(zone).plusDays(1), now)
+        val candle = prefs.candleLightingMinutes.toLong()
+        val next = nextZman(location, cityId, LocalDate.now(zone), now, candle)
+            ?: nextZman(location, cityId, LocalDate.now(zone).plusDays(1), now, candle)
         val zmanName = next?.first?.shortName ?: "—"
         val zmanTime = next?.let { (_, instant) -> timeFmt.format(instant.atZone(zone)) } ?: ""
 
         // Next armed alarm
-        val nextAlarm = alarmScheduler.nextAlarmOccurrence()
+        // cacheOnly: a receiver has a ~10s goAsync budget — the zman lookups
+        // behind this must never reach the network (a cold city could issue
+        // dozens of HTTP requests and ANR the broadcast).
+        val nextAlarm = alarmScheduler.nextAlarmOccurrence(cacheOnly = true)
         val nextAlarmText = nextAlarm?.let { (alarm, fire) ->
             val time = timeFmt.format(fire.atZone(zone))
             val what = when {
@@ -129,9 +133,13 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         cityId: String?,
         date: LocalDate,
         now: Instant,
+        candleLightingMinutes: Long,
     ): Pair<ZmanKind, Instant>? {
         // cacheOnly: a receiver must not hit the network (goAsync ~10s budget)
-        val day = zmanimRepository.getDayZmanim(location, cityId, date, cacheOnly = true)
+        val day = zmanimRepository.getDayZmanim(
+            location, cityId, date, cacheOnly = true,
+            candleLightingOffsetMinutes = candleLightingMinutes,
+        )
         return day.relevantTimedZmanim(date)
             .filter { (_, instant) -> instant.isAfter(now) }
             .minByOrNull { (_, instant) -> instant }

@@ -80,13 +80,37 @@ fun SettingsScreen(
         }
     }
 
+    // These were computed once during composition, so a card stayed on screen
+    // after the user granted the permission (the grant happens in system
+    // Settings, i.e. while this screen is stopped). Re-check on every resume.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val permissionTickState = androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableIntStateOf(0)
+    }
+    val permissionTick = permissionTickState.intValue
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                permissionTickState.intValue++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val alarmManager = context.getSystemService<AlarmManager>()
-    val exactAlarmsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-        alarmManager?.canScheduleExactAlarms() == true
-    val fullScreenOk = Build.VERSION.SDK_INT < 34 ||
-        context.getSystemService<android.app.NotificationManager>()
-            ?.canUseFullScreenIntent() == true
-    val overlayOk = Settings.canDrawOverlays(context)
+    val exactAlarmsOk = androidx.compose.runtime.remember(permissionTick) {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            alarmManager?.canScheduleExactAlarms() == true
+    }
+    val fullScreenOk = androidx.compose.runtime.remember(permissionTick) {
+        Build.VERSION.SDK_INT < 34 ||
+            context.getSystemService<android.app.NotificationManager>()
+                ?.canUseFullScreenIntent() == true
+    }
+    val overlayOk = androidx.compose.runtime.remember(permissionTick) {
+        Settings.canDrawOverlays(context)
+    }
 
     SettingsContent(
         prefs = prefs,

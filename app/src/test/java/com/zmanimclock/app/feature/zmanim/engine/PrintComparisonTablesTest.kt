@@ -16,17 +16,18 @@ class PrintComparisonTablesTest {
 
     private val cities = listOf(
         EngineLocation("ירושלים", 31.778, 35.235, 0.0, "Asia/Jerusalem"),
+        EngineLocation("צפת", 32.9646, 35.4960, 0.0, "Asia/Jerusalem"),
+        EngineLocation("באר שבע", 31.2518, 34.7913, 0.0, "Asia/Jerusalem"),
         EngineLocation("תל אביב", 32.0853, 34.7818, 0.0, "Asia/Jerusalem"),
         EngineLocation("חיפה", 32.794, 34.9896, 0.0, "Asia/Jerusalem"),
-        EngineLocation("באר שבע", 31.2518, 34.7913, 0.0, "Asia/Jerusalem"),
         EngineLocation("קרני שומרון", 32.1667, 35.0833, 0.0, "Asia/Jerusalem"),
     )
 
     private val dates = listOf(
-        LocalDate.of(2026, 7, 19),
-        LocalDate.of(2026, 8, 19),
-        LocalDate.of(2027, 1, 19),
-        LocalDate.of(2027, 7, 19),
+        LocalDate.of(2026, 7, 27),   // summer
+        LocalDate.of(2026, 12, 15),  // winter (standard time)
+        LocalDate.of(2027, 4, 10),   // spring, next year
+        LocalDate.of(2027, 1, 19),   // deep winter, next year
     )
 
     @Test

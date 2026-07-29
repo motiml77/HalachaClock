@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android-12 equivalent of data_extraction_rules.xml (see the note there). -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/" />
+    <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+</full-backup-content>

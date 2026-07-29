@@ -27,13 +27,23 @@ object AppModule {
         // visible-sunrise cache are reachable after a reboot BEFORE the user
         // unlocks the device for the first time. Migrate any old CE db once.
         val dpsContext = context.createDeviceProtectedStorageContext()
-        runCatching { dpsContext.moveDatabaseFrom(context, "zmanim.db") }
+        // ONE-SHOT move only. Running it on every process start could clobber
+        // the live device-protected database with a stale credential-encrypted
+        // copy (and it can execute pre-unlock, via the directBootAware
+        // BootReceiver, when CE storage is not even readable).
+        runCatching {
+            if (!dpsContext.getDatabasePath("zmanim.db").exists()) {
+                dpsContext.moveDatabaseFrom(context, "zmanim.db")
+            }
+        }
         return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
             // v4→v5: ring duration moved from whole minutes to seconds — keep
             // the user's existing alarms by converting minutes×60 in place.
             .addMigrations(MIGRATION_4_5)
-            // any other pre-release schema jump still resets cleanly
-            .fallbackToDestructiveMigration()
+            // Destructive fallback is limited to the PRE-RELEASE versions.
+            // It must never apply to v4+, or a future schema bump would
+            // silently wipe every alarm the user created.
+            .fallbackToDestructiveMigrationFrom(1, 2, 3)
             .build()
     }
 

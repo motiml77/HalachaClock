@@ -120,8 +120,6 @@ dependencies {
     // KosherJava Zmanim (astronomical substrate only)
     implementation(libs.kosherjava.zmanim)
 
-    // Location
-    implementation(libs.play.services.location)
 
     // JSON (cities.json)
     implementation(libs.moshi.kotlin)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark window background: the ringing screen paints a night gradient and
+     wakes the screen itself, so a light starting window flashed at full
+     brightness before the first frame. -->
+<resources>
+    <style name="Theme.ZmanimClock" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF0B1220</item>
+    </style>
+</resources>

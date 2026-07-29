@@ -66,5 +66,5 @@
     <string name="zman_kiddush_levana_7">קידוש לבנה - 7 ימים</string>
     <string name="zman_kiddush_levana_15">סוף זמן קידוש לבנה</string>
     <string name="zman_candle_lighting">הדלקת נרות</string>
-    <string name="widget_description">מציג את 3 הזמנים ההלכתיים הקרובים</string>
+    <string name="widget_description">מציג את הזמנים ההלכתיים שבחרת ואת הזמן הבא</string>
 </resources>

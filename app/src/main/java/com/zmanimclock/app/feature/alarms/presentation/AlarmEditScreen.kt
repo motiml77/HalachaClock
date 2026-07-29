@@ -56,6 +56,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -564,11 +565,17 @@ private fun AnchorTypeSelector(current: AlarmType, onSelect: (AlarmType) -> Unit
 @Composable
 private fun FixedAnchorSection(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEntity) -> Unit) {
     SectionTitle("באיזו שעה לקום?")
-    val timeState = rememberTimePickerState(
-        initialHour = alarm.hour,
-        initialMinute = alarm.minute,
-        is24Hour = true,
-    )
+    // rememberTimePickerState is keyless, so it latches the FIRST composition's
+    // values. The alarm loads asynchronously, so when EDITING an existing alarm
+    // the picker used to keep showing the placeholder 06:00. Key it to the
+    // loaded alarm so it re-initialises once the real values arrive.
+    val timeState = key(alarm.id, alarm.hour, alarm.minute) {
+        rememberTimePickerState(
+            initialHour = alarm.hour,
+            initialMinute = alarm.minute,
+            is24Hour = true,
+        )
+    }
     LaunchedEffect(timeState.hour, timeState.minute) {
         update { it.copy(hour = timeState.hour, minute = timeState.minute) }
     }
@@ -591,7 +598,12 @@ private fun ZmanAnchorSection(
         color = MaterialTheme.colorScheme.secondary,
     )
     var menuOpen by remember { mutableStateOf(false) }
-    var customMinutes by remember { mutableStateOf("") }
+    // Seeded from the alarm (a custom offset used to render as an empty box)
+    // and kept across rotation / tab switches.
+    val presets = listOf(0, 15, 30, 45, 60)
+    var customMinutes by rememberSaveable(alarm.id) {
+        mutableStateOf(alarm.offsetMinutes.takeIf { it !in presets }?.toString() ?: "")
+    }
 
     ExposedDropdownMenuBox(expanded = menuOpen, onExpandedChange = { menuOpen = it }) {
         OutlinedTextField(
@@ -619,9 +631,9 @@ private fun ZmanAnchorSection(
 
     Text("כמה דקות לפני?", style = MaterialTheme.typography.bodyMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf(0, 15, 30, 45, 60).forEach { minutes ->
+        presets.forEach { minutes ->
             FilterChip(
-                selected = alarm.offsetMinutes == minutes && customMinutes.isBlank(),
+                selected = alarm.offsetMinutes == minutes,
                 onClick = {
                     customMinutes = ""
                     update { it.copy(offsetMinutes = minutes, offsetBefore = true) }
@@ -747,13 +759,15 @@ private fun QuickRingtonePicker(
     val tones = remember {
         runCatching {
             val rm = RingtoneManager(context).apply { setType(RingtoneManager.TYPE_ALARM) }
-            val cursor = rm.cursor
-            buildList {
-                while (cursor.moveToNext() && size < 6) {
-                    add(
-                        cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX) to
-                            rm.getRingtoneUri(cursor.position).toString()
-                    )
+            // use{}: the cursor used to leak on every visit to the צליל tab
+            rm.cursor.use { cursor ->
+                buildList {
+                    while (cursor.moveToNext() && size < 6) {
+                        add(
+                            cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX) to
+                                rm.getRingtoneUri(cursor.position).toString()
+                        )
+                    }
                 }
             }
         }.getOrDefault(emptyList())
