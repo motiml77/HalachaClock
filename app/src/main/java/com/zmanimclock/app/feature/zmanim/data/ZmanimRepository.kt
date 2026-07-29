@@ -30,6 +30,7 @@ class ZmanimRepository @Inject constructor(
         cityId: String?,
         date: LocalDate,
         candleLightingOffsetMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
+        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
         /** true = no network fetch (receivers / pre-unlock); mishor fallback. */
         cacheOnly: Boolean = false,
     ): DayZmanim {
@@ -40,6 +41,7 @@ class ZmanimRepository @Inject constructor(
             date = date,
             visibleSunrise = visibleSunrise,
             candleLightingOffsetMinutes = candleLightingOffsetMinutes,
+            tzeitShabbatMinutes = tzeitShabbatMinutes,
         )
     }
 

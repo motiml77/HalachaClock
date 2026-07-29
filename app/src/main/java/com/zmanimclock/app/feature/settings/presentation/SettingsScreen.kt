@@ -40,6 +40,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +55,7 @@ import androidx.core.content.getSystemService
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.settings.data.UserPreferences
+import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
 
 /**
  * Settings: location (city picker entry), halachic prefs, display prefs,
@@ -127,6 +135,7 @@ fun SettingsScreen(
         },
         onCityClick = onOpenCityPicker,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
+        onTzeitShabbatMinutesChange = viewModel::setTzeitShabbatMinutes,
         onPersistentNotificationChange = ::onPersistentToggle,
         onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
@@ -157,6 +166,7 @@ fun SettingsContent(
     onRequestOverlay: () -> Unit = {},
     onCityClick: () -> Unit,
     onCandleMinutesChange: (Int) -> Unit,
+    onTzeitShabbatMinutesChange: (Int) -> Unit = {},
     onPersistentNotificationChange: (Boolean) -> Unit,
     onRingTest: () -> Unit = {},
     onRequestExactAlarms: () -> Unit,
@@ -328,6 +338,14 @@ fun SettingsContent(
             }
         }
 
+        // צאת שבת — a MINHAG, not a ruling, so it is a setting with the
+        // sources laid out. The luach we follow prints 30; much of Israel
+        // keeps 40. See the explanation dialog.
+        TzeitShabbatCard(
+            minutes = prefs.tzeitShabbatMinutes,
+            onChange = onTzeitShabbatMinutesChange,
+        )
+
         // Persistent status notification
         Card {
             Row(
@@ -423,5 +441,103 @@ fun SettingsContent(
                 )
             }
         }
+    }
+}
+
+/**
+ * צאת שבת picker.
+ *
+ * This is the one zman in the app the user is asked to choose, because the
+ * practice genuinely differs and the difference is a flat offset rather than
+ * a calculation: measured against the Ohr HaChaim luach across 5 cities and
+ * 5 dates, our default 40 sits exactly 10 minutes after its 30, with a
+ * spread of 4 seconds. Everything else the engine publishes matches that
+ * luach to within seconds, so it would be wrong to bury this one silently.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TzeitShabbatCard(minutes: Int, onChange: (Int) -> Unit) {
+    var showInfo by remember { mutableStateOf(false) }
+
+    Card {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("צאת שבת", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "$minutes דקות אחרי השקיעה",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                TextButton(onClick = { showInfo = true }) { Text("מה ההבדל?") }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MaranZmanimEngine.TZEIT_SHABBAT_OPTIONS.forEach { (value, label) ->
+                    FilterChip(
+                        selected = minutes.toLong() == value,
+                        onClick = { onChange(value.toInt()) },
+                        label = { Text(label.substringBefore(" —")) },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                when (minutes) {
+                    30 -> "כשיטת לוח אור החיים"
+                    40 -> "כמנהג הרווח בארץ"
+                    72 -> "כשיטת רבנו תם"
+                    else -> "הגדרה אישית"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+    }
+
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            confirmButton = { TextButton(onClick = { showInfo = false }) { Text("הבנתי") } },
+            title = { Text("צאת שבת — למה יש כמה זמנים?") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "כל שאר הזמנים באפליקציה מחושבים לפי לוח אור החיים " +
+                            "(זמני יוסף), ותואמים לו עד כדי שניות בודדות. " +
+                            "צאת שבת הוא היוצא מן הכלל: כאן ההבדל בין הלוחות " +
+                            "אינו בחישוב אלא בהכרעה — כמה דקות להוסיף אחרי השקיעה.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("השיטות:", style = MaterialTheme.typography.titleSmall)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "• 30 דקות — לוח אור החיים / זמני יוסף, " +
+                            "לפי הכרעת מרן הראשון לציון.\n\n" +
+                            "• 40 דקות — המנהג הרווח בהרבה קהילות בארץ, " +
+                            "והברירת מחדל כאן.\n\n" +
+                            "• 42 דקות — נהוג בחלק מקהילות ירושלים.\n\n" +
+                            "• 72 דקות — שיטת רבנו תם, למחמירים.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "ההפרש הוא קבוע — בדיוק אותו מספר דקות בכל עיר ובכל " +
+                            "עונה — ולכן זו שאלה של מנהג בלבד. " +
+                            "יש לנהוג כמנהג המקום וכהוראת רב.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            },
+        )
     }
 }

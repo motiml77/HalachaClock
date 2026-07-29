@@ -108,6 +108,7 @@ class ZmanimViewModel @Inject constructor(
                 cityId = cityId,
                 date = today,
                 candleLightingOffsetMinutes = prefs.candleLightingMinutes.toLong(),
+                tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
             )
 
             val timeFormat = DateTimeFormatter.ofPattern("HH:mm")

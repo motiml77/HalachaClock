@@ -44,6 +44,7 @@ class MaranZmanimEngine @Inject constructor() {
         date: LocalDate,
         visibleSunrise: Instant? = null,
         candleLightingOffsetMinutes: Long = DEFAULT_CANDLE_OFFSET_MINUTES,
+        tzeitShabbatMinutes: Long = TZEIT_SHABBAT_FIXED_MINUTES,
     ): DayZmanim {
         val czc = complexCalendarFor(location, date)
 
@@ -146,7 +147,12 @@ class MaranZmanimEngine @Inject constructor() {
             com.kosherjava.zmanim.AstronomicalCalendar.GEOMETRIC_ZENITH + TZEIT_LECHUMRA_DEGREES
         )?.toInstant()
 
-        val tzeitShabbat = sunset.plusMillis(Duration.ofMinutes(TZEIT_SHABBAT_FIXED_MINUTES).toMillis())
+        // צאת שבת — fixed minutes after shkia, and the ONE zman here that is a
+        // user setting rather than a fixed ruling. Ohr HaChaim / Zemaneh Yosef
+        // publishes 30; much of Israel keeps 40; Jerusalem communities go
+        // further still. The gap is a flat offset — identical in every city and
+        // every season — so it is purely a question of minhag, not arithmetic.
+        val tzeitShabbat = sunset.plusMillis(Duration.ofMinutes(tzeitShabbatMinutes).toMillis())
         // Rabbeinu Tam le-kulah (approved Zemaneh Yosef default, rtKulah=true):
         // the EARLIER of 72 zmaniyot and 72 fixed minutes after shkia.
         // Summer (shaah > 60): fixed wins; winter: zmaniyot wins.
@@ -281,8 +287,26 @@ class MaranZmanimEngine @Inject constructor() {
          */
         const val TZEIT_LECHUMRA_DEGREES = 6.2
 
-        /** צאת שבת — 40 fixed minutes after shkia. */
+        /**
+         * צאת שבת — fixed minutes after shkia. This is the app DEFAULT, not a
+         * ruling: it is a user setting, because the practice genuinely varies.
+         *
+         * Measured against the Ohr HaChaim / Zemaneh Yosef luach across 5
+         * cities × 5 dates, our 40 sits exactly 10 minutes after its 30 — a
+         * flat offset with a spread of 4 seconds, i.e. purely the parameter.
+         */
         const val TZEIT_SHABBAT_FIXED_MINUTES = 40L
+
+        /** צאת שבת options offered in settings, with their provenance. */
+        val TZEIT_SHABBAT_OPTIONS = listOf(
+            25L to "כ\"ה דקות",
+            30L to "ל' דקות — לוח אור החיים",
+            35L to "ל\"ה דקות",
+            40L to "מ' דקות — מנהג רווח",
+            42L to "מ\"ב דקות",
+            50L to "נ' דקות",
+            72L to "ע\"ב דקות — ר\"ת",
+        )
 
         /**
          * רבנו תם — the EARLIER of 72 zmaniyot / 72 fixed minutes after shkia

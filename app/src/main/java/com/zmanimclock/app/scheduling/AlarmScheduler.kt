@@ -84,6 +84,7 @@ class AlarmScheduler @Inject constructor(
                 scheduleNextOccurrence(
                     alarm, location, cityId,
                     candleLightingMinutes = prefs.candleLightingMinutes.toLong(),
+                    tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
                 )
             }.onFailure { Log.e(TAG, "Failed to schedule alarm ${alarm.id}", it) }
         }
@@ -115,10 +116,13 @@ class AlarmScheduler @Inject constructor(
         location: AppGeoLocation,
         cityId: String?,
         candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
+        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
     ) {
         val zone = ZoneId.of(location.timeZone.id)
         val fireTime = computeNextOccurrence(
-            alarm, location, cityId, candleLightingMinutes = candleLightingMinutes,
+            alarm, location, cityId,
+            candleLightingMinutes = candleLightingMinutes,
+            tzeitShabbatMinutes = tzeitShabbatMinutes,
         )
         if (fireTime == null) {
             // Disarm rather than leaving a stale alarm armed from a previous
@@ -137,6 +141,7 @@ class AlarmScheduler @Inject constructor(
         cityId: String?,
         cacheOnly: Boolean = false,
         candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
+        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
     ): Instant? {
         val zone = ZoneId.of(location.timeZone.id)
         // Skip-next (B2): treat occurrences up to skipUntil as already past
@@ -144,7 +149,10 @@ class AlarmScheduler @Inject constructor(
         return when (alarm.type) {
             AlarmType.FIXED -> AlarmTimeCalculator.nextFixedOccurrence(alarm, zone, now)
             AlarmType.ZMAN ->
-                nextZmanOccurrence(alarm, location, cityId, zone, now, cacheOnly, candleLightingMinutes)
+                nextZmanOccurrence(
+                    alarm, location, cityId, zone, now, cacheOnly,
+                    candleLightingMinutes, tzeitShabbatMinutes,
+                )
         }
     }
 
@@ -158,6 +166,7 @@ class AlarmScheduler @Inject constructor(
                 computeNextOccurrence(
                     alarm, location, cityId, cacheOnly,
                     prefs.candleLightingMinutes.toLong(),
+                    prefs.tzeitShabbatMinutes.toLong(),
                 )?.let { alarm to it }
             }
             .minByOrNull { (_, fire) -> fire }
@@ -191,12 +200,14 @@ class AlarmScheduler @Inject constructor(
         date: LocalDate,
         cacheOnly: Boolean = false,
         candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
+        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
     ): Instant? {
         val kind = ZmanKind.fromNameOrNull(alarm.zmanId) ?: return null
         val day = zmanimRepository.getDayZmanim(
             location, cityId, date,
             cacheOnly = cacheOnly,
             candleLightingOffsetMinutes = candleLightingMinutes,
+            tzeitShabbatMinutes = tzeitShabbatMinutes,
         )
         val zmanTime = day.instantOf(kind) ?: return null
         val offset = alarm.offsetMinutes * 60_000L
@@ -213,12 +224,14 @@ class AlarmScheduler @Inject constructor(
         now: Instant,
         cacheOnly: Boolean,
         candleLightingMinutes: Long,
+        tzeitShabbatMinutes: Long,
     ): Instant? {
         var date = LocalDate.now(zone)
         repeat(AlarmTimeCalculator.MAX_LOOKAHEAD_DAYS) {
             if (AlarmTimeCalculator.isDayAllowed(alarm, date, zone)) {
                 val fire = zmanInstantFor(
-                    alarm, location, cityId, date, cacheOnly, candleLightingMinutes,
+                    alarm, location, cityId, date, cacheOnly,
+                    candleLightingMinutes, tzeitShabbatMinutes,
                 )
                 if (fire != null && fire.isAfter(now)) return fire
             }

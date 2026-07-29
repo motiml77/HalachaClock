@@ -31,6 +31,9 @@ data class UserPreferences(
     val useGps: Boolean = false,
     val useElevation: Boolean = true,
     val candleLightingMinutes: Int = 20,
+    /** צאת שבת — fixed minutes after shkia. Minhag, not a ruling; the
+     *  Ohr HaChaim luach itself prints 30. See MaranZmanimEngine. */
+    val tzeitShabbatMinutes: Int = 40,
     val nusach: String = "sephardi", // ashkenazi, sephardi
     val primaryShita: String = "both", // gra, mga, both
     val darkMode: String = "system", // light, dark, system
@@ -62,6 +65,7 @@ class UserPreferencesRepository @Inject constructor(
         val USE_GPS = booleanPreferencesKey("use_gps")
         val USE_ELEVATION = booleanPreferencesKey("use_elevation")
         val CANDLE_LIGHTING_MIN = intPreferencesKey("candle_lighting_min")
+        val TZEIT_SHABBAT_MIN = intPreferencesKey("tzeit_shabbat_min")
         val NUSACH = stringPreferencesKey("nusach")
         val PRIMARY_SHITA = stringPreferencesKey("primary_shita")
         val DARK_MODE = stringPreferencesKey("dark_mode")
@@ -82,6 +86,7 @@ class UserPreferencesRepository @Inject constructor(
             useGps = prefs[Keys.USE_GPS] ?: false,
             useElevation = prefs[Keys.USE_ELEVATION] ?: true,
             candleLightingMinutes = prefs[Keys.CANDLE_LIGHTING_MIN] ?: 20,
+            tzeitShabbatMinutes = prefs[Keys.TZEIT_SHABBAT_MIN] ?: 40,
             nusach = prefs[Keys.NUSACH] ?: "sephardi",
             primaryShita = prefs[Keys.PRIMARY_SHITA] ?: "both",
             darkMode = prefs[Keys.DARK_MODE] ?: "system",
@@ -111,6 +116,7 @@ class UserPreferencesRepository @Inject constructor(
             .putString("tz", p.timeZoneId)
             .putBoolean("useGps", p.useGps)
             .putInt("candle", p.candleLightingMinutes)
+            .putInt("tzeitShabbat", p.tzeitShabbatMinutes)
             .putBoolean("persistent", p.persistentNotification)
             .apply()
     }
@@ -125,6 +131,7 @@ class UserPreferencesRepository @Inject constructor(
         timeZoneId = dpsPrefs.getString("tz", "Asia/Jerusalem")!!,
         useGps = dpsPrefs.getBoolean("useGps", false),
         candleLightingMinutes = dpsPrefs.getInt("candle", 20),
+        tzeitShabbatMinutes = dpsPrefs.getInt("tzeitShabbat", 40),
         persistentNotification = dpsPrefs.getBoolean("persistent", true),
     )
 
@@ -154,6 +161,10 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setUseElevation(useElevation: Boolean) {
         context.dataStore.edit { it[Keys.USE_ELEVATION] = useElevation }
+    }
+
+    suspend fun setTzeitShabbatMinutes(minutes: Int) {
+        context.dataStore.edit { it[Keys.TZEIT_SHABBAT_MIN] = minutes }
     }
 
     suspend fun setCandleLightingMinutes(minutes: Int) {

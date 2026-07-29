@@ -69,8 +69,11 @@ class StatusNotificationReceiver : BroadcastReceiver() {
 
         // Next zman: first upcoming today, else tomorrow's first
         val candle = prefs.candleLightingMinutes.toLong()
-        val next = nextZman(location, cityId, LocalDate.now(zone), now, candle)
-            ?: nextZman(location, cityId, LocalDate.now(zone).plusDays(1), now, candle)
+        val tzeitShabbat = prefs.tzeitShabbatMinutes.toLong()
+        val next = nextZman(location, cityId, LocalDate.now(zone), now, candle, tzeitShabbat)
+            ?: nextZman(
+                location, cityId, LocalDate.now(zone).plusDays(1), now, candle, tzeitShabbat,
+            )
         val zmanName = next?.first?.shortName ?: "—"
         val zmanTime = next?.let { (_, instant) -> timeFmt.format(instant.atZone(zone)) } ?: ""
 
@@ -134,11 +137,13 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         date: LocalDate,
         now: Instant,
         candleLightingMinutes: Long,
+        tzeitShabbatMinutes: Long,
     ): Pair<ZmanKind, Instant>? {
         // cacheOnly: a receiver must not hit the network (goAsync ~10s budget)
         val day = zmanimRepository.getDayZmanim(
             location, cityId, date, cacheOnly = true,
             candleLightingOffsetMinutes = candleLightingMinutes,
+            tzeitShabbatMinutes = tzeitShabbatMinutes,
         )
         return day.relevantTimedZmanim(date)
             .filter { (_, instant) -> instant.isAfter(now) }

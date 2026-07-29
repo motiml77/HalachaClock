@@ -55,12 +55,14 @@ class WidgetRenderer @Inject constructor(
 
         // Honour the user's candle-lighting offset (Jerusalem 40 min etc.)
         val candle = prefs.candleLightingMinutes.toLong()
+        val tzeitShabbat = prefs.tzeitShabbatMinutes.toLong()
         val dayToday = zmanimRepository.getDayZmanim(
-            location, cityId, today, cacheOnly = true, candleLightingOffsetMinutes = candle,
+            location, cityId, today, cacheOnly = true,
+            candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
         )
         val dayTomorrow = zmanimRepository.getDayZmanim(
             location, cityId, today.plusDays(1), cacheOnly = true,
-            candleLightingOffsetMinutes = candle,
+            candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
         )
 
         // Next zman across today→tomorrow (candle-lighting/tzeit-Shabbat only

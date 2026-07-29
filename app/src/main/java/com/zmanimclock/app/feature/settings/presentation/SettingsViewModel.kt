@@ -32,6 +32,10 @@ class SettingsViewModel @Inject constructor(
     val preferences: StateFlow<UserPreferences> = prefsRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserPreferences())
 
+    fun setTzeitShabbatMinutes(minutes: Int) {
+        viewModelScope.launch { prefsRepository.setTzeitShabbatMinutes(minutes) }
+    }
+
     fun setCandleLightingMinutes(minutes: Int) {
         viewModelScope.launch { prefsRepository.setCandleLightingMinutes(minutes) }
     }
