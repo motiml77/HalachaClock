@@ -63,10 +63,17 @@
             tools:text="עוד 1:06:32" />
     </LinearLayout>
 
-    <View
+    <!--
+        Divider. Must be an ImageView, NOT a plain <View>: RemoteViews only
+        inflates a fixed whitelist of view classes, and View is not on it —
+        a bare <View> here makes the whole widget fail to inflate on the
+        launcher process, so the user just sees "Problem loading widget".
+    -->
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#33FFFFFF"
+        android:contentDescription="@null"
         android:layout_marginBottom="6dp" />
 
     <!-- Zman rows (up to 5; toggled by renderer) -->

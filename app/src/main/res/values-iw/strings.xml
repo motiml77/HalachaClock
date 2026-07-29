@@ -38,6 +38,7 @@
     <string name="zman_shma_mga">סוף זמן ק\"ש - מג\"א</string>
     <string name="zman_tfila_gra">סוף זמן תפילה - גר\"א</string>
     <string name="zman_tfila_mga">סוף זמן תפילה - מג\"א</string>
+    <string name="zman_chatzot_hayom">חצות היום</string>
     <string name="zman_mincha_gedola">מנחה גדולה</string>
     <string name="zman_mincha_ketana_161">מנחה קטנה - 16.1\u00B0</string>
     <string name="zman_mincha_ketana_72">מנחה קטנה - 72 דקות</string>
