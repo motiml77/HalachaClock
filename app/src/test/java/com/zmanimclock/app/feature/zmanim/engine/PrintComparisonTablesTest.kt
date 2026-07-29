@@ -29,8 +29,18 @@ class PrintComparisonTablesTest {
         LocalDate.of(2027, 4, 10),   // spring, next year
         LocalDate.of(2026, 3, 27),   // DST STARTS (clocks jump forward)
         LocalDate.of(2026, 10, 25),  // DST ENDS (clocks fall back)
-        LocalDate.of(2028, 2, 29),   // leap day
+        // ---- Gregorian leap year: the day itself and both neighbours ----
+        LocalDate.of(2028, 2, 28),   // eve of the leap day
+        LocalDate.of(2028, 2, 29),   // THE LEAP DAY
+        LocalDate.of(2028, 3, 1),    // first day of the one-day drift window
+        LocalDate.of(2027, 3, 1),    // same date, non-leap year — must match ±sec
         LocalDate.of(2028, 3, 24),   // DST start in a LEAP year
+        LocalDate.of(2028, 12, 31),  // day 366 — the far end of the drift window
+        LocalDate.of(2029, 1, 1),    // the year AFTER a leap year
+        // ---- Hebrew leap year 5787 (Adar I + Adar II) ----
+        LocalDate.of(2027, 2, 20),   // inside Adar I — no fast may appear
+        LocalDate.of(2027, 3, 22),   // Taanit Esther, Adar II
+        LocalDate.of(2027, 3, 26),   // DST start 2027 (boundary moved vs 2026)
     )
 
     @Test
