@@ -44,12 +44,18 @@ data class DayZmanim(
     val hanetzVisible: Instant?,
     val hanetzMishor: Instant?,
 
-    // Morning deadlines — MGA in both displayed shitot (16.1° / 72 fixed)
-    val sofZmanShmaMga: Instant?,   // 16.1° solar depression
-    val sofZmanShmaMga72: Instant?, // 72 fixed minutes
+    // Morning deadlines — MGA in the two displayed shitot.
+    // The PRIMARY one is the luach's own: a day running from 72 zmaniyot
+    // minutes before sunrise to 72 zmaniyot minutes after sunset, i.e. exactly
+    // 1.2 × the GRA shaah. Verified against royzmanim.com (Zemaneh Yosef, the
+    // Ohr HaChaim calendar) to within 4 seconds over 25 city/date points.
+    // 16.1° is kept as the secondary shita for those who follow it; it is up
+    // to 9.5 minutes away from the luach in midwinter.
+    val sofZmanShmaMga: Instant?,   // 72 zmaniyot minutes — the luach
+    val sofZmanShmaMga16: Instant?, // 16.1° solar depression
     val sofZmanShmaGra: Instant?,
-    val sofZmanTfilaMga: Instant?,   // 16.1°
-    val sofZmanTfilaMga72: Instant?, // 72 fixed
+    val sofZmanTfilaMga: Instant?,   // 72 zmaniyot minutes — the luach
+    val sofZmanTfilaMga16: Instant?, // 16.1°
     val sofZmanTfilaGra: Instant?,
 
     // Midday

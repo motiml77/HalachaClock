@@ -24,11 +24,17 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     ALOT_HASHACHAR("עלות השחר"),
     MISHEYAKIR("משיכיר"),
     HANETZ("הנץ החמה"),
-    SOF_ZMAN_SHMA_MGA("ק\"ש מג\"א 16.1°", "ק\"ש מג\"א"),
-    SOF_ZMAN_SHMA_MGA_72("ק\"ש מג\"א 72'", "ק\"ש מג\"א"),
+    // The CONSTANT NAMES are frozen: they are persisted as `alarm.zmanId` and
+    // resolved back through fromNameOrNull, so renaming one would orphan every
+    // alarm a user has already saved. Only the labels and the values behind
+    // them moved when the MGA shita was corrected to the luach's own (72
+    // zmaniyot minutes); _MGA is now that, and _MGA_72 carries the 16.1°
+    // reading that used to sit on _MGA.
+    SOF_ZMAN_SHMA_MGA("ק\"ש מג\"א 72 ד\"ז", "ק\"ש מג\"א"),
+    SOF_ZMAN_SHMA_MGA_72("ק\"ש מג\"א 16.1°", "ק\"ש מג\"א"),
     SOF_ZMAN_SHMA_GRA("סוף זמן ק\"ש גר\"א", "ק\"ש גר\"א"),
-    SOF_ZMAN_TFILA_MGA("תפילה מג\"א 16.1°", "תפילה מג\"א"),
-    SOF_ZMAN_TFILA_MGA_72("תפילה מג\"א 72'", "תפילה מג\"א"),
+    SOF_ZMAN_TFILA_MGA("תפילה מג\"א 72 ד\"ז", "תפילה מג\"א"),
+    SOF_ZMAN_TFILA_MGA_72("תפילה מג\"א 16.1°", "תפילה מג\"א"),
     SOF_ZMAN_TFILA_GRA("סוף זמן תפילה גר\"א", "תפילה גר\"א"),
     CHATZOT("חצות היום"),
     MINCHA_GEDOLA("מנחה גדולה"),
@@ -85,10 +91,10 @@ fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.MISHEYAKIR -> misheyakir60 // luach standard: one shaah zmanit before the netz
     ZmanKind.HANETZ -> hanetzVisible ?: hanetzMishor
     ZmanKind.SOF_ZMAN_SHMA_MGA -> sofZmanShmaMga
-    ZmanKind.SOF_ZMAN_SHMA_MGA_72 -> sofZmanShmaMga72
+    ZmanKind.SOF_ZMAN_SHMA_MGA_72 -> sofZmanShmaMga16
     ZmanKind.SOF_ZMAN_SHMA_GRA -> sofZmanShmaGra
     ZmanKind.SOF_ZMAN_TFILA_MGA -> sofZmanTfilaMga
-    ZmanKind.SOF_ZMAN_TFILA_MGA_72 -> sofZmanTfilaMga72
+    ZmanKind.SOF_ZMAN_TFILA_MGA_72 -> sofZmanTfilaMga16
     ZmanKind.SOF_ZMAN_TFILA_GRA -> sofZmanTfilaGra
     ZmanKind.CHATZOT -> chatzot
     ZmanKind.MINCHA_GEDOLA -> minchaGedola

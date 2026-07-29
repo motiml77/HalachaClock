@@ -86,15 +86,27 @@ class MaranZmanimEngine @Inject constructor() {
         val shmaGra = fromBase(3.0)
         val tfilaGra = fromBase(4.0)
 
-        // MGA — the two shitot the luach prints side by side:
-        //  16.1°: dawn/nightfall at 16.1° actual solar depression on THIS day
-        //         (longer than 72 min in winter/summer, 72 at the equinox);
-        //  72':   dawn/nightfall at 72 fixed clock minutes.
-        // Both use KosherJava's canonical day-of-alos→tzais 3/12 and 4/12.
+        // MGA — the luach's own shita, with 16.1° kept alongside it.
+        //
+        // THE LUACH (primary): the Magen Avraham day runs from 72 ZMANIYOT
+        // minutes before sunrise to 72 zmaniyot minutes after sunset, so its
+        // seasonal hour is exactly 1.2 × the GRA one — which is `shaahMga`,
+        // already computed above. Sof zman shma is 3 such hours after alot,
+        // tefila 4. Note alot is itself 72 zmaniyot before sunrise, so this
+        // is self-consistent.
+        //
+        // This replaces KosherJava's 16.1° and 72-FIXED variants, neither of
+        // which is what Ohr HaChaim prints. Read straight out of the Zemaneh
+        // Yosef engine (royzmanim.com in Israel mode, config.fixedMil = true):
+        // its dawn sits at exactly 72.00 zmaniyot minutes before sunrise in
+        // every season, and its shaahMga / shaahGra is exactly 1.2. The 16.1°
+        // version was up to 9 min 25 s away from the luach in midwinter — the
+        // largest single error left in the engine. The formula below
+        // reproduces the luach to within 4 seconds over 25 city/date points.
+        val shmaMga = alot.plusMillis((shaahMga * 3.0).toLong())
+        val tfilaMga = alot.plusMillis((shaahMga * 4.0).toLong())
         val shmaMga16 = czc.sofZmanShmaMGA16Point1Degrees?.toInstant()
         val tfilaMga16 = czc.sofZmanTfilaMGA16Point1Degrees?.toInstant()
-        val shmaMga72 = czc.sofZmanShmaMGA72Minutes?.toInstant()
-        val tfilaMga72 = czc.sofZmanTfilaMGA72Minutes?.toInstant()
 
         // === Midday: TRUE solar noon (sun transit) ===
         // Chazon Yosef (ROYZmanim getChatzot === getSunTransit) fixes chatzot at
@@ -161,11 +173,11 @@ class MaranZmanimEngine @Inject constructor() {
             misheyakir60 = misheyakir60,
             hanetzVisible = visibleSunrise,
             hanetzMishor = mishorSunrise,
-            sofZmanShmaMga = shmaMga16,
-            sofZmanShmaMga72 = shmaMga72,
+            sofZmanShmaMga = shmaMga,
+            sofZmanShmaMga16 = shmaMga16,
             sofZmanShmaGra = shmaGra,
-            sofZmanTfilaMga = tfilaMga16,
-            sofZmanTfilaMga72 = tfilaMga72,
+            sofZmanTfilaMga = tfilaMga,
+            sofZmanTfilaMga16 = tfilaMga16,
             sofZmanTfilaGra = tfilaGra,
             chatzot = chatzot,
             minchaGedola = minchaGedola,
@@ -213,10 +225,10 @@ class MaranZmanimEngine @Inject constructor() {
         hanetzVisible = visibleSunrise,
         hanetzMishor = mishorSunrise,
         sofZmanShmaMga = null,
-        sofZmanShmaMga72 = null,
+        sofZmanShmaMga16 = null,
         sofZmanShmaGra = null,
         sofZmanTfilaMga = null,
-        sofZmanTfilaMga72 = null,
+        sofZmanTfilaMga16 = null,
         sofZmanTfilaGra = null,
         chatzot = null,
         minchaGedola = null,
