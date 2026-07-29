@@ -102,20 +102,23 @@ class ChaiTablesHtmlParser @Inject constructor() {
                     try {
                         val jewishDate = JewishDate(params.hebrewYear, kjMonth, hebrewDay)
                         val gregCal = jewishDate.getGregorianCalendar()
-                        // Solar key (month*100+day) — stable across leap years
-                        val dayOfYear = com.zmanimclock.app.feature.chaitables.data.SolarDayKey.of(
-                            java.time.LocalDate.of(
-                                gregCal.get(Calendar.YEAR),
-                                gregCal.get(Calendar.MONTH) + 1,
-                                gregCal.get(Calendar.DAY_OF_MONTH),
-                            )
+                        // The exact Gregorian date this row belongs to. A
+                        // Hebrew year spans two Gregorian years, so this — not
+                        // the fetch year — is what the DST re-basing needs.
+                        val gregDate = java.time.LocalDate.of(
+                            gregCal.get(Calendar.YEAR),
+                            gregCal.get(Calendar.MONTH) + 1,
+                            gregCal.get(Calendar.DAY_OF_MONTH),
                         )
+                        // Solar key (month*100+day) — stable across leap years
+                        val dayOfYear = com.zmanimclock.app.feature.chaitables.data.SolarDayKey.of(gregDate)
 
                         entries[dayOfYear] = SunriseTimeEntry(
                             dayOfYear = dayOfYear,
                             hour = hour,
                             minute = minute,
                             second = second,
+                            sourceEpochDay = gregDate.toEpochDay(),
                         )
                     } catch (e: Exception) {
                         Log.w(TAG, "Invalid date: year=${params.hebrewYear} month=$kjMonth day=$hebrewDay", e)

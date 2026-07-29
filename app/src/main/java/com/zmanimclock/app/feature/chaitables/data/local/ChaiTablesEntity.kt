@@ -33,4 +33,15 @@ data class ChaiTablesEntity(
     val sunriseMinute: Int,        // 0-59
     val sunriseSecond: Int,        // 0-59
     val fetchedAt: Long,           // when this was cached (epoch millis)
+    /**
+     * The REAL Gregorian date this row was recorded for, as an epoch day
+     * (0 = unknown, for rows written before this column existed).
+     *
+     * Needed because a Hebrew year spans TWO Gregorian years — so the year the
+     * table was fetched in is the wrong year for roughly half the rows, and
+     * Israel's DST boundary moves annually. Without the true source date the
+     * DST re-basing in the repository can be a full hour out on the days
+     * between the two years' boundaries.
+     */
+    val sourceEpochDay: Long = 0L,
 )

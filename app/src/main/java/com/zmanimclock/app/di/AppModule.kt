@@ -39,7 +39,7 @@ object AppModule {
         return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
             // v4→v5: ring duration moved from whole minutes to seconds — keep
             // the user's existing alarms by converting minutes×60 in place.
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
             // silently wipe every alarm the user created.
@@ -54,6 +54,20 @@ object AppModule {
      * re-seeds immediately and any custom city refetches on next use.
      * ALARMS ARE UNTOUCHED; only the derived sunrise cache is cleared.
      */
+    /**
+     * v6→v7: rows now carry the real Gregorian date they were recorded for,
+     * so the DST re-basing no longer has to guess a year (a Hebrew year spans
+     * two Gregorian years, so the guess was wrong for about half the table).
+     * Existing rows get 0 = "unknown" and keep the old heuristic.
+     */
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE chai_tables_cache ADD COLUMN sourceEpochDay INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
+
     private val MIGRATION_5_6 = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("DELETE FROM chai_tables_cache")

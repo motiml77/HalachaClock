@@ -106,6 +106,10 @@ class ChaiTablesFetcher @Inject constructor(
             val url = urlBuilder.buildUrlWithRadius(params, radius)
             val html = executeRequest(url) ?: continue
             val data = htmlParser.parse(html, params, locationKey)
+            // A Hebrew year is 353–385 days, so ANY complete table clears
+            // this bar; it only rejects a truncated/garbled response. (Full
+            // SOLAR-year coverage is asserted in the repository, not here —
+            // a non-leap year legitimately returns ~354 rows.)
             if (data != null && data.entries.size >= 300) {
                 Log.i(TAG, "Found valid data at radius $radius with ${data.entries.size} entries")
                 return Result.success(data.copy(fetchUrl = url))

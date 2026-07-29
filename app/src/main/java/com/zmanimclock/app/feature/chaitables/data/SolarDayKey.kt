@@ -31,4 +31,28 @@ object SolarDayKey {
 
     /** True for keys written by this scheme (as opposed to legacy 1..366). */
     fun isSolarKey(key: Int): Boolean = key >= 101
+
+    /**
+     * Decode a key back to a date in [year] — needed by consumers that must
+     * know WHEN a cached row's wall-clock time was recorded (the DST re-basing
+     * in ChaiTablesRepository).
+     *
+     * SOLAR KEYS ONLY. The legacy 1..366 day-of-year space overlaps this one
+     * (101..366 is ambiguous), so it cannot be decoded unambiguously — and it
+     * does not need to be: the v5→v6 migration deletes every legacy row, and
+     * the preloader rewrites the bundled asset into this scheme. Anything that
+     * is not a valid solar key (markers, the sentinel, stale rows) returns
+     * null, and callers fall back to leaving the stored time untouched.
+     */
+    fun toDate(key: Int, year: Int): LocalDate? {
+        if (!isSolarKey(key)) return null
+        val month = key / 100
+        val day = key % 100
+        if (month !in 1..12 || day !in 1..31) return null
+        // 29 Feb has no date in a plain year — use 28 Feb, its solar twin
+        if (month == 2 && day == 29 && !java.time.Year.isLeap(year.toLong())) {
+            return LocalDate.of(year, 2, 28)
+        }
+        return runCatching { LocalDate.of(year, month, day) }.getOrNull()
+    }
 }

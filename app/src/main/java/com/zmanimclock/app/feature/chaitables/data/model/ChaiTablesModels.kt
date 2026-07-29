@@ -20,7 +20,9 @@ data class ChaiTablesParams(
  * Time-of-day is the same every year for a given solar date and location.
  */
 data class SunriseTimeEntry(
-    val dayOfYear: Int,     // 1-366 (Gregorian)
+    val dayOfYear: Int,     // solar key (month*100+day)
+    /** the real Gregorian date this row came from, as an epoch day. */
+    val sourceEpochDay: Long = 0L,
     val hour: Int,          // 0-23
     val minute: Int,        // 0-59
     val second: Int,        // 0-59

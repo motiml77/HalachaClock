@@ -36,11 +36,24 @@ class ChaiTablesRepository @Inject constructor(
     companion object {
         private const val TAG = "ChaiTablesRepo"
 
-        /** ~365 entries expected for a full year. */
-        private const val FULL_YEAR_THRESHOLD = 300
+        /**
+         * A full SOLAR year is 365 distinct (month, day) keys. This used to be
+         * 300, which silently accepted an incomplete table: a Hebrew NON-leap
+         * year is only 353–355 days, so one fetch yields 353–355 distinct
+         * keys and ~10–13 calendar days are left with no data at all. The old
+         * threshold then declared the cache "complete" and those days fell
+         * back to the mishor sunrise forever. Only a Hebrew LEAP year
+         * (383–385 days) covers a whole solar year in a single fetch.
+         * 29 February is excused — SolarDayKey.fallbackFor maps it to 28 Feb.
+         */
+        private const val FULL_YEAR_KEYS = 365
 
         private const val SENTINEL_DAY = 0
         private const val SENTINEL_HOUR = -1
+
+        /** Marker row recording "Hebrew year N was already fetched". */
+        private const val FETCHED_YEAR_HOUR = -2
+        private fun fetchedYearKey(hebrewYear: Int) = -hebrewYear
     }
 
     /**
@@ -73,9 +86,9 @@ class ChaiTablesRepository @Inject constructor(
             }
         }
 
-        // 2. Full year already cached — this specific day simply has no data
+        // 2. Genuinely complete table → this day really has no data
         val count = dao.getCountForLocation(locationKey)
-        if (count >= FULL_YEAR_THRESHOLD) return null
+        if (count >= FULL_YEAR_KEYS) return null
 
         // 3. GPS users inside Israel: try the nearest preloaded metro area
         if (cityId == null && metroMapper.isCoordinateInIsrael(location.latitude, location.longitude)) {
@@ -94,9 +107,16 @@ class ChaiTablesRepository @Inject constructor(
 
         if (!allowNetwork) return null
 
-        // 5. Fetch a full Hebrew year from the network and cache it forever
-        Log.i(TAG, "Fetching ChaiTables for $locationKey")
+        // 5. Fetch the Hebrew year that CONTAINS the requested date. Because a
+        // non-leap Hebrew year is shorter than a solar year, one fetch cannot
+        // cover every calendar day — so this is keyed to the date being asked
+        // for, and each Hebrew year is fetched at most once per location.
         val hebrewYear = hebrewYearFor(date)
+        if (dao.getSunrise(locationKey, fetchedYearKey(hebrewYear)) != null) {
+            Log.d(TAG, "Hebrew year $hebrewYear already fetched for $locationKey — no data for $date")
+            return null
+        }
+        Log.i(TAG, "Fetching ChaiTables for $locationKey (Hebrew year $hebrewYear)")
         val params = metroMapper.buildParams(location, cityId, hebrewYear)
         val result = fetcher.fetch(params, locationKey)
 
@@ -110,9 +130,23 @@ class ChaiTablesRepository @Inject constructor(
                     sunriseMinute = e.minute,
                     sunriseSecond = e.second,
                     fetchedAt = now,
+                    sourceEpochDay = e.sourceEpochDay,
                 )
             })
-            Log.i(TAG, "Cached ${data.entries.size} entries for $locationKey (valid forever)")
+            // Remember we covered this Hebrew year so it is never refetched
+            dao.insertAll(
+                listOf(
+                    ChaiTablesEntity(
+                        locationKey = locationKey,
+                        dayOfYear = fetchedYearKey(hebrewYear),
+                        sunriseHour = FETCHED_YEAR_HOUR,
+                        sunriseMinute = 0,
+                        sunriseSecond = 0,
+                        fetchedAt = now,
+                    )
+                )
+            )
+            Log.i(TAG, "Cached ${data.entries.size} entries for $locationKey (Hebrew year $hebrewYear)")
             dao.getSunrise(locationKey, dayKey)?.let { entry ->
                 return instantFromEntry(entry, date, location)
             }
@@ -151,7 +185,7 @@ class ChaiTablesRepository @Inject constructor(
         val locationKey = metroMapper.computeLocationKey(cityId, location)
 
         val count = dao.getCountForLocation(locationKey)
-        if (count >= FULL_YEAR_THRESHOLD) {
+        if (count >= FULL_YEAR_KEYS) {
             Log.d(TAG, "Already have $count entries for $locationKey")
             return true
         }
@@ -169,6 +203,7 @@ class ChaiTablesRepository @Inject constructor(
                     sunriseMinute = e.minute,
                     sunriseSecond = e.second,
                     fetchedAt = now,
+                    sourceEpochDay = e.sourceEpochDay,
                 )
             })
             Log.i(TAG, "Prefetched ${data.entries.size} entries for $locationKey")
@@ -215,11 +250,21 @@ class ChaiTablesRepository @Inject constructor(
 
         val corrected = runCatching {
             val rules = zone.rules
-            val sourceYear = Instant.ofEpochMilli(entry.fetchedAt).atZone(zone).year
-            val sourceDate = LocalDate.ofYearDay(
-                sourceYear,
-                entry.dayOfYear.coerceIn(1, if (LocalDate.of(sourceYear, 1, 1).isLeapYear) 366 else 365),
-            )
+            // Prefer the row's OWN recorded date. A Hebrew year spans two
+            // Gregorian years, so inferring the year from fetchedAt is wrong
+            // for roughly half the rows — and since Israel's DST boundary
+            // moves annually, that mis-dating shows up as a full-hour error on
+            // the days between the two years' boundaries. Older rows (and the
+            // bundled asset) have no source date, so they keep the old
+            // heuristic, which is right for the majority of the table.
+            val sourceDate = entry.sourceEpochDay
+                .takeIf { it > 0 }
+                ?.let { LocalDate.ofEpochDay(it) }
+                ?: SolarDayKey.toDate(
+                    entry.dayOfYear,
+                    Instant.ofEpochMilli(entry.fetchedAt).atZone(zone).year,
+                )
+                ?: return@runCatching stored
             val sourceOffset = rules.getOffset(sourceDate.atTime(stored))
             val targetOffset = rules.getOffset(date.atTime(stored))
             stored.plusSeconds((targetOffset.totalSeconds - sourceOffset.totalSeconds).toLong())
