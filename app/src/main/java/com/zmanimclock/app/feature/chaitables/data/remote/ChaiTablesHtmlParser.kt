@@ -102,7 +102,14 @@ class ChaiTablesHtmlParser @Inject constructor() {
                     try {
                         val jewishDate = JewishDate(params.hebrewYear, kjMonth, hebrewDay)
                         val gregCal = jewishDate.getGregorianCalendar()
-                        val dayOfYear = gregCal.get(Calendar.DAY_OF_YEAR)
+                        // Solar key (month*100+day) — stable across leap years
+                        val dayOfYear = com.zmanimclock.app.feature.chaitables.data.SolarDayKey.of(
+                            java.time.LocalDate.of(
+                                gregCal.get(Calendar.YEAR),
+                                gregCal.get(Calendar.MONTH) + 1,
+                                gregCal.get(Calendar.DAY_OF_MONTH),
+                            )
+                        )
 
                         entries[dayOfYear] = SunriseTimeEntry(
                             dayOfYear = dayOfYear,

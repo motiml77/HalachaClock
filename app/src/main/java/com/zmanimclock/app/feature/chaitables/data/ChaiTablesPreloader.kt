@@ -49,6 +49,14 @@ class ChaiTablesPreloader @Inject constructor(
             val jsonStr = context.assets.open(ASSET_FILE).bufferedReader().use { it.readText() }
             val json = JSONObject(jsonStr)
 
+            // The Gregorian year whose day-of-year numbering the asset used.
+            // The bundled table covers a Hebrew year spanning two Gregorian
+            // years, but day-of-year → (month, day) is identical for both
+            // unless one is a leap year, so the generation year is the right
+            // reference to decode it with.
+            val assetSourceYear = json.optString("generatedAt", "")
+                .take(4).toIntOrNull() ?: 2026
+
             val metros = json.getJSONObject("metros")
             val cityToMetro = json.getJSONObject("cityToMetro")
             var totalEntries = 0
@@ -65,7 +73,7 @@ class ChaiTablesPreloader @Inject constructor(
                     entities.add(
                         ChaiTablesEntity(
                             locationKey = metroName,
-                            dayOfYear = entry.getInt(0),
+                            dayOfYear = solarKey(entry.getInt(0), assetSourceYear),
                             sunriseHour = entry.getInt(1),
                             sunriseMinute = entry.getInt(2),
                             sunriseSecond = entry.getInt(3),
@@ -100,7 +108,7 @@ class ChaiTablesPreloader @Inject constructor(
                     cityEntities.add(
                         ChaiTablesEntity(
                             locationKey = cityId,
-                            dayOfYear = entry.getInt(0),
+                            dayOfYear = solarKey(entry.getInt(0), assetSourceYear),
                             sunriseHour = entry.getInt(1),
                             sunriseMinute = entry.getInt(2),
                             sunriseSecond = entry.getInt(3),
@@ -120,4 +128,18 @@ class ChaiTablesPreloader @Inject constructor(
             false
         }
     }
+
+    /**
+     * The bundled asset stores Gregorian DAY-OF-YEAR for [sourceYear]. Convert
+     * it to the leap-safe (month, day) key so lookups are correct in every
+     * year — otherwise a table generated in a leap year is read one day off
+     * for the three following years.
+     */
+    private fun solarKey(dayOfYear: Int, sourceYear: Int): Int = runCatching {
+        val maxDay = if (java.time.Year.isLeap(sourceYear.toLong())) 366 else 365
+        SolarDayKey.of(
+            java.time.LocalDate.ofYearDay(sourceYear, dayOfYear.coerceIn(1, maxDay))
+        )
+    }.getOrDefault(dayOfYear)
+
 }

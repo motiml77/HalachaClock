@@ -58,11 +58,19 @@ class ChaiTablesRepository @Inject constructor(
         allowNetwork: Boolean = true,
     ): Instant? {
         val locationKey = metroMapper.computeLocationKey(cityId, location)
-        val dayOfYear = date.dayOfYear
+        // Keyed by (month, day), NOT by day-of-year: the table is a solar
+        // almanac, and a leap day shifts every later day-of-year by one, so
+        // raw day-of-year reads the wrong row for three years out of four.
+        val dayKey = SolarDayKey.of(date)
 
-        // 1. Cache hit by Gregorian day-of-year
-        dao.getSunrise(locationKey, dayOfYear)?.let { cached ->
+        // 1. Cache hit for this calendar day (29 Feb falls back to 28 Feb)
+        dao.getSunrise(locationKey, dayKey)?.let { cached ->
             return instantFromEntry(cached, date, location)
+        }
+        SolarDayKey.fallbackFor(date)?.let { alt ->
+            dao.getSunrise(locationKey, alt)?.let { cached ->
+                return instantFromEntry(cached, date, location)
+            }
         }
 
         // 2. Full year already cached — this specific day simply has no data
@@ -72,7 +80,7 @@ class ChaiTablesRepository @Inject constructor(
         // 3. GPS users inside Israel: try the nearest preloaded metro area
         if (cityId == null && metroMapper.isCoordinateInIsrael(location.latitude, location.longitude)) {
             metroMapper.findNearestMetro(location.latitude, location.longitude)?.let { metro ->
-                dao.getSunrise(metro, dayOfYear)?.let { metroCached ->
+                dao.getSunrise(metro, dayKey)?.let { metroCached ->
                     Log.d(TAG, "Using nearest metro '$metro' for GPS location $locationKey")
                     return instantFromEntry(metroCached, date, location)
                 }
@@ -105,8 +113,13 @@ class ChaiTablesRepository @Inject constructor(
                 )
             })
             Log.i(TAG, "Cached ${data.entries.size} entries for $locationKey (valid forever)")
-            dao.getSunrise(locationKey, dayOfYear)?.let { entry ->
+            dao.getSunrise(locationKey, dayKey)?.let { entry ->
                 return instantFromEntry(entry, date, location)
+            }
+            SolarDayKey.fallbackFor(date)?.let { alt ->
+                dao.getSunrise(locationKey, alt)?.let { entry ->
+                    return instantFromEntry(entry, date, location)
+                }
             }
         }
 

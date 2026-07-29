@@ -39,12 +39,25 @@ object AppModule {
         return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
             // v4→v5: ring duration moved from whole minutes to seconds — keep
             // the user's existing alarms by converting minutes×60 in place.
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
             // silently wipe every alarm the user created.
             .fallbackToDestructiveMigrationFrom(1, 2, 3)
             .build()
+    }
+
+    /**
+     * v5→v6: the visible-sunrise cache moved from a raw Gregorian
+     * day-of-year key to a leap-safe (month*100+day) key. The old rows are
+     * unreadable under the new scheme, so drop them — the bundled asset
+     * re-seeds immediately and any custom city refetches on next use.
+     * ALARMS ARE UNTOUCHED; only the derived sunrise cache is cleared.
+     */
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DELETE FROM chai_tables_cache")
+        }
     }
 
     private val MIGRATION_4_5 = object : Migration(4, 5) {

@@ -27,7 +27,10 @@ class PrintComparisonTablesTest {
         LocalDate.of(2026, 7, 27),   // summer
         LocalDate.of(2026, 12, 15),  // winter (standard time)
         LocalDate.of(2027, 4, 10),   // spring, next year
-        LocalDate.of(2027, 1, 19),   // deep winter, next year
+        LocalDate.of(2026, 3, 27),   // DST STARTS (clocks jump forward)
+        LocalDate.of(2026, 10, 25),  // DST ENDS (clocks fall back)
+        LocalDate.of(2028, 2, 29),   // leap day
+        LocalDate.of(2028, 3, 24),   // DST start in a LEAP year
     )
 
     @Test
