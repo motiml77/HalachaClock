@@ -38,7 +38,8 @@ import javax.inject.Inject
  *
  * Per-alarm ring configuration (loaded from Room by id):
  *  - custom sound URI (system default when null), ALARM audio stream
- *  - target volume with ramp-up (starts soft, climbs to the target)
+ *  - target volume, constant by default; an optional per-alarm gentle
+ *    climb paced to finish inside the ring duration
  *  - ring duration → self-snooze when unattended
  *  - vibration on/off
  * One-time alarms deactivate themselves after ringing; the reschedule chain
@@ -70,12 +71,30 @@ class AlarmSoundService : Service() {
      * unreliable. These writes must survive the service.
      */
     private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + ringErrorHandler)
-    private var mediaPlayer: MediaPlayer? = null
+    /**
+     * Written from Dispatchers.IO in [tryPlay] and read/cleared on the main
+     * thread in [stopRinging] — @Volatile so the two threads cannot see a
+     * stale value. Paired with [stopped] below.
+     */
+    @Volatile private var mediaPlayer: MediaPlayer? = null
+    /**
+     * Set the moment the alarm is told to stop.
+     *
+     * A slow content:// ringtone provider can leave prepare()/start() still
+     * running on the IO thread when the user dismisses. Without this flag
+     * that thread then publishes a freshly STARTED looping player into a
+     * service that has already torn down — nothing is left to release it,
+     * and the alarm loops forever with no UI to stop it.
+     */
+    @Volatile private var stopped = false
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     private var alarm: AlarmEntity? = null
-    private var currentVolume = 0f
+    // 1f, not 0f: if any future path ever reads this before startSound
+    // sets it, the failure mode should be 'full volume' and not a SILENT
+    // alarm, which produces no exception and no log line to notice.
+    private var currentVolume = 1f
     private var targetVolume = 1f
     /** System ALARM-stream level before we forced it up, to restore on stop. */
     private var savedAlarmVolume: Int? = null
@@ -83,29 +102,27 @@ class AlarmSoundService : Service() {
     private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
     /** The ringing alarm's chosen loudness, needed when the player is built. */
     private var boostPercent: Int = 100
+    /** Ramp pacing for the current alarm; see [rampIntervalFor]. */
+    private var rampIntervalMs: Long = VOLUME_STEP_INTERVAL_MS
 
     private val volumeRampStep = object : Runnable {
         override fun run() {
-            currentVolume = (currentVolume + VOLUME_STEP).coerceAtMost(targetVolume)
+            currentVolume = (currentVolume + AlarmVolume.VOLUME_STEP).coerceAtMost(targetVolume)
             try {
                 mediaPlayer?.setVolume(currentVolume, currentVolume)
             } catch (_: IllegalStateException) {
             }
             if (currentVolume < targetVolume) {
-                handler.postDelayed(this, VOLUME_STEP_INTERVAL_MS)
-            } else {
-                // Ramp finished — only now engage the above-100% boost.
-                // Engaging a compressor during the gentle climb would flatten
-                // it and defeat the point of ramping at all, and by this point
-                // the player's output track certainly exists on an output
-                // thread, which is the most compatible moment to attach a
-                // session effect.
-                attachBoost(mediaPlayer)
+                handler.postDelayed(this, rampIntervalMs)
             }
+            // NOTE: the boost is deliberately NOT attached here any more.
+            // Hanging it off ramp COMPLETION meant a gradual alarm whose ring
+            // duration was shorter than the ramp never got it at all — see
+            // startSound.
         }
     }
 
-    /** Attaches the >100% boost when there is no ramp to hang it off. */
+    /** Attaches the >100% boost, on its own timer for every alarm. */
     private val attachBoostStep = Runnable { attachBoost(mediaPlayer) }
 
     private val autoSilence = Runnable {
@@ -269,6 +286,7 @@ class AlarmSoundService : Service() {
     }
 
     private fun startSound(alarm: AlarmEntity) {
+        stopped = false
         // CRITICAL: force the system ALARM stream up to the chosen level.
         // The alarm stream is independent of the ringer, but if the phone is
         // on vibrate/silent its ALARM volume is often left at 0 — then a
@@ -293,7 +311,13 @@ class AlarmSoundService : Service() {
         // simply be showing them the wrong alarm.
         targetVolume = 1f
         val ramp = alarm.gradualVolume
-        currentVolume = if (ramp) RAMP_START_VOLUME else 1f
+        currentVolume = if (ramp) AlarmVolume.RAMP_START_VOLUME else 1f
+        // Pace the climb to THIS alarm's ring duration. At the old fixed
+        // 2.5 s per step the climb took 20 s, but the ring duration slider
+        // starts at 10 s — so a short gradual alarm stopped while still
+        // half-volume, having never reached the loudness the user chose.
+        // The ramp now always completes inside the ring.
+        rampIntervalMs = AlarmVolume.rampIntervalMs(alarm.ringDurationSeconds)
 
         // Custom URI first; if it vanished (file deleted / permission lost),
         // FALL BACK to the system default — a silent alarm is the worst bug.
@@ -309,16 +333,17 @@ class AlarmSoundService : Service() {
                 candidates.firstOrNull { tryPlay(it) }
             }
             if (played != null) {
-                if (ramp) {
-                    handler.postDelayed(volumeRampStep, VOLUME_STEP_INTERVAL_MS)
-                } else {
-                    // No ramp, so nothing will reach the ramp's terminal
-                    // branch — the boost has to be attached on its own. Give
-                    // the output track a moment to exist first; attaching a
-                    // session effect before it does takes AudioFlinger's
-                    // orphan-chain path, which works but is the fragile one.
-                    handler.postDelayed(attachBoostStep, BOOST_ATTACH_DELAY_MS)
-                }
+                if (ramp) handler.postDelayed(volumeRampStep, rampIntervalMs)
+                // The boost is attached on its own timer in BOTH cases, never
+                // off the end of the ramp. Tying it to ramp completion meant a
+                // gradual alarm that stopped before the climb finished rang
+                // with no boost at all — the user asked for +6 dB and got
+                // nothing, silently. A compressor very slightly flattening the
+                // climb is a cosmetic cost next to that.
+                // The delay lets the output track exist first: attaching a
+                // session effect before it does takes AudioFlinger's
+                // orphan-chain path, which works but is the fragile one.
+                handler.postDelayed(attachBoostStep, BOOST_ATTACH_DELAY_MS)
             } else {
                 Log.e(TAG, "All sound sources failed — vibration only")
             }
@@ -330,34 +355,48 @@ class AlarmSoundService : Service() {
      * callers run this off the main thread (see [startSound]) so a slow
      * ringtone provider cannot ANR the ringing service.
      */
-    private fun tryPlay(uri: Uri): Boolean = try {
-        mediaPlayer?.release()
-        mediaPlayer = MediaPlayer().apply {
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
-            setDataSource(this@AlarmSoundService, uri)
-            isLooping = true
-            setVolume(currentVolume, currentVolume)
-            prepare()
-            start()
+    private fun tryPlay(uri: Uri): Boolean {
+        return try {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(this@AlarmSoundService, uri)
+                isLooping = true
+                setVolume(currentVolume, currentVolume)
+                prepare()
+                start()
+            }
+            if (stopped) {
+                // Told to stop while this was still preparing. Release the
+                // player we just started rather than publishing it into a
+                // service that has already torn down — nothing else would ever
+                // release it, and it would loop forever with no UI to stop it.
+                Log.i(TAG, "Sound became ready after stop — releasing it")
+                runCatching { mediaPlayer?.stop() }
+                mediaPlayer?.release()
+                mediaPlayer = null
+                return false
+            }
+            // The boost is deliberately NOT created here. The catch below
+            // swallows Exception, and LoudnessEnhancer's constructor throws
+            // RuntimeException — so a device that cannot provide the effect
+            // would be treated as a FAILED SOUND SOURCE. Every candidate URI
+            // would fall through the same way and the alarm would ring
+            // silently. It is attached from attachBoostStep instead, well
+            // away from this path.
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Sound source failed: $uri (${e.message})")
+            releaseBoost()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            false
         }
-        // The boost is deliberately NOT created here. tryPlay's catch below
-        // swallows Exception, and LoudnessEnhancer's constructor throws
-        // RuntimeException — so a device that cannot provide the effect would
-        // be treated as a FAILED SOUND SOURCE. Every candidate URI would fall
-        // through the same way and the alarm would ring silently. The boost is
-        // attached from the volume ramp instead, well away from this path.
-        true
-    } catch (e: Exception) {
-        Log.w(TAG, "Sound source failed: $uri (${e.message})")
-        releaseBoost()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        false
     }
 
     /**
@@ -441,6 +480,7 @@ class AlarmSoundService : Service() {
     }
 
     private fun stopRinging() {
+        stopped = true
         handler.removeCallbacksAndMessages(null)
         try {
             mediaPlayer?.stop()
@@ -587,12 +627,9 @@ class AlarmSoundService : Service() {
 
         // Ramp 0.2 → 1.0 in ~20s (ring durations are now 10s–3min, so the old
         // one-minute ramp meant short alarms never reached full loudness)
-        /** Where a gradual ring starts, as a fraction of the target. */
-        private const val RAMP_START_VOLUME = 0.2f
-        /** Settling time before attaching the boost on a constant ring. */
+        /** Settling time before attaching the boost. */
         private const val BOOST_ATTACH_DELAY_MS = 500L
 
-        private const val VOLUME_STEP = 0.1f
-        private const val VOLUME_STEP_INTERVAL_MS = 2_500L
+        private const val VOLUME_STEP_INTERVAL_MS = AlarmVolume.MAX_RAMP_STEP_MS
     }
 }

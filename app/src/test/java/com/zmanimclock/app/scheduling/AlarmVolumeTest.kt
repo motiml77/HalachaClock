@@ -83,4 +83,58 @@ class AlarmVolumeTest {
             )
         }
     }
+
+    // ---- the optional gentle climb ----
+
+    @Test
+    fun `the climb always finishes before the alarm stops ringing`() {
+        // THE BUG THIS PINS: the step interval used to be a fixed 2.5s, so the
+        // climb took 20s — while the ring-duration slider starts at 10s. A
+        // gradual alarm set to 10 or 15 seconds was auto-silenced while still
+        // at roughly half volume, having never once reached the loudness the
+        // user actually chose. Someone could sleep straight through an alarm
+        // that was, by the numbers, ~12 dB quieter than what the UI promised.
+        for (ring in AlarmVolume.MIN_RING_SECONDS..AlarmVolume.MAX_RING_SECONDS) {
+            val total = AlarmVolume.rampTotalMs(ring)
+            val ringMs = ring * 1000L
+            assertTrue(
+                "ring ${ring}s: climb takes ${total}ms, alarm stops at ${ringMs}ms",
+                total < ringMs,
+            )
+        }
+    }
+
+    @Test
+    fun `the shortest possible ring still reaches full volume in time`() {
+        val ring = AlarmVolume.MIN_RING_SECONDS
+        assertTrue(AlarmVolume.rampTotalMs(ring) < ring * 1000L)
+        // …and does it without degenerating into an instant jump
+        assertTrue(AlarmVolume.rampIntervalMs(ring) >= AlarmVolume.MIN_RAMP_STEP_MS)
+    }
+
+    @Test
+    fun `a long ring keeps the original gentle pace`() {
+        // No reason to rush a 3-minute alarm; it should still feel gradual.
+        assertEquals(
+            AlarmVolume.MAX_RAMP_STEP_MS,
+            AlarmVolume.rampIntervalMs(AlarmVolume.MAX_RING_SECONDS),
+        )
+    }
+
+    @Test
+    fun `the climb actually starts quiet and ends at full`() {
+        assertTrue(AlarmVolume.RAMP_START_VOLUME > 0f)
+        assertTrue(AlarmVolume.RAMP_START_VOLUME < 1f)
+        // stepping rampSteps() times from the start must land at or above 1.0
+        val reached = AlarmVolume.RAMP_START_VOLUME +
+            AlarmVolume.VOLUME_STEP * AlarmVolume.rampSteps()
+        assertTrue("climb ends at $reached, short of full volume", reached >= 1f)
+    }
+
+    @Test
+    fun `an out-of-range ring duration is clamped rather than dividing by zero`() {
+        assertTrue(AlarmVolume.rampIntervalMs(0) > 0)
+        assertTrue(AlarmVolume.rampIntervalMs(-10) > 0)
+        assertTrue(AlarmVolume.rampIntervalMs(100_000) > 0)
+    }
 }

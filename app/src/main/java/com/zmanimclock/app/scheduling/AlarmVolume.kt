@@ -41,4 +41,40 @@ object AlarmVolume {
     /** The level to drive the system ALARM stream to, as a percentage. */
     fun streamPercent(volumePercent: Int): Int =
         volumePercent.coerceIn(MIN_PERCENT, NORMAL_MAX_PERCENT)
+
+    // ---- optional gentle climb ----
+
+    /** Where a gradual ring starts, as a fraction of the target. */
+    const val RAMP_START_VOLUME = 0.2f
+    const val VOLUME_STEP = 0.1f
+    /** The original gentle pace, and the slowest one still allowed. */
+    const val MAX_RAMP_STEP_MS = 2_500L
+    const val MIN_RAMP_STEP_MS = 200L
+    /** The climb must be finished this far into the ring, at the latest. */
+    const val RAMP_FRACTION_OF_RING = 0.6
+
+    const val MIN_RING_SECONDS = 10
+    const val MAX_RING_SECONDS = 180
+
+    /** Number of steps from [RAMP_START_VOLUME] up to full. */
+    fun rampSteps(): Int =
+        Math.ceil(((1f - RAMP_START_VOLUME) / VOLUME_STEP).toDouble()).toInt().coerceAtLeast(1)
+
+    /**
+     * Step interval for an alarm whose ring lasts [ringDurationSeconds].
+     *
+     * At the old FIXED 2.5 s the climb took 20 s, but the ring-duration
+     * slider starts at 10 s — so a short gradual alarm was auto-silenced
+     * while still at half volume, having never reached the loudness the user
+     * chose. Pacing the climb to the ring makes that impossible.
+     */
+    fun rampIntervalMs(ringDurationSeconds: Int): Long {
+        val ring = ringDurationSeconds.coerceIn(MIN_RING_SECONDS, MAX_RING_SECONDS)
+        val windowMs = (ring * 1000L * RAMP_FRACTION_OF_RING).toLong()
+        return (windowMs / rampSteps()).coerceIn(MIN_RAMP_STEP_MS, MAX_RAMP_STEP_MS)
+    }
+
+    /** How long the whole climb takes for that ring duration. */
+    fun rampTotalMs(ringDurationSeconds: Int): Long =
+        rampIntervalMs(ringDurationSeconds) * rampSteps()
 }

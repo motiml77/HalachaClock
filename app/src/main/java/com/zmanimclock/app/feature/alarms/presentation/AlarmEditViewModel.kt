@@ -175,6 +175,7 @@ class AlarmEditViewModel @Inject constructor(
                 soundEnabled = edited.soundEnabled,
                 soundUri = edited.soundUri,
                 volumePercent = edited.volumePercent,
+                gradualVolume = edited.gradualVolume,
                 ringDurationSeconds = edited.ringDurationSeconds,
                 vibrate = edited.vibrate,
                 dismissChallenge = edited.dismissChallenge,
