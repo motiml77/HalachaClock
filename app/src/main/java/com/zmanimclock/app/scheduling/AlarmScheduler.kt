@@ -81,11 +81,7 @@ class AlarmScheduler @Inject constructor(
             runCatching {
                 // A fresh occurrence gets a fresh snooze budget (B3)
                 if (alarm.snoozeCount != 0) alarmDao.setSnoozeCount(alarm.id, 0)
-                scheduleNextOccurrence(
-                    alarm, location, cityId,
-                    candleLightingMinutes = prefs.candleLightingMinutes.toLong(),
-                    tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
-                )
+                scheduleNextOccurrence(alarm, location, cityId, ZmanOffsets.from(prefs))
             }.onFailure { Log.e(TAG, "Failed to schedule alarm ${alarm.id}", it) }
         }
     }
@@ -96,9 +92,17 @@ class AlarmScheduler @Inject constructor(
         val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
-        val next = computeNextOccurrence(alarm, location, cityId) ?: return
+        val offsets = ZmanOffsets.from(prefs)
+        // The watermark MUST be computed with the user's real offsets. With the
+        // defaults it could land before the occurrence it was meant to
+        // suppress, and the alarm would ring despite the card saying it was
+        // skipped.
+        val next = computeNextOccurrence(alarm, location, cityId, offsets = offsets) ?: return
         alarmDao.setSkipUntil(alarmId, next.toEpochMilli() + 60_000L)
-        scheduleNextOccurrence(alarm.copy(skipUntilEpochMs = next.toEpochMilli() + 60_000L), location, cityId)
+        scheduleNextOccurrence(
+            alarm.copy(skipUntilEpochMs = next.toEpochMilli() + 60_000L),
+            location, cityId, offsets,
+        )
     }
 
     suspend fun undoSkip(alarmId: Long) {
@@ -107,7 +111,9 @@ class AlarmScheduler @Inject constructor(
         val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
-        scheduleNextOccurrence(alarm.copy(skipUntilEpochMs = 0), location, cityId)
+        scheduleNextOccurrence(
+            alarm.copy(skipUntilEpochMs = 0), location, cityId, ZmanOffsets.from(prefs),
+        )
     }
 
     /** Arm the next occurrence of a single alarm. */
@@ -115,15 +121,10 @@ class AlarmScheduler @Inject constructor(
         alarm: AlarmEntity,
         location: AppGeoLocation,
         cityId: String?,
-        candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
-        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
+        offsets: ZmanOffsets,
     ) {
         val zone = ZoneId.of(location.timeZone.id)
-        val fireTime = computeNextOccurrence(
-            alarm, location, cityId,
-            candleLightingMinutes = candleLightingMinutes,
-            tzeitShabbatMinutes = tzeitShabbatMinutes,
-        )
+        val fireTime = computeNextOccurrence(alarm, location, cityId, offsets = offsets)
         if (fireTime == null) {
             // Disarm rather than leaving a stale alarm armed from a previous
             // configuration — otherwise it fires at the OLD time.
@@ -140,8 +141,7 @@ class AlarmScheduler @Inject constructor(
         location: AppGeoLocation,
         cityId: String?,
         cacheOnly: Boolean = false,
-        candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
-        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
+        offsets: ZmanOffsets,
     ): Instant? {
         val zone = ZoneId.of(location.timeZone.id)
         // Skip-next (B2): treat occurrences up to skipUntil as already past
@@ -149,10 +149,7 @@ class AlarmScheduler @Inject constructor(
         return when (alarm.type) {
             AlarmType.FIXED -> AlarmTimeCalculator.nextFixedOccurrence(alarm, zone, now)
             AlarmType.ZMAN ->
-                nextZmanOccurrence(
-                    alarm, location, cityId, zone, now, cacheOnly,
-                    candleLightingMinutes, tzeitShabbatMinutes,
-                )
+                nextZmanOccurrence(alarm, location, cityId, zone, now, cacheOnly, offsets)
         }
     }
 
@@ -163,11 +160,7 @@ class AlarmScheduler @Inject constructor(
         val cityId = if (prefs.useGps) null else prefs.cityId
         return alarmDao.getActiveAlarmsList()
             .mapNotNull { alarm ->
-                computeNextOccurrence(
-                    alarm, location, cityId, cacheOnly,
-                    prefs.candleLightingMinutes.toLong(),
-                    prefs.tzeitShabbatMinutes.toLong(),
-                )?.let { alarm to it }
+                computeNextOccurrence(alarm, location, cityId, cacheOnly, ZmanOffsets.from(prefs))?.let { alarm to it }
             }
             .minByOrNull { (_, fire) -> fire }
     }
@@ -199,15 +192,14 @@ class AlarmScheduler @Inject constructor(
         cityId: String?,
         date: LocalDate,
         cacheOnly: Boolean = false,
-        candleLightingMinutes: Long = MaranZmanimEngine.DEFAULT_CANDLE_OFFSET_MINUTES,
-        tzeitShabbatMinutes: Long = MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
+        offsets: ZmanOffsets,
     ): Instant? {
         val kind = ZmanKind.fromNameOrNull(alarm.zmanId) ?: return null
         val day = zmanimRepository.getDayZmanim(
             location, cityId, date,
             cacheOnly = cacheOnly,
-            candleLightingOffsetMinutes = candleLightingMinutes,
-            tzeitShabbatMinutes = tzeitShabbatMinutes,
+            candleLightingOffsetMinutes = offsets.candleLightingMinutes,
+            tzeitShabbatMinutes = offsets.tzeitShabbatMinutes,
         )
         val zmanTime = day.instantOf(kind) ?: return null
         val offset = alarm.offsetMinutes * 60_000L
@@ -223,16 +215,12 @@ class AlarmScheduler @Inject constructor(
         zone: ZoneId,
         now: Instant,
         cacheOnly: Boolean,
-        candleLightingMinutes: Long,
-        tzeitShabbatMinutes: Long,
+        offsets: ZmanOffsets,
     ): Instant? {
         var date = LocalDate.now(zone)
         repeat(AlarmTimeCalculator.MAX_LOOKAHEAD_DAYS) {
             if (AlarmTimeCalculator.isDayAllowed(alarm, date, zone)) {
-                val fire = zmanInstantFor(
-                    alarm, location, cityId, date, cacheOnly,
-                    candleLightingMinutes, tzeitShabbatMinutes,
-                )
+                val fire = zmanInstantFor(alarm, location, cityId, date, cacheOnly, offsets)
                 if (fire != null && fire.isAfter(now)) return fire
             }
             date = date.plusDays(1)

@@ -204,7 +204,10 @@ class AlarmEditViewModel @Inject constructor(
             val cityId = if (prefs.useGps) null else prefs.cityId
             val zone = ZoneId.of(prefs.timeZoneId)
             val tomorrow = LocalDate.now(zone).plusDays(1)
-            val fire = alarmScheduler.zmanInstantFor(a, location, cityId, tomorrow)
+            val fire = alarmScheduler.zmanInstantFor(
+                a, location, cityId, tomorrow,
+                offsets = com.zmanimclock.app.scheduling.ZmanOffsets.from(prefs),
+            )
             _zmanPreview.value = fire?.let {
                 "מחר: ${DateTimeFormatter.ofPattern("HH:mm").format(it.atZone(zone))}"
             }

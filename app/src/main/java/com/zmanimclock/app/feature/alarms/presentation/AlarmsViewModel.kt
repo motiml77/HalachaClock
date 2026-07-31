@@ -67,7 +67,10 @@ class AlarmsViewModel @Inject constructor(
             val location = prefsRepository.prefsToGeoLocation(prefs)
             val cityId = if (prefs.useGps) null else prefs.cityId
             val zone = ZoneId.of(prefs.timeZoneId)
-            val fire = alarmScheduler.computeNextOccurrence(alarm, location, cityId)
+            val fire = alarmScheduler.computeNextOccurrence(
+                alarm, location, cityId,
+                offsets = com.zmanimclock.app.scheduling.ZmanOffsets.from(prefs),
+            )
                 ?: return AlarmListItem(alarm, null, null, null, FireBucket.OFF)
             val local = fire.atZone(zone)
             val today = LocalDate.now(zone)
@@ -140,6 +143,12 @@ class AlarmsViewModel @Inject constructor(
             } else {
                 alarmScheduler.skipNext(alarm.id)
             }
+            // Same as toggleAlarm: re-arm from the authoritative path rather
+            // than trusting the single alarm skipNext/undoSkip just armed. The
+            // only other thing that corrects a mis-armed alarm is the periodic
+            // worker, which runs once a DAY — so without this a wrong fire time
+            // could stand for up to 24 hours.
+            requestReschedule()
         }
     }
 

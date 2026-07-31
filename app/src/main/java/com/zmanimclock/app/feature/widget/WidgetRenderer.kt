@@ -228,8 +228,7 @@ class WidgetRenderer @Inject constructor(
                 runCatching {
                     alarmScheduler.computeNextOccurrence(
                         alarm, location, cityId, cacheOnly = true,
-                        candleLightingMinutes = prefs.candleLightingMinutes.toLong(),
-                        tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
+                        offsets = com.zmanimclock.app.scheduling.ZmanOffsets.from(prefs),
                     )
                 }.getOrNull()?.let { alarm to it }
             }
