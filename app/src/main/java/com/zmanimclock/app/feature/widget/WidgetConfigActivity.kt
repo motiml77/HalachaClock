@@ -10,22 +10,33 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.ui.theme.ZmanimTheme
@@ -35,8 +46,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Widget configuration: pick which zmanim (up to 5) appear on this widget.
- * Launched when the widget is placed AND from long-press → reconfigure.
+ * Widget configuration.
+ *
+ * Three independent sections the user switches on or off — the Hebrew date,
+ * the halachic zmanim (and which ones), and their own alarms — so the same
+ * widget can be a quiet date strip or a full board. Launched when the widget
+ * is placed AND from long-press → reconfigure.
  */
 @AndroidEntryPoint
 class WidgetConfigActivity : ComponentActivity() {
@@ -56,48 +71,163 @@ class WidgetConfigActivity : ComponentActivity() {
             finish(); return
         }
 
-        val initial = WidgetPrefs.getSelection(this, widgetId).toSet()
+        val initial = WidgetPrefs.getConfig(this, widgetId)
 
         setContent {
             ZmanimTheme {
+                var showDate by remember { mutableStateOf(initial.showHebrewDate) }
+                var showNext by remember { mutableStateOf(initial.showNextZman) }
+                var showZmanim by remember { mutableStateOf(initial.showZmanim) }
+                var showAlarms by remember { mutableStateOf(initial.showAlarms) }
+                var alarmCount by remember { mutableIntStateOf(initial.alarmCount) }
                 val selected = remember {
-                    mutableStateListOf<String>().apply { addAll(initial) }
+                    mutableStateListOf<String>().apply { addAll(initial.zmanim) }
                 }
+
+                val nothingOn = !showDate && !showNext &&
+                    (!showZmanim || selected.isEmpty()) && !showAlarms
+
                 Scaffold { padding ->
-                    Column(modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp)) {
-                        Text("בחר זמנים לווידג'ט", style = MaterialTheme.typography.headlineSmall)
+                    Column(
+                        modifier = Modifier
+                            .padding(padding)
+                            .fillMaxSize()
+                            .padding(16.dp),
+                    ) {
+                        Text("הגדרת הווידג'ט", style = MaterialTheme.typography.headlineSmall)
                         Text(
-                            "עד 5 זמנים · הזמן הבא והספירה לאחור תמיד מוצגים",
+                            "בחר מה יופיע. אפשר להוסיף כמה ווידג'טים עם תוכן שונה.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 6.dp),
+                            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
                         )
-                        LazyColumn(modifier = Modifier.weight(1f)) {
-                            items(ZmanKind.entries.toList()) { kind ->
-                                val checked = kind.name in selected
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            if (checked) selected.remove(kind.name)
-                                            else if (selected.size < 5) selected.add(kind.name)
-                                        }
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Checkbox(
-                                        checked = checked,
-                                        onCheckedChange = { on ->
-                                            if (on) { if (selected.size < 5) selected.add(kind.name) }
-                                            else selected.remove(kind.name)
-                                        },
+
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            item {
+                                SectionCard {
+                                    ToggleRow(
+                                        title = "תאריך עברי",
+                                        subtitle = "התאריך העברי, שם העיר והתאריך הלועזי",
+                                        checked = showDate,
+                                        onChange = { showDate = it },
                                     )
-                                    Text(kind.hebrewName, style = MaterialTheme.typography.bodyLarge)
+                                    HorizontalDivider()
+                                    ToggleRow(
+                                        title = "הזמן הבא",
+                                        subtitle = "שם הזמן, השעה וספירה לאחור חיה",
+                                        checked = showNext,
+                                        onChange = { showNext = it },
+                                    )
+                                }
+                            }
+
+                            item {
+                                SectionCard {
+                                    ToggleRow(
+                                        title = "זמנים הלכתיים",
+                                        subtitle = if (showZmanim) {
+                                            "${selected.size} מתוך ${WidgetPrefs.MAX_ZMANIM} נבחרו"
+                                        } else {
+                                            "כבוי"
+                                        },
+                                        checked = showZmanim,
+                                        onChange = { showZmanim = it },
+                                    )
+                                }
+                            }
+
+                            if (showZmanim) {
+                                items(ZmanKind.entries.toList()) { kind ->
+                                    val checked = kind.name in selected
+                                    val atLimit = selected.size >= WidgetPrefs.MAX_ZMANIM
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable(enabled = checked || !atLimit) {
+                                                if (checked) selected.remove(kind.name)
+                                                else if (!atLimit) selected.add(kind.name)
+                                            }
+                                            .padding(horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Checkbox(
+                                            checked = checked,
+                                            enabled = checked || !atLimit,
+                                            onCheckedChange = { on ->
+                                                if (on) { if (!atLimit) selected.add(kind.name) }
+                                                else selected.remove(kind.name)
+                                            },
+                                        )
+                                        Text(
+                                            kind.hebrewName,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = if (checked || !atLimit) {
+                                                MaterialTheme.colorScheme.onSurface
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+
+                            item {
+                                SectionCard {
+                                    ToggleRow(
+                                        title = "שעונים מעוררים",
+                                        subtitle = "השעונים הפעילים הקרובים, לפי סדר הזמנים",
+                                        checked = showAlarms,
+                                        onChange = { showAlarms = it },
+                                    )
+                                    if (showAlarms) {
+                                        HorizontalDivider()
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(
+                                                "כמה להציג",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                            )
+                                            Spacer(Modifier.height(6.dp))
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                (1..WidgetPrefs.MAX_ALARMS).forEach { n ->
+                                                    FilterChip(
+                                                        selected = alarmCount == n,
+                                                        onClick = { alarmCount = n },
+                                                        label = { Text("$n") },
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
+
+                        if (nothingOn) {
+                            Text(
+                                "צריך לבחור לפחות דבר אחד",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                        }
                         Button(
-                            onClick = { save(selected.toList()) },
+                            onClick = {
+                                save(
+                                    WidgetPrefs.Config(
+                                        showHebrewDate = showDate,
+                                        showNextZman = showNext,
+                                        showZmanim = showZmanim,
+                                        zmanim = selected.toList()
+                                            .ifEmpty { WidgetPrefs.DEFAULT_SELECTION },
+                                        showAlarms = showAlarms,
+                                        alarmCount = alarmCount,
+                                    )
+                                )
+                            },
+                            enabled = !nothingOn,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("שמירה") }
                     }
@@ -106,8 +236,8 @@ class WidgetConfigActivity : ComponentActivity() {
         }
     }
 
-    private fun save(kinds: List<String>) {
-        WidgetPrefs.setSelection(this, widgetId, kinds.ifEmpty { WidgetPrefs.DEFAULT_SELECTION })
+    private fun save(config: WidgetPrefs.Config) {
+        WidgetPrefs.setConfig(this, widgetId, config)
         // Render immediately, then return OK so the launcher places the widget
         val renderer = dagger.hilt.android.EntryPointAccessors
             .fromApplication(applicationContext, ZmanWidgetProvider.WidgetEntryPoint::class.java)
@@ -119,5 +249,45 @@ class WidgetConfigActivity : ComponentActivity() {
             Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId),
         )
         finish()
+    }
+}
+
+@Composable
+private fun SectionCard(content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        ),
+    ) { Column { content() } }
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }

@@ -79,6 +79,10 @@ class AlarmSoundService : Service() {
     private var targetVolume = 1f
     /** System ALARM-stream level before we forced it up, to restore on stop. */
     private var savedAlarmVolume: Int? = null
+    /** Above-100% boost. Null whenever the device cannot provide it. */
+    private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
+    /** The ringing alarm's chosen loudness, needed when the player is built. */
+    private var boostPercent: Int = 100
 
     private val volumeRampStep = object : Runnable {
         override fun run() {
@@ -89,6 +93,14 @@ class AlarmSoundService : Service() {
             }
             if (currentVolume < targetVolume) {
                 handler.postDelayed(this, VOLUME_STEP_INTERVAL_MS)
+            } else {
+                // Ramp finished — only now engage the above-100% boost.
+                // Engaging a compressor during the gentle climb would flatten
+                // it and defeat the point of ramping at all, and by this point
+                // the player's output track certainly exists on an output
+                // thread, which is the most compatible moment to attach a
+                // session effect.
+                attachBoost(mediaPlayer)
             }
         }
     }
@@ -259,6 +271,7 @@ class AlarmSoundService : Service() {
         // MediaPlayer scalar has nothing to amplify and the alarm is silent.
         // Raising it here makes the alarm audible regardless of ringer mode.
         forceAlarmStreamVolume(alarm.volumePercent)
+        boostPercent = alarm.volumePercent
 
         // The chosen loudness lives ONLY in the stream level above. The
         // MediaPlayer scalar just implements the gentle ramp, always ending
@@ -309,9 +322,16 @@ class AlarmSoundService : Service() {
             prepare()
             start()
         }
+        // The boost is deliberately NOT created here. tryPlay's catch below
+        // swallows Exception, and LoudnessEnhancer's constructor throws
+        // RuntimeException — so a device that cannot provide the effect would
+        // be treated as a FAILED SOUND SOURCE. Every candidate URI would fall
+        // through the same way and the alarm would ring silently. The boost is
+        // attached from the volume ramp instead, well away from this path.
         true
     } catch (e: Exception) {
         Log.w(TAG, "Sound source failed: $uri (${e.message})")
+        releaseBoost()
         mediaPlayer?.release()
         mediaPlayer = null
         false
@@ -328,7 +348,11 @@ class AlarmSoundService : Service() {
             val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
             if (savedAlarmVolume == null) savedAlarmVolume =
                 am.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
-            val target = (max * volumePercent.coerceIn(10, 100) / 100).coerceAtLeast(1)
+            // 100 and above both mean the hardware maximum; the extra
+            // loudness above 100 comes from the LoudnessEnhancer, not from
+            // the stream, which has nothing left to give.
+            val target = (max * AlarmVolume.streamPercent(volumePercent) / 100)
+                .coerceAtLeast(1)
             am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, target, 0)
         }
     }
@@ -399,11 +423,75 @@ class AlarmSoundService : Service() {
             mediaPlayer?.stop()
         } catch (_: IllegalStateException) {
         }
+        // The effect is bound to the player's audio session — release it FIRST,
+        // otherwise it outlives the session it is attached to.
+        releaseBoost()
         mediaPlayer?.release()
         mediaPlayer = null
         vibrator?.cancel()
         vibrator = null
         restoreAlarmStreamVolume()
+    }
+
+    /**
+     * Attach the above-100% boost, if this alarm asked for one.
+     *
+     * The system ALARM stream is already at its maximum by the time we get
+     * here, so "louder than 100%" cannot come from the stream — it has to come
+     * from amplifying the signal itself. [android.media.audiofx.LoudnessEnhancer]
+     * does exactly that, and it COMPRESSES anything that would exceed the
+     * sample range rather than hard-clipping it, so the result stays usable
+     * rather than turning into a buzz.
+     *
+     * Gain is in millibels (100 mB = 1 dB). 120% maps to +6 dB — a clearly
+     * audible step up, not the literal 1.58 dB that "20% more amplitude" would
+     * give, which nobody would notice through a pillow.
+     *
+     * EVERY failure path here is swallowed on purpose. This is an alarm: a
+     * device without the effect, an OEM that throws from the constructor, or a
+     * session id that is not ready must all end with a normal alarm ringing at
+     * 100%, never with an exception escaping into the ring path. The four
+     * exception types are the ones the AOSP constructor declares
+     * (IllegalState / IllegalArgument / UnsupportedOperation / Runtime), and
+     * runCatching covers all of them plus anything an OEM adds.
+     */
+    private fun attachBoost(player: android.media.MediaPlayer?) {
+        releaseBoost()
+        val percent = boostPercent
+        if (!AlarmVolume.needsBoost(percent)) return
+        val player = player ?: return
+        runCatching {
+            val sessionId = player.audioSessionId
+            if (sessionId == 0) return@runCatching  // no session to attach to
+            val gainMb = AlarmVolume.boostMillibels(percent)
+            val effect = android.media.audiofx.LoudnessEnhancer(sessionId)
+            // The native default target gain is 0 — without this call the
+            // effect attaches and does precisely nothing.
+            effect.setTargetGain(gainMb)
+            val status = effect.setEnabled(true)
+            if (status != android.media.audiofx.AudioEffect.SUCCESS) {
+                // Attached but refused to engage (another app holds control,
+                // OEM policy…). Let go rather than leave a dead effect bound
+                // to the session.
+                Log.w(TAG, "Loudness boost refused to enable (status=$status)")
+                runCatching { effect.release() }
+                loudnessEnhancer = null
+                return@runCatching
+            }
+            loudnessEnhancer = effect
+            Log.i(TAG, "Loudness boost on: $percent% (+${gainMb / 100} dB)")
+        }.onFailure {
+            Log.w(TAG, "Loudness boost unavailable on this device: ${it.message}")
+            loudnessEnhancer = null
+        }
+    }
+
+    private fun releaseBoost() {
+        runCatching {
+            loudnessEnhancer?.enabled = false
+            loudnessEnhancer?.release()
+        }
+        loudnessEnhancer = null
     }
 
     private fun acquireWakeLock() {

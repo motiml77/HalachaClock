@@ -56,10 +56,13 @@ class StatusNotificationReceiver : BroadcastReceiver() {
 
     private suspend fun refresh(context: Context) {
         val prefs = prefsRepository.schedulingPreferences()
-        if (!prefs.persistentNotification) {
-            notificationHelper.cancelOngoingStatus()
-            return
-        }
+        // NOTE: the persistentNotification preference is applied further down,
+        // around the notification call ONLY. It used to early-return here,
+        // which also skipped the widget refresh and the self re-arm below —
+        // so a setting that reads as being about the notification silently
+        // froze the home-screen widget and killed the boundary chain that
+        // drives both. Turning the notification off must not stop the clock.
+        val showNotification = prefs.persistentNotification
 
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
@@ -97,20 +100,37 @@ class StatusNotificationReceiver : BroadcastReceiver() {
             "$time · $what"
         }
 
-        notificationHelper.showOngoingStatus(zmanName, zmanTime, nextAlarmText)
+        if (showNotification) {
+            notificationHelper.showOngoingStatus(zmanName, zmanTime, nextAlarmText)
+        } else {
+            notificationHelper.cancelOngoingStatus()
+        }
 
-        // Zman boundaries also refresh the home-screen widget content
+        // Zman boundaries also refresh the home-screen widget content.
+        // Deliberately outside the notification check — the widget is a
+        // separate surface with its own setting (whether it is on the home
+        // screen at all).
         com.zmanimclock.app.feature.widget.ZmanWidgetProvider.refresh(context)
 
-        // Re-arm this receiver for the moment the display should change
-        next?.let { (_, instant) ->
-            val am = context.getSystemService<AlarmManager>() ?: return
-            am.setAndAllowWhileIdle(
-                AlarmManager.RTC,
-                instant.plusSeconds(30).toEpochMilli(),
-                refreshPendingIntent(context),
-            )
-        }
+        // Re-arm this receiver for the moment the display should change.
+        //
+        // This MUST happen even when there is no next zman. Previously the
+        // re-arm sat inside `next?.let {}`, so a single pass with no upcoming
+        // zman — no cached table for the city yet, a lookup failure, the
+        // sentinel — silently ended the chain, and the notification and widget
+        // then froze on that content for good, with nothing to ever restart
+        // them. That is the "stuck on an old time" report at its worst,
+        // because it never recovers on its own.
+        val am = context.getSystemService<AlarmManager>() ?: return
+        val wakeAt = next?.second?.plusSeconds(30)
+            // No zman to wait for: try again within the hour so a transient
+            // failure cannot become permanent.
+            ?: Instant.now().plusSeconds(3600)
+        am.setAndAllowWhileIdle(
+            AlarmManager.RTC,
+            wakeAt.toEpochMilli(),
+            refreshPendingIntent(context),
+        )
     }
 
     companion object {

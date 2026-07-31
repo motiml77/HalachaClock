@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home-screen widget (style 1D). Live countdown via system Chronometer —
-     no app wakeups. Up to 5 zman rows toggled by the renderer. -->
+<!--
+    Home-screen widget (style 1D).
+
+    Three independently switchable sections, chosen per widget instance in
+    WidgetConfigActivity: the Hebrew date, the halachic zmanim, and the
+    user's alarms. Every section is a container the renderer shows or hides,
+    so one layout serves the whole range from a bare Hebrew-date strip to a
+    full board.
+
+    The countdown is a system Chronometer — the OS animates it live with zero
+    app wakeups.
+
+    IMPORTANT: RemoteViews inflates only a fixed whitelist of view classes.
+    A plain <View> is NOT on it and makes the entire widget fail to inflate
+    ("Problem loading widget"), so dividers here are ImageViews.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
@@ -11,90 +25,188 @@
     android:background="@drawable/widget_bg"
     android:padding="14dp">
 
-    <!-- Header: next zman + live countdown -->
+    <!-- ===== Section 1: Hebrew date + city ===== -->
     <LinearLayout
+        android:id="@+id/widget_date_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
 
         <TextView
-            android:id="@+id/widget_next_name"
+            android:id="@+id/widget_hebrew_date"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="ט״ו באב תשפ״ו" />
+
+        <TextView
+            android:id="@+id/widget_city"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#9FB3D9"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="ירושלים" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_gregorian_date"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#9FB3D9"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:layout_marginBottom="8dp"
+        tools:text="פרשת עקב · 29.7.2026" />
+
+    <!-- ===== Section 2: next zman + live countdown ===== -->
+    <LinearLayout
+        android:id="@+id/widget_next_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/widget_next_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:textColor="#F5C518"
             android:textSize="15sp"
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end"
             tools:text="הזמן הבא: מנחה קטנה" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="2dp">
+
+            <TextView
+                android:id="@+id/widget_next_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:fontFeatureSettings="tnum"
+                tools:text="16:53" />
+
+            <Chronometer
+                android:id="@+id/widget_countdown"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="start"
+                android:paddingStart="10dp"
+                android:paddingEnd="0dp"
+                android:textColor="#D6E2FF"
+                android:textSize="16sp"
+                android:fontFeatureSettings="tnum"
+                tools:text="עוד 1:06:32" />
+        </LinearLayout>
     </LinearLayout>
 
+    <!-- ===== Section 3: halachic zmanim ===== -->
     <LinearLayout
+        android:id="@+id/widget_zmanim_section"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="8dp">
+        android:orientation="vertical">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#33FFFFFF"
+            android:contentDescription="@null"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout android:id="@+id/widget_row_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" tools:text="הנץ החמה" />
+            <TextView android:id="@+id/widget_time_0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" tools:text="05:52" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_5" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_5" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_6" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_6" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_row_7" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
+            <TextView android:id="@+id/widget_name_7" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_time_7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ===== Section 4: the user's alarms ===== -->
+    <LinearLayout
+        android:id="@+id/widget_alarms_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="4dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#33FFFFFF"
+            android:contentDescription="@null"
+            android:layout_marginBottom="5dp" />
 
         <TextView
-            android:id="@+id/widget_next_time"
-            android:layout_width="wrap_content"
+            android:id="@+id/widget_alarms_header"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="30sp"
+            android:textColor="#F5C518"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:fontFeatureSettings="tnum"
-            tools:text="16:53" />
+            android:maxLines="1"
+            android:layout_marginBottom="2dp"
+            tools:text="שעונים מעוררים" />
 
-        <Chronometer
-            android:id="@+id/widget_countdown"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="start"
-            android:paddingStart="10dp"
-            android:paddingEnd="0dp"
-            android:textColor="#D6E2FF"
-            android:textSize="16sp"
-            android:fontFeatureSettings="tnum"
-            tools:text="עוד 1:06:32" />
-    </LinearLayout>
-
-    <!--
-        Divider. Must be an ImageView, NOT a plain <View>: RemoteViews only
-        inflates a fixed whitelist of view classes, and View is not on it —
-        a bare <View> here makes the whole widget fail to inflate on the
-        launcher process, so the user just sees "Problem loading widget".
-    -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#33FFFFFF"
-        android:contentDescription="@null"
-        android:layout_marginBottom="6dp" />
-
-    <!-- Zman rows (up to 5; toggled by renderer) -->
-    <LinearLayout android:id="@+id/widget_row_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
-        <TextView android:id="@+id/widget_name_0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" tools:text="הנץ החמה" />
-        <TextView android:id="@+id/widget_time_0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" tools:text="05:52" />
-    </LinearLayout>
-    <LinearLayout android:id="@+id/widget_row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
-        <TextView android:id="@+id/widget_name_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
-        <TextView android:id="@+id/widget_time_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
-    </LinearLayout>
-    <LinearLayout android:id="@+id/widget_row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
-        <TextView android:id="@+id/widget_name_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
-        <TextView android:id="@+id/widget_time_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
-    </LinearLayout>
-    <LinearLayout android:id="@+id/widget_row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
-        <TextView android:id="@+id/widget_name_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
-        <TextView android:id="@+id/widget_time_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
-    </LinearLayout>
-    <LinearLayout android:id="@+id/widget_row_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="3dp">
-        <TextView android:id="@+id/widget_name_4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" />
-        <TextView android:id="@+id/widget_time_4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        <LinearLayout android:id="@+id/widget_alarm_row_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="2dp">
+            <TextView android:id="@+id/widget_alarm_name_0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" tools:text="השכמה · א׳-ו׳" />
+            <TextView android:id="@+id/widget_alarm_time_0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:fontFeatureSettings="tnum" tools:text="06:15" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_alarm_row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="2dp">
+            <TextView android:id="@+id/widget_alarm_name_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_alarm_time_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_alarm_row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="2dp">
+            <TextView android:id="@+id/widget_alarm_name_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_alarm_time_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_alarm_row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="2dp">
+            <TextView android:id="@+id/widget_alarm_name_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textColor="#EAF0FF" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/widget_alarm_time_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

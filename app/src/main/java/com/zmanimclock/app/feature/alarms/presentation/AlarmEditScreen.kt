@@ -74,6 +74,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.ui.theme.Ext
 import kotlinx.coroutines.launch
 
 private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
@@ -297,15 +298,40 @@ fun AlarmEditScreen(
                                         modifier = Modifier.size(18.dp),
                                     )
                                     Spacer(Modifier.width(6.dp))
-                                    Text("עוצמה: ${alarm.volumePercent}%", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "עוצמה: ${alarm.volumePercent}%",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    if (alarm.volumePercent > 100) {
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            "מוגבר",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Ext.colors.accentGold,
+                                        )
+                                    }
                                 }
+                                // 100% is the device maximum — everything above
+                                // it is real amplification of the signal, so the
+                                // scale deliberately stops at 120.
                                 Slider(
                                     value = alarm.volumePercent.toFloat(),
                                     onValueChange = { v ->
-                                        viewModel.update { it.copy(volumePercent = v.toInt().coerceIn(10, 100)) }
+                                        viewModel.update {
+                                            it.copy(volumePercent = v.toInt().coerceIn(10, 120))
+                                        }
                                     },
-                                    valueRange = 10f..100f,
+                                    valueRange = 10f..120f,
                                 )
+                                if (alarm.volumePercent > 100) {
+                                    Text(
+                                        "מעל 100% הצליל מוגבר מעבר למקסימום של המכשיר. " +
+                                            "בחלק מהמכשירים ההגברה אינה נתמכת — ואז השעון " +
+                                            "יצלצל בעוצמה מלאה רגילה.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
 

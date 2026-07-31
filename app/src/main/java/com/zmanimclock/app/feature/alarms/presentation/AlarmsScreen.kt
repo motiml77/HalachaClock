@@ -201,7 +201,15 @@ private fun AlarmCard(
     val alarm = item.alarm
     val cs = MaterialTheme.colorScheme
     val isZman = alarm.type == AlarmType.ZMAN
-    val contentAlpha = if (alarm.isActive) 1f else 0.45f
+    val active = alarm.isActive
+
+    // OFF state: quiet, not buried. A grey fill plus heavy dimming made the
+    // card read as a smudge — the surface colour fought the text and the row
+    // became hard to scan. Instead an off alarm keeps the SAME surface as an
+    // active one and is marked by three light touches: no elevation, a
+    // hairline outline, and a drained accent stripe. The text only steps down
+    // one level of emphasis, so the name and time stay properly readable.
+    val contentAlpha = if (active) 1f else 0.72f
 
     // Accent stripe identifies the alarm's kind at a glance, in our palette:
     // navy = wake-up clock, gold = halachic zman, candle-gold = Shabbat entry.
@@ -210,14 +218,19 @@ private fun AlarmCard(
         isZman -> cs.tertiary
         else -> cs.primary
     }
+    // Keep a HINT of the kind colour when off — a grey stripe would throw away
+    // the one cue that says what this alarm is.
+    val stripeColor = if (active) accent else accent.copy(alpha = 0.28f)
+    val timeColor = if (active) cs.primary else cs.onSurfaceVariant
 
     Card(
         modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (alarm.isActive) cs.surface else cs.surfaceVariant.copy(alpha = 0.6f),
+        colors = CardDefaults.cardColors(containerColor = cs.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (active) 1.dp else 0.dp),
+        border = if (active) null else androidx.compose.foundation.BorderStroke(
+            1.dp, cs.outlineVariant.copy(alpha = 0.6f),
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (alarm.isActive) 1.dp else 0.dp),
     ) {
         Row(
             modifier = Modifier
@@ -230,7 +243,7 @@ private fun AlarmCard(
                 modifier = Modifier
                     .width(5.dp)
                     .fillMaxHeight()
-                    .background(accent.copy(alpha = contentAlpha)),
+                    .background(stripeColor),
             )
 
             Column(
@@ -256,7 +269,7 @@ private fun AlarmCard(
                             imageVector = if (alarm.shabbatMode) AppIcons.Candle
                             else Icons.Filled.WbTwilight,
                             contentDescription = null,
-                            tint = accent,
+                            tint = stripeColor,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(6.dp))
@@ -265,7 +278,7 @@ private fun AlarmCard(
                         text = if (isZman) (item.nextFireTime ?: "--:--")
                         else "%02d:%02d".format(alarm.hour, alarm.minute),
                         style = ZmanListTimeStyle.copy(fontSize = 26.sp, lineHeight = 28.sp),
-                        color = cs.primary,
+                        color = timeColor,
                     )
                 }
                 // Detail lines: schedule, then the countdown
@@ -313,7 +326,7 @@ private fun AlarmCard(
                     Icon(
                         Icons.Outlined.DeleteOutline,
                         contentDescription = "מחק לצמיתות",
-                        tint = cs.onSurfaceVariant.copy(alpha = contentAlpha),
+                        tint = cs.onSurfaceVariant.copy(alpha = if (active) 1f else 0.7f),
                         modifier = Modifier.size(20.dp),
                     )
                 }

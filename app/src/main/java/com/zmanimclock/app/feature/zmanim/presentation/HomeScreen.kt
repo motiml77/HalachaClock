@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.ui.theme.Ext
@@ -51,6 +52,16 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val alertedKinds by viewModel.alertedKinds.collectAsStateWithLifecycle()
+
+    // Recompute the moment the screen comes back into view. The ViewModel
+    // survives backgrounding and its minute ticker cannot run while the
+    // process is frozen, so without this the user returns to whatever was on
+    // screen when they left — which is exactly the "stuck on an old zman"
+    // report. Also covers the device having slept across a zman boundary.
+    LifecycleResumeEffect(Unit) {
+        viewModel.onScreenResumed()
+        onPauseOrDispose { }
+    }
 
     ZmanimContent(
         state = state,

@@ -85,15 +85,37 @@ class ZmanimViewModel @Inject constructor(
         viewModelScope.launch {
             prefsRepository.preferences.collect { refresh() }
         }
-        // …and every minute, so the countdown, the next-zman highlight and the
-        // date never freeze for the lifetime of the screen.
+        // …and on every wall-clock minute boundary.
+        //
+        // This used to be `while (true) { delay(60_000); refresh() }`, which
+        // drifts and — worse — goes stale exactly when the user notices. A
+        // coroutine delay does not advance while the process is frozen or the
+        // device dozes, so after the phone had been asleep the screen could
+        // sit on an already-passed zman for up to a full minute after being
+        // reopened. Two changes fix that:
+        //   1. the delay is recomputed from the ACTUAL clock each iteration,
+        //      so it lands on the :00 second and self-corrects after any
+        //      freeze rather than accumulating drift;
+        //   2. [onScreenResumed] refreshes immediately when the user comes
+        //      back, so nothing stale is ever on screen while we wait.
         viewModelScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(60_000)
+                val millisToNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
+                kotlinx.coroutines.delay(millisToNextMinute)
                 refresh()
             }
         }
     }
+
+    /**
+     * Called when the screen becomes visible again.
+     *
+     * The ViewModel outlives the screen, so returning to a backgrounded app
+     * lands mid-delay on the ticker above. Without this the user sees the
+     * value from whenever they last looked — the "stuck on an old zman"
+     * report. Cheap enough to run unconditionally: it recomputes from cache.
+     */
+    fun onScreenResumed() = refresh()
 
     fun refresh() {
         viewModelScope.launch {

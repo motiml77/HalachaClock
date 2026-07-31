@@ -38,6 +38,9 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
+            // Midnight rollover — the zmanim for the new day differ, and both
+            // the widget and the status notification must move with it.
+            Intent.ACTION_DATE_CHANGED,
             -> {
                 Log.i(TAG, "Rescheduling alarms due to ${intent.action}")
                 val unlocked = context.getSystemService<UserManager>()?.isUserUnlocked ?: true

@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Required to attach a LoudnessEnhancer to the alarm audio session
+         for the above-100% volume option. Install-time permission — no
+         runtime prompt, and nothing is recorded. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Draw-over-apps: lets the ringing screen open even while the phone is
          unlocked and in use (Android otherwise demotes it to a heads-up).
@@ -90,6 +94,10 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <!-- Midnight rollover: without this the widget and the status
+                     notification can keep showing yesterday's zmanim until
+                     something else happens to wake them. -->
+                <action android:name="android.intent.action.DATE_CHANGED" />
             </intent-filter>
         </receiver>
 

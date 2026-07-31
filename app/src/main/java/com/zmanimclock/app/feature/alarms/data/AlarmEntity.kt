@@ -52,7 +52,10 @@ data class AlarmEntity(
     // Ring
     val soundEnabled: Boolean = true,  // false = vibrate-only alert
     val soundUri: String? = null,      // null = system default alarm sound
-    val volumePercent: Int = 100,      // 10..100, ramp climbs to this target
+    // 10..120. 100 = the device maximum; above that the AlarmSoundService
+    // amplifies the signal itself with a LoudnessEnhancer. The default
+    // stays at plain 100 — boosting is opt-in per alarm.
+    val volumePercent: Int = 100,
     @Deprecated("Superseded by ringDurationSeconds") val ringDurationMinutes: Int = 1,
     /** Auto-silence (self-snooze) after this many seconds. 10..180 (max 3 min). */
     val ringDurationSeconds: Int = 60,
