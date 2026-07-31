@@ -279,6 +279,14 @@ class AlarmSoundService : Service() {
             )
         }.onFailure { Log.w(TAG, "Direct full-screen start blocked: ${it.message}") }
 
+        // Reset the stop latch HERE, not inside startSound: a vibrate-only
+        // alarm never calls startSound, so the flag would keep whatever the
+        // previous ring left behind. It happens to be harmless today (only
+        // tryPlay reads it, and that is reachable only via startSound), but
+        // relying on that is exactly the kind of ordering dependency that
+        // turns into a silent alarm the next time this method is edited.
+        stopped = false
+
         if (alarm.soundEnabled) startSound(alarm)
         if (alarm.vibrate) startVibration()
         handler.postDelayed(autoSilence, alarm.ringDurationSeconds.coerceIn(10, 180) * 1_000L)
@@ -286,7 +294,6 @@ class AlarmSoundService : Service() {
     }
 
     private fun startSound(alarm: AlarmEntity) {
-        stopped = false
         // CRITICAL: force the system ALARM stream up to the chosen level.
         // The alarm stream is independent of the ringer, but if the phone is
         // on vibrate/silent its ALARM volume is often left at 0 — then a
