@@ -123,6 +123,7 @@ class AlarmEditViewModel @Inject constructor(
             putExtra(AlarmSoundService.EXTRA_PREVIEW_SOUND_ENABLED, a.soundEnabled)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_SOUND_URI, a.soundUri)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_VOLUME, a.volumePercent)
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_GRADUAL, a.gradualVolume)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_VIBRATE, a.vibrate)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_SHABBAT, a.shabbatMode)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_TITLE, title)

@@ -105,6 +105,9 @@ class AlarmSoundService : Service() {
         }
     }
 
+    /** Attaches the >100% boost when there is no ramp to hang it off. */
+    private val attachBoostStep = Runnable { attachBoost(mediaPlayer) }
+
     private val autoSilence = Runnable {
         // Ring duration elapsed. NEVER route through snooze() here: with the
         // "no snooze" default, the snooze-limit gate blocked this path and the
@@ -151,6 +154,7 @@ class AlarmSoundService : Service() {
             soundEnabled = intent.getBooleanExtra(EXTRA_PREVIEW_SOUND_ENABLED, true),
             soundUri = intent.getStringExtra(EXTRA_PREVIEW_SOUND_URI),
             volumePercent = intent.getIntExtra(EXTRA_PREVIEW_VOLUME, 100),
+            gradualVolume = intent.getBooleanExtra(EXTRA_PREVIEW_GRADUAL, false),
             vibrate = intent.getBooleanExtra(EXTRA_PREVIEW_VIBRATE, true),
             ringDurationSeconds = 30, // a preview never rings longer than 30s
             shabbatMode = intent.getBooleanExtra(EXTRA_PREVIEW_SHABBAT, false),
@@ -274,12 +278,22 @@ class AlarmSoundService : Service() {
         boostPercent = alarm.volumePercent
 
         // The chosen loudness lives ONLY in the stream level above. The
-        // MediaPlayer scalar just implements the gentle ramp, always ending
-        // at 1.0 — previously the percent was applied twice (stream × scalar),
-        // which made the volume slider feel like it did nothing.
-        // A preview skips the ramp so the user hears the true loudness now.
+        // MediaPlayer scalar always ENDS at 1.0 — previously the percent was
+        // applied twice (stream × scalar), which made the volume slider feel
+        // like it did nothing.
+        //
+        // Constant by default: an alarm exists to wake someone, and a fade
+        // makes the first seconds — the ones a deep sleeper most needs — the
+        // quietest ones. The gentle climb is now opt-in per alarm.
+        //
+        // The preview HONOURS the setting rather than forcing constant. It
+        // used to always skip the ramp, which made sense when the ramp was
+        // unconditional and the preview existed to demonstrate loudness; now
+        // that the user chooses, a preview that ignored the choice would
+        // simply be showing them the wrong alarm.
         targetVolume = 1f
-        currentVolume = if (previewMode) 1f else 0.2f
+        val ramp = alarm.gradualVolume
+        currentVolume = if (ramp) RAMP_START_VOLUME else 1f
 
         // Custom URI first; if it vanished (file deleted / permission lost),
         // FALL BACK to the system default — a silent alarm is the worst bug.
@@ -295,7 +309,16 @@ class AlarmSoundService : Service() {
                 candidates.firstOrNull { tryPlay(it) }
             }
             if (played != null) {
-                handler.postDelayed(volumeRampStep, VOLUME_STEP_INTERVAL_MS)
+                if (ramp) {
+                    handler.postDelayed(volumeRampStep, VOLUME_STEP_INTERVAL_MS)
+                } else {
+                    // No ramp, so nothing will reach the ramp's terminal
+                    // branch — the boost has to be attached on its own. Give
+                    // the output track a moment to exist first; attaching a
+                    // session effect before it does takes AudioFlinger's
+                    // orphan-chain path, which works but is the fragile one.
+                    handler.postDelayed(attachBoostStep, BOOST_ATTACH_DELAY_MS)
+                }
             } else {
                 Log.e(TAG, "All sound sources failed — vibration only")
             }
@@ -549,6 +572,7 @@ class AlarmSoundService : Service() {
         const val EXTRA_PREVIEW_SOUND_ENABLED = "preview_sound_enabled"
         const val EXTRA_PREVIEW_SOUND_URI = "preview_sound_uri"
         const val EXTRA_PREVIEW_VOLUME = "preview_volume"
+        const val EXTRA_PREVIEW_GRADUAL = "preview_gradual"
         const val EXTRA_PREVIEW_VIBRATE = "preview_vibrate"
         const val EXTRA_PREVIEW_SHABBAT = "preview_shabbat"
         const val EXTRA_PREVIEW_TITLE = "preview_title"
@@ -563,6 +587,11 @@ class AlarmSoundService : Service() {
 
         // Ramp 0.2 → 1.0 in ~20s (ring durations are now 10s–3min, so the old
         // one-minute ramp meant short alarms never reached full loudness)
+        /** Where a gradual ring starts, as a fraction of the target. */
+        private const val RAMP_START_VOLUME = 0.2f
+        /** Settling time before attaching the boost on a constant ring. */
+        private const val BOOST_ATTACH_DELAY_MS = 500L
+
         private const val VOLUME_STEP = 0.1f
         private const val VOLUME_STEP_INTERVAL_MS = 2_500L
     }

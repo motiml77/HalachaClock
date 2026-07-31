@@ -333,6 +333,20 @@ fun AlarmEditScreen(
                                     )
                                 }
                             }
+
+                            GroupDivider()
+                            SwitchSettingRow(
+                                title = "עלייה הדרגתית",
+                                subtitle = if (alarm.gradualVolume) {
+                                    "מתחיל חלש ומתחזק עד לעוצמה שנבחרה"
+                                } else {
+                                    "מצלצל מיד בעוצמה המלאה שנבחרה"
+                                },
+                                checked = alarm.gradualVolume,
+                                onChange = { on ->
+                                    viewModel.update { it.copy(gradualVolume = on) }
+                                },
+                            )
                         }
 
                         GroupDivider()

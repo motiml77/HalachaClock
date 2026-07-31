@@ -56,6 +56,16 @@ data class AlarmEntity(
     // amplifies the signal itself with a LoudnessEnhancer. The default
     // stays at plain 100 — boosting is opt-in per alarm.
     val volumePercent: Int = 100,
+    /**
+     * false (default) = ring at the chosen volume IMMEDIATELY.
+     * true = climb to it gently over a few seconds.
+     *
+     * A ramp used to be unconditional, which is the wrong default for an
+     * alarm: the whole point is to wake someone, and the first seconds —
+     * the ones a deep sleeper most needs — were the quietest. It is a
+     * genuine preference though, so it stays available per alarm.
+     */
+    val gradualVolume: Boolean = false,
     @Deprecated("Superseded by ringDurationSeconds") val ringDurationMinutes: Int = 1,
     /** Auto-silence (self-snooze) after this many seconds. 10..180 (max 3 min). */
     val ringDurationSeconds: Int = 60,

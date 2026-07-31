@@ -39,7 +39,7 @@ object AppModule {
         return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
             // v4→v5: ring duration moved from whole minutes to seconds — keep
             // the user's existing alarms by converting minutes×60 in place.
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
             // silently wipe every alarm the user created.
@@ -60,6 +60,21 @@ object AppModule {
      * two Gregorian years, so the guess was wrong for about half the table).
      * Existing rows get 0 = "unknown" and keep the old heuristic.
      */
+    /**
+     * v7→v8: per-alarm choice between a constant ring volume and a gentle
+     * climb. DEFAULT 0 = constant, deliberately: the ramp used to be
+     * unconditional, and existing alarms should pick up the corrected
+     * behaviour rather than silently keep a fade the user never chose.
+     * Anyone who actually wants it can switch it back on per alarm.
+     */
+    private val MIGRATION_7_8 = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE alarms ADD COLUMN gradualVolume INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
+
     private val MIGRATION_6_7 = object : Migration(6, 7) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
