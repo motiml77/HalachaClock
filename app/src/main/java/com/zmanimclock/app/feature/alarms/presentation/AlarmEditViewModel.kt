@@ -76,6 +76,22 @@ class AlarmEditViewModel @Inject constructor(
                 type = type,
                 zmanId = preselectedZman ?: "HANETZ",
                 offsetMinutes = if (type == AlarmType.ZMAN) 30 else 0,
+                // הדלקת נרות and צאת שבת are the only two zmanim that do not
+                // exist every day (relevantTimedZmanim hides them the rest of
+                // the week) — but AlarmEntity's own default is ALL_DAYS, and
+                // this branch never overrode it. Tapping the בell next to
+                // הדלקת נרות (visible only on Friday) and saving without
+                // touching the day picker used to create an alarm that
+                // showed "כל יום" and rang every single evening, since the
+                // ENGINE still computes both unconditionally for every date —
+                // only their day-of-week RELEVANCE is filtered, at display
+                // time. Seed the one sensible day here so the default the
+                // user is most likely to just save is the correct one.
+                daysOfWeek = when (preselectedZman) {
+                    "CANDLE_LIGHTING" -> AlarmEntity.FRIDAY_ONLY
+                    "TZEIT_SHABBAT" -> AlarmEntity.SATURDAY_ONLY
+                    else -> AlarmEntity.ALL_DAYS
+                },
             )
             refreshPreview()
         }
@@ -162,6 +178,26 @@ class AlarmEditViewModel @Inject constructor(
             // it off from the list, a skip was set…). Re-read the row and copy
             // only the fields this screen actually edits.
             val current = if (edited.id != 0L) alarmDao.getAlarmById(edited.id) else null
+            // skipUntilEpochMs is an ABSOLUTE EPOCH watermark computed from
+            // the OLD fire time when the user tapped "דלג על הבאה" — not in
+            // this whitelist, so it survives untouched by default, which is
+            // right when nothing about the timing changed. But every field
+            // that actually MOVES the fire time IS in this whitelist, and
+            // used to be written straight over it: change the hour from 6:30
+            // to 7:00 after skipping tomorrow's 6:30, and the stale
+            //6:31-watermark no longer suppresses tomorrow's (now later)
+            // 7:00 occurrence — it gets armed anyway. The card then showed
+            // both "מחר · 07:00" AND "מדלג על הבאה — בטל" at once, and the
+            // alarm rang despite it.
+            val timingChanged = current != null && (
+                current.type != edited.type ||
+                    current.hour != edited.hour ||
+                    current.minute != edited.minute ||
+                    current.zmanId != edited.zmanId ||
+                    current.offsetMinutes != edited.offsetMinutes ||
+                    current.offsetBefore != edited.offsetBefore ||
+                    current.daysOfWeek != edited.daysOfWeek
+                )
             val toSave = current?.copy(
                 type = edited.type,
                 hour = edited.hour,
@@ -170,6 +206,7 @@ class AlarmEditViewModel @Inject constructor(
                 offsetMinutes = edited.offsetMinutes,
                 offsetBefore = edited.offsetBefore,
                 daysOfWeek = edited.daysOfWeek,
+                skipUntilEpochMs = if (timingChanged) 0L else current.skipUntilEpochMs,
                 skipShabbat = edited.skipShabbat,
                 skipYomTov = edited.skipYomTov,
                 soundEnabled = edited.soundEnabled,

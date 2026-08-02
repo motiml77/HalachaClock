@@ -108,8 +108,11 @@ data class AlarmEntity(
         /** א'-ה'. */
         const val SUNDAY_TO_THURSDAY = 0b0011111
 
-        /** יום שישי בלבד — התראת כניסת שבת. */
+        /** יום שישי בלבד — התראת כניסת שבת / הדלקת נרות. */
         const val FRIDAY_ONLY = 0b0100000
+
+        /** שבת בלבד — צאת שבת. */
+        const val SATURDAY_ONLY = 0b1000000
 
         /** Sunday-first bit for a java.time.DayOfWeek (SUNDAY=bit0 … SATURDAY=bit6). */
         fun bitFor(dayOfWeek: java.time.DayOfWeek): Int =

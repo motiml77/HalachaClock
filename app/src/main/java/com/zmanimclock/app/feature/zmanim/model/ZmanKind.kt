@@ -95,6 +95,34 @@ fun isZmanRelevantOn(kind: ZmanKind, date: LocalDate, zone: ZoneId): Boolean {
     }
 }
 
+/**
+ * The single "next zman" ranked across [today]'s list AND [yesterday]'s
+ * חצות לילה, if it has not passed yet.
+ *
+ * חצות לילה for a date D is D's chatzot + 12h — solar midnight — which lands
+ * on the CALENDAR DAY AFTER D whenever chatzot itself is after 12:00 wall
+ * clock (roughly half the year, whenever DST is in effect). So the חצות
+ * לילה a user actually needs in the first ~40 minutes after midnight lives
+ * in YESTERDAY's [DayZmanim], not today's: today's own row for this kind is
+ * ~24 hours out. Every "next zman" consumer used to fetch only today (and,
+ * for the widget/notification, tomorrow as a forward fallback) — never
+ * yesterday — so during that window the headline pointed at the day's first
+ * MORNING zman while חצות לילה, minutes away, sat unranked at the bottom of
+ * today's own list showing a time that is in fact ~24h out.
+ */
+fun nextRelevantZman(
+    today: DayZmanim,
+    date: LocalDate,
+    now: Instant,
+    yesterday: DayZmanim?,
+): Pair<ZmanKind, Instant>? {
+    val candidates = today.relevantTimedZmanim(date).filter { (_, instant) -> instant.isAfter(now) }
+    val fromYesterday = yesterday?.chatzotLayla?.takeIf { it.isAfter(now) }
+        ?.let { ZmanKind.CHATZOT_LAYLA to it }
+    return (if (fromYesterday != null) candidates + fromYesterday else candidates)
+        .minByOrNull { (_, instant) -> instant }
+}
+
 /** The concrete time of [kind] on this day (visible-netz-based when available). */
 fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.CHATZOT_LAYLA -> chatzotLayla

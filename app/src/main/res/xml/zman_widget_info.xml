@@ -10,4 +10,5 @@
     android:configure="com.zmanimclock.app.feature.widget.WidgetConfigActivity"
     android:resizeMode="vertical|horizontal"
     android:widgetCategory="home_screen"
-    android:previewLayout="@layout/widget_zmanim" />
+    android:previewLayout="@layout/widget_zmanim"
+    android:widgetFeatures="reconfigurable" />

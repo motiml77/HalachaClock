@@ -37,7 +37,16 @@ class WakeCheckReceiver : BroadcastReceiver() {
             context,
             AlarmScheduler.requestCode(alarmId, AlarmScheduler.SLOT_WAKE_CHECK),
             Intent(context, AlarmTriggerReceiver::class.java)
-                .putExtra(AlarmTriggerReceiver.EXTRA_ALARM_ID, alarmId),
+                .putExtra(AlarmTriggerReceiver.EXTRA_ALARM_ID, alarmId)
+                // Marks this specific firing as the wake-check's OWN re-ring,
+                // so that when the user dismisses IT, AlarmSoundService does
+                // not arm YET ANOTHER wake-check. Without this the cycle had
+                // no end: dismiss re-arms a check, the check's re-ring looks
+                // exactly like a normal firing (same ACTION_START), its OWN
+                // dismiss re-armed another check, forever — every 12 minutes,
+                // all day, until the user happened to catch the "אני ער" tap
+                // inside a 2-minute window or switched the alarm off.
+                .putExtra(AlarmTriggerReceiver.EXTRA_IS_WAKE_CHECK_RERING, true),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val reRingAt = System.currentTimeMillis() + RE_RING_MINUTES * 60_000L

@@ -70,13 +70,23 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         val now = Instant.now()
         val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
-        // Next zman: first upcoming today, else tomorrow's first
+        // Next zman: first upcoming today (including yesterday's still-pending
+        // חצות לילה, in the ~40min window right after midnight — see
+        // nextRelevantZman), else tomorrow's first.
         val candle = prefs.candleLightingMinutes.toLong()
         val tzeitShabbat = prefs.tzeitShabbatMinutes.toLong()
-        val next = nextZman(location, cityId, LocalDate.now(zone), now, candle, tzeitShabbat)
-            ?: nextZman(
-                location, cityId, LocalDate.now(zone).plusDays(1), now, candle, tzeitShabbat,
+        val today = LocalDate.now(zone)
+        val next = run {
+            val dayToday = zmanimRepository.getDayZmanim(
+                location, cityId, today, cacheOnly = true,
+                candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
             )
+            val dayYesterday = zmanimRepository.getDayZmanim(
+                location, cityId, today.minusDays(1), cacheOnly = true,
+                candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
+            )
+            com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(dayToday, today, now, dayYesterday)
+        } ?: nextZman(location, cityId, today.plusDays(1), now, candle, tzeitShabbat)
         val zmanName = next?.first?.shortName ?: "—"
         val zmanTime = next?.let { (_, instant) -> timeFmt.format(instant.atZone(zone)) } ?: ""
 

@@ -137,7 +137,18 @@ class ZmanimViewModel @Inject constructor(
             val now = Instant.now()
 
             val timed = day.relevantTimedZmanim(today)
-            val next = timed.firstOrNull { (_, instant) -> instant.isAfter(now) }
+            // Yesterday only for the NEXT-ZMAN ranking, not for `rows` — the
+            // list itself should keep showing today's own חצות לילה (which
+            // will occur ~24h out, near tomorrow's midnight) rather than a
+            // second, confusingly-near-duplicate row for yesterday's.
+            val yesterday = zmanimRepository.getDayZmanim(
+                location = location,
+                cityId = cityId,
+                date = today.minusDays(1),
+                candleLightingOffsetMinutes = prefs.candleLightingMinutes.toLong(),
+                tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
+            )
+            val next = com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(day, today, now, yesterday)
 
             _uiState.value = UiState(
                 loading = false,

@@ -132,6 +132,15 @@ class AlarmsViewModel @Inject constructor(
         viewModelScope.launch {
             alarmScheduler.cancelAlarm(alarm.id)
             alarmDao.deleteAlarm(alarm)
+            // Unlike toggleAlarm/toggleSkipNext, this never pinged the status
+            // notification or the widget — cancelAlarm only touches
+            // AlarmManager. StatusNotificationReceiver.ping/ZmanWidgetProvider
+            // .refresh only run inside RescheduleWorker, so a deleted alarm
+            // kept advertising itself on the lock screen (and the widget,
+            // until its own ~30-min tick) until the next unrelated zman
+            // boundary happened to trigger a refresh — hours, on a deleted
+            // evening alarm.
+            requestReschedule()
         }
     }
 

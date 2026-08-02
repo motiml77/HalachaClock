@@ -50,6 +50,8 @@ class ChaiTablesRepository @Inject constructor(
 
         private const val SENTINEL_DAY = 0
         private const val SENTINEL_HOUR = -1
+        /** How long a failed-fetch sentinel blocks retrying — see below. */
+        private const val SENTINEL_TTL_MS = 12 * 60 * 60 * 1000L
 
         /** Marker row recording "Hebrew year N was already fetched". */
         private const val FETCHED_YEAR_HOUR = -2
@@ -100,9 +102,26 @@ class ChaiTablesRepository @Inject constructor(
             }
         }
 
-        // 4. Sentinel — this location is known to have no ChaiTables data
-        if (count > 0 && dao.getSunrise(locationKey, SENTINEL_DAY)?.sunriseHour == SENTINEL_HOUR) {
-            return null
+        // 4. Sentinel — this location is known to have no ChaiTables data.
+        // TTL'd: the fetch that wrote this sentinel can have failed for a
+        // purely TRANSIENT reason (no network at that instant — offline
+        // install, a dead cell signal). Without an expiry, that one failure
+        // blocked every later in-app attempt for this location FOREVER —
+        // getVisibleSunrise short-circuits here before ever reaching the
+        // fetch call again. The only thing that could still repair it was
+        // the once-a-day ChaiTablesRefreshWorker, which calls
+        // prefetchForLocation directly and never even looks at this
+        // sentinel — so a city outside the 8 bundled metros that failed once
+        // while offline stayed on the mishor-sunrise fallback (~12 minutes
+        // early in a hill town) for up to a day even after connectivity
+        // returned.
+        if (count > 0) {
+            val sentinel = dao.getSunrise(locationKey, SENTINEL_DAY)
+            if (sentinel?.sunriseHour == SENTINEL_HOUR) {
+                val ageMs = System.currentTimeMillis() - sentinel.fetchedAt
+                if (ageMs < SENTINEL_TTL_MS) return null
+                Log.i(TAG, "Sentinel for $locationKey is ${ageMs / 60_000} min old — retrying fetch")
+            }
         }
 
         if (!allowNetwork) return null

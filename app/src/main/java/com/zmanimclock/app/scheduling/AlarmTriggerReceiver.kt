@@ -18,7 +18,8 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val alarmId = intent.getLongExtra(EXTRA_ALARM_ID, -1)
         if (alarmId < 0) return
-        Log.i(TAG, "Alarm fired: id=$alarmId")
+        val isWakeCheckRering = intent.getBooleanExtra(EXTRA_IS_WAKE_CHECK_RERING, false)
+        Log.i(TAG, "Alarm fired: id=$alarmId" + if (isWakeCheckRering) " (wake-check re-ring)" else "")
 
         // Android 12+ only lets an app start a foreground service from the
         // background under an exemption — the relevant one being "an exact
@@ -34,6 +35,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
                 Intent(context, AlarmSoundService::class.java).apply {
                     action = AlarmSoundService.ACTION_START
                     putExtra(AlarmSoundService.EXTRA_ALARM_ID, alarmId)
+                    putExtra(AlarmSoundService.EXTRA_IS_WAKE_CHECK_RERING, isWakeCheckRering)
                 },
             )
         }.isSuccess
@@ -74,5 +76,6 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "AlarmTriggerReceiver"
         const val EXTRA_ALARM_ID = "alarm_id"
+        const val EXTRA_IS_WAKE_CHECK_RERING = "is_wake_check_rering"
     }
 }

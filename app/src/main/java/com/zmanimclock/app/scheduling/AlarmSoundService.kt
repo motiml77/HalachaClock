@@ -163,10 +163,23 @@ class AlarmSoundService : Service() {
     }
 
     private var previewMode = false
+    /**
+     * True when THIS ring is a wake-check's own re-ring (armed by
+     * [WakeCheckReceiver] after a previous dismissal). Read by
+     * [performDismiss] so dismissing it does not arm YET ANOTHER wake-check —
+     * without this a wake-check re-ring's own dismiss looked identical to any
+     * other, and re-armed another check, forever: every wakeCheckMinutes +
+     * RE_RING_MINUTES, all day, until the user happened to tap "אני ער"
+     * inside its 2-minute window or switched the alarm off entirely.
+     */
+    private var isWakeCheckRering = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> start(intent.getLongExtra(EXTRA_ALARM_ID, -1))
+            ACTION_START -> start(
+                intent.getLongExtra(EXTRA_ALARM_ID, -1),
+                intent.getBooleanExtra(EXTRA_IS_WAKE_CHECK_RERING, false),
+            )
             ACTION_PREVIEW -> startPreview(intent)
             // The alarm id travels on EVERY dismiss/snooze intent (AlarmActivity
             // has always sent it) so a FRESH service instance — recreated after
@@ -213,7 +226,7 @@ class AlarmSoundService : Service() {
         ring(transient)
     }
 
-    private fun start(alarmId: Long) {
+    private fun start(alarmId: Long, isWakeCheckRering: Boolean = false) {
         if (alarmId < 0) {
             stopSelf(); return
         }
@@ -221,6 +234,7 @@ class AlarmSoundService : Service() {
         // service would make the real alarm take the preview code paths
         // (no snooze, no wake-check, no reschedule).
         previewMode = false
+        this.isWakeCheckRering = isWakeCheckRering
         // startForegroundService() gives us ~5s to call startForeground —
         // post a placeholder IMMEDIATELY (before any DB work), otherwise a
         // slow query or a deleted alarm crashes with
@@ -539,7 +553,9 @@ class AlarmSoundService : Service() {
         // the (already-stopped) sound and returned — the armed SLOT_SNOOZE
         // survived untouched and rang again on schedule regardless.
         alarmScheduler.cancelSnooze(a.id)
-        if (a.wakeCheckMinutes > 0) {
+        // Arm ONE follow-up check, never a second one for the check's own
+        // re-ring — see the isWakeCheckRering doc comment.
+        if (a.wakeCheckMinutes > 0 && !isWakeCheckRering) {
             WakeCheckReceiver.schedule(this, a.id, a.wakeCheckMinutes)
         }
         // Close a stale ringing screen for THIS alarm, if one is still up —
@@ -747,6 +763,7 @@ class AlarmSoundService : Service() {
         const val EXTRA_PREVIEW_TITLE = "preview_title"
 
         const val EXTRA_ALARM_ID = "alarm_id"
+        const val EXTRA_IS_WAKE_CHECK_RERING = "is_wake_check_rering"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TIME_TEXT = "time_text"
         const val EXTRA_SNOOZE_MINUTES = "snooze_minutes"

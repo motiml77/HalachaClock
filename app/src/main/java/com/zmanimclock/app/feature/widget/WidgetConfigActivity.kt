@@ -220,8 +220,15 @@ class WidgetConfigActivity : ComponentActivity() {
                                         showHebrewDate = showDate,
                                         showNextZman = showNext,
                                         showZmanim = showZmanim,
-                                        zmanim = selected.toList()
-                                            .ifEmpty { WidgetPrefs.DEFAULT_SELECTION },
+                                        // Save exactly what the user chose, including
+                                        // empty. Collapsing an explicit empty selection
+                                        // back to WidgetPrefs.DEFAULT_SELECTION here used
+                                        // to silently resurrect all four defaults the
+                                        // instant the user unchecked them — the subtitle
+                                        // above even confirms "0 מתוך 8 נבחרו" while שמירה
+                                        // stays enabled (another section is on), so nothing
+                                        // in the UI hinted the save would not do what it said.
+                                        zmanim = selected.toList(),
                                         showAlarms = showAlarms,
                                         alarmCount = alarmCount,
                                     )

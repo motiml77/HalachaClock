@@ -43,9 +43,15 @@ object WidgetPrefs {
 
     fun getConfig(context: Context, widgetId: Int): Config {
         val p = prefs(context)
-        val zmanim = p.getString(zmanimKey(widgetId), null)
-            ?.split(",")?.filter { it.isNotBlank() }?.ifEmpty { null }
-            ?: DEFAULT_SELECTION
+        // getString returning null means the key was NEVER WRITTEN — a
+        // brand-new widget — and DEFAULT_SELECTION is the right fallback.
+        // getString returning "" means the user explicitly unchecked every
+        // zman and saved; that used to collapse through the exact same
+        // ?: DEFAULT_SELECTION and silently resurrect all four defaults the
+        // user had just removed, with the config screen (if #13's
+        // reconfigure route is even reachable) still showing them unchecked.
+        val raw = p.getString(zmanimKey(widgetId), null)
+        val zmanim = if (raw == null) DEFAULT_SELECTION else raw.split(",").filter { it.isNotBlank() }
         val config = Config(
             showHebrewDate = p.getBoolean(key(widgetId, "date"), true),
             showNextZman = p.getBoolean(key(widgetId, "next"), true),

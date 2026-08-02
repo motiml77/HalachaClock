@@ -107,14 +107,19 @@ class WidgetRenderer @Inject constructor(
             location, cityId, today.plusDays(1), cacheOnly = true,
             candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
         )
+        // Only for the narrow post-midnight window where yesterday's own
+        // חצות לילה (chatzot + 12h) can still be pending — see
+        // nextRelevantZman's doc. Cheap and cache-only either way.
+        val dayYesterday = zmanimRepository.getDayZmanim(
+            location, cityId, today.minusDays(1), cacheOnly = true,
+            candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
+        )
 
-        // Next zman across today→tomorrow (candle-lighting/tzeit-Shabbat only
-        // surface on their relevant days — never mid-week)
-        val next = dayToday.relevantTimedZmanim(today)
-            .filter { it.second.isAfter(now) }
-            .minByOrNull { it.second }
-            ?: dayTomorrow.relevantTimedZmanim(today.plusDays(1))
-                .minByOrNull { it.second }
+        // Next zman across yesterday's tail→today→tomorrow (candle-lighting/
+        // tzeit-Shabbat only surface on their relevant days — never mid-week)
+        val next = com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(
+            dayToday, today, now, dayYesterday,
+        ) ?: dayTomorrow.relevantTimedZmanim(today.plusDays(1)).minByOrNull { it.second }
 
         // Alarms are only queried if at least one widget actually asks for
         // them — this runs from a broadcast receiver on a goAsync budget.
@@ -128,6 +133,14 @@ class WidgetRenderer @Inject constructor(
         for (id in ids) {
             val config = configs.getValue(id)
             val views = RemoteViews(context.packageName, R.layout.widget_zmanim)
+            // Whether ANYTHING ended up visible. Config-time validation
+            // (WidgetConfigActivity's "בחר לפחות דבר אחד") only checks which
+            // SECTIONS are toggled on, not whether the one enabled section has
+            // anything to draw right now — showAlarms=true with zero active
+            // alarms, or showZmanim=true with the selection genuinely emptied
+            // out, both passed that check and then rendered as a blank navy
+            // rectangle with no recovery short of deleting the widget.
+            var anyVisible = false
 
             // --- Hebrew date ---
             if (config.showHebrewDate) {
@@ -136,6 +149,7 @@ class WidgetRenderer @Inject constructor(
                 views.setTextViewText(R.id.widget_hebrew_date, hebrew)
                 views.setTextViewText(R.id.widget_city, prefs.cityNameHebrew)
                 views.setTextViewText(R.id.widget_gregorian_date, gregorian)
+                anyVisible = true
             } else {
                 views.setViewVisibility(R.id.widget_date_section, View.GONE)
                 views.setViewVisibility(R.id.widget_gregorian_date, View.GONE)
@@ -152,37 +166,51 @@ class WidgetRenderer @Inject constructor(
                 views.setChronometer(R.id.widget_countdown, base, "עוד %s", true)
                 views.setChronometerCountDown(R.id.widget_countdown, true)
                 views.setViewVisibility(R.id.widget_countdown, View.VISIBLE)
+                anyVisible = true
             } else if (config.showNextZman) {
                 // Asked for, but nothing to show (no city / no cached data yet)
                 views.setViewVisibility(R.id.widget_next_section, View.VISIBLE)
                 views.setTextViewText(R.id.widget_next_name, prefs.cityNameHebrew)
                 views.setTextViewText(R.id.widget_next_time, "פתח לבחירת עיר")
                 views.setViewVisibility(R.id.widget_countdown, View.GONE)
+                anyVisible = true
             } else {
                 views.setViewVisibility(R.id.widget_next_section, View.GONE)
             }
 
             // --- Selected zman rows ---
+            // Filtered through relevantTimedZmanim, NOT raw instantOf: the
+            // engine computes הדלקת נרות and צאת שבת unconditionally for
+            // every date (only their DISPLAY is day-gated), so reading
+            // instantOf directly used to render both as real, correctly-
+            // formatted rows on an ordinary Tuesday — indistinguishable in
+            // styling from the genuine zmanim beside them. The "next zman"
+            // section below already used the guarded helper; only these rows
+            // did not.
+            val relevantToday = dayToday.relevantTimedZmanim(today).toMap()
             val selection = if (config.showZmanim) {
                 config.zmanim.mapNotNull { ZmanKind.fromNameOrNull(it) }.take(rowIds.size)
             } else {
                 emptyList()
             }
-            views.setViewVisibility(
-                R.id.widget_zmanim_section,
-                if (selection.isEmpty()) View.GONE else View.VISIBLE,
-            )
+            var anyZmanRowVisible = false
             rowIds.indices.forEach { i ->
                 val kind = selection.getOrNull(i)
-                val instant = kind?.let { dayToday.instantOf(it) }
+                val instant = kind?.let { relevantToday[it] }
                 if (kind != null && instant != null) {
                     views.setViewVisibility(rowIds[i], View.VISIBLE)
                     views.setTextViewText(nameIds[i], kind.hebrewName)
                     views.setTextViewText(timeIds[i], timeFmt.format(instant.atZone(zone)))
+                    anyZmanRowVisible = true
                 } else {
                     views.setViewVisibility(rowIds[i], View.GONE)
                 }
             }
+            views.setViewVisibility(
+                R.id.widget_zmanim_section,
+                if (anyZmanRowVisible) View.VISIBLE else View.GONE,
+            )
+            if (anyZmanRowVisible) anyVisible = true
 
             // --- The user's alarms ---
             val alarms = if (config.showAlarms) upcomingAlarms.take(config.alarmCount) else emptyList()
@@ -201,6 +229,18 @@ class WidgetRenderer @Inject constructor(
                         views.setTextViewText(alarmTimeIds[i], entry.time)
                     }
                 }
+                anyVisible = true
+            }
+
+            if (!anyVisible) {
+                // Better an unrequested Hebrew date than a blank navy
+                // rectangle the user can only fix by deleting the widget —
+                // see the comment on `anyVisible` above.
+                views.setViewVisibility(R.id.widget_date_section, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_gregorian_date, View.VISIBLE)
+                views.setTextViewText(R.id.widget_hebrew_date, hebrew)
+                views.setTextViewText(R.id.widget_city, prefs.cityNameHebrew)
+                views.setTextViewText(R.id.widget_gregorian_date, gregorian)
             }
 
             // Tap anywhere → open the app
