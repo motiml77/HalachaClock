@@ -50,9 +50,22 @@ class NotificationHelper @Inject constructor(
          * Status-line channel. A channel's settings are immutable once created,
          * so the id is versioned: bumping it recreates the channel with the
          * lock-screen visibility below on devices that already had v1.
+         *
+         * v2 -> v3: IMPORTANCE_LOW was wrong. Android 12+ groups any channel at
+         * LOW or below into the collapsed "silent notifications" bucket on the
+         * lock screen — a single small icon at the bottom that the user must
+         * tap to expand, not the notification itself. For a notification whose
+         * entire purpose is to be glanceable ON the lock screen, that reads as
+         * "not shown at all". IMPORTANCE_DEFAULT keeps it out of that bucket
+         * while staying just as quiet: the channel explicitly has no sound and
+         * no vibration configured (a channel that never calls setSound() at
+         * DEFAULT+ otherwise gets the system default sound assigned
+         * automatically, which would have made every zman-boundary update
+         * audibly alert — exactly what an ongoing status line must not do).
          */
-        const val CHANNEL_SERVICE = "zmanim_status_v2"
+        const val CHANNEL_SERVICE = "zmanim_status_v3"
         private const val CHANNEL_SERVICE_LEGACY = "zmanim_service"
+        private const val CHANNEL_SERVICE_V2 = "zmanim_status_v2"
 
         const val ALARM_NOTIFICATION_ID = 1001
         const val STATUS_NOTIFICATION_ID = 1002
@@ -165,16 +178,29 @@ class NotificationHelper @Inject constructor(
         val service = NotificationChannel(
             CHANNEL_SERVICE,
             "שורת הזמן הבא",
-            NotificationManager.IMPORTANCE_LOW,
+            // DEFAULT, not LOW — see the v2->v3 note above the CHANNEL_SERVICE
+            // constant: LOW is collapsed into a tap-to-expand "silent" bucket
+            // on the Android 12+ lock screen, which is the opposite of what
+            // an always-visible status line needs.
+            NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
             description = "הזמן ההלכתי הבא והשעון המעורר הבא — קבוע בהתראות ובמסך הנעילה"
+            // A channel at DEFAULT+ that never calls setSound() gets the
+            // system's default notification sound auto-assigned — silence it
+            // explicitly, or every zman-boundary update (several times a day)
+            // would audibly alert.
+            setSound(null, null)
+            enableVibration(false)
             // Show the full line on the lock screen, not "תוכן מוסתר"
             lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
 
-        // Retire the v1 status channel so upgraders don't keep its settings
+        // Retire the old status channels so upgraders don't keep their settings
+        // locked in — a channel's importance/sound/vibration are immutable
+        // once created, so bumping the id is the only way to change them.
         runCatching { manager.deleteNotificationChannel(CHANNEL_SERVICE_LEGACY) }
+        runCatching { manager.deleteNotificationChannel(CHANNEL_SERVICE_V2) }
         manager.createNotificationChannels(listOf(alarm, alarmFallback, reminder, service))
     }
 
