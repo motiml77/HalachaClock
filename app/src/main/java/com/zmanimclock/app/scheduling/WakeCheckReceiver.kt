@@ -131,10 +131,6 @@ class WakeCheckConfirmReceiver : BroadcastReceiver() {
             ?.cancel(WakeCheckReceiver.wakeCheckNotifId(alarmId))
         // Belt and braces: re-arm the normal schedule in case anything above
         // ever disturbs it.
-        runCatching {
-            androidx.work.WorkManager.getInstance(context).enqueue(
-                androidx.work.OneTimeWorkRequestBuilder<RescheduleWorker>().build()
-            )
-        }
+        runCatching { RescheduleWorker.enqueueUnique(context) }
     }
 }

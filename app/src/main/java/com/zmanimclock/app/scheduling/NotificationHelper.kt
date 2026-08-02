@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import com.zmanimclock.app.R
@@ -28,6 +30,21 @@ class NotificationHelper @Inject constructor(
     companion object {
         const val CHANNEL_ALARM = "zmanim_alarm"
         const val CHANNEL_REMINDER = "zmanim_reminder"
+
+        /**
+         * Used ONLY when [AlarmTriggerReceiver] cannot start [AlarmSoundService]
+         * in the foreground — Android 12/12L with the exact-alarm permission
+         * revoked degrades the scheduled alarm to setAndAllowWhileIdle(), which
+         * does not carry the background foreground-service-start exemption, so
+         * ContextCompat.startForegroundService throws. CHANNEL_ALARM is
+         * deliberately silent (the service supplies sound/vibration precisely
+         * so the volume ramp/boost/loop can be controlled), but in THIS path
+         * the service never runs at all — a silent notification here meant the
+         * user got no sound, no vibration, and no signal that anything had
+         * happened. Real alarm sound + vibration, so a fallback ring is still
+         * audible even though the fine-grained playback control is lost.
+         */
+        const val CHANNEL_ALARM_FALLBACK = "zmanim_alarm_fallback"
 
         /**
          * Status-line channel. A channel's settings are immutable once created,
@@ -118,6 +135,25 @@ class NotificationHelper @Inject constructor(
             lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
         }
 
+        val alarmFallback = NotificationChannel(
+            CHANNEL_ALARM_FALLBACK,
+            "התראת חירום (ללא הרשאת שעון מדויק)",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "משמש רק כאשר האפליקציה לא הצליחה להפעיל את מנוע הצלצול הרגיל"
+            setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 700, 400, 700, 800, 700, 400, 700, 800)
+            setBypassDnd(true)
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+        }
+
         val reminder = NotificationChannel(
             CHANNEL_REMINDER,
             "תזכורות",
@@ -139,7 +175,7 @@ class NotificationHelper @Inject constructor(
 
         // Retire the v1 status channel so upgraders don't keep its settings
         runCatching { manager.deleteNotificationChannel(CHANNEL_SERVICE_LEGACY) }
-        manager.createNotificationChannels(listOf(alarm, reminder, service))
+        manager.createNotificationChannels(listOf(alarm, alarmFallback, reminder, service))
     }
 
     /**
@@ -155,6 +191,8 @@ class NotificationHelper @Inject constructor(
         challenge: String = "NONE",
         shabbatMode: Boolean = false,
         snoozesLeft: Int = -1,
+        /** CHANNEL_ALARM_FALLBACK when AlarmSoundService could not be started. */
+        channelId: String = CHANNEL_ALARM,
     ): android.app.Notification {
         val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -181,7 +219,7 @@ class NotificationHelper @Inject constructor(
             else -> "נודניק ($snoozeMinutes ד')"
         }
 
-        return NotificationCompat.Builder(context, CHANNEL_ALARM)
+        return NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_zman)
             .setColor(ACCENT)
             .setContentTitle(title)

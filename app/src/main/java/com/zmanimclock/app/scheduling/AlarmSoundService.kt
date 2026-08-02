@@ -132,14 +132,32 @@ class AlarmSoundService : Service() {
         // (classic missed-alarm behavior); otherwise stop outright — the
         // duration the user set is final.
         val a = alarm
-        val canSnooze = a != null && !previewMode &&
-            a.maxSnoozes != 0 && (a.maxSnoozes < 0 || a.snoozeCount < a.maxSnoozes)
-        if (canSnooze) {
+        val autoSnoozeAllowed = a != null && !previewMode && a.maxSnoozes != 0 && (
+            // maxSnoozes < 0 means "unlimited" for the user's OWN button
+            // presses (snooze()'s own gate, unchanged below, always lets
+            // those through). It must NOT also mean unlimited AUTOMATIC
+            // re-rings: an alarm nobody is there to answer would then ring
+            // forever, every snoozeMinutes, with nothing to stop it short of
+            // physically handling the phone. Cap the unattended case at a
+            // fixed number of rounds regardless of the user's own budget.
+            if (a!!.maxSnoozes < 0) a.snoozeCount < MAX_UNATTENDED_AUTO_SNOOZE_ROUNDS
+            else a.snoozeCount < a.maxSnoozes
+        )
+        if (autoSnoozeAllowed) {
             Log.i(TAG, "Ring duration elapsed — auto-snoozing")
-            snooze()
+            performSnooze(a!!)
         } else {
             Log.i(TAG, "Ring duration elapsed — stopping")
             stopRinging()
+            // This occurrence is over — the budget resets here, not in
+            // rescheduleAll (which used to reset it unconditionally on every
+            // reschedule, for every active alarm, racing a live snooze
+            // increment from a completely unrelated trigger — see
+            // AlarmScheduler.rescheduleAll for the full story).
+            if (a != null) {
+                persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, 0) } }
+                AlarmRingBus.ringEnded(a.id)
+            }
             stopSelf()
         }
     }
@@ -150,8 +168,13 @@ class AlarmSoundService : Service() {
         when (intent?.action) {
             ACTION_START -> start(intent.getLongExtra(EXTRA_ALARM_ID, -1))
             ACTION_PREVIEW -> startPreview(intent)
-            ACTION_DISMISS -> dismiss()
-            ACTION_SNOOZE -> snooze()
+            // The alarm id travels on EVERY dismiss/snooze intent (AlarmActivity
+            // has always sent it) so a FRESH service instance — recreated after
+            // the previous one auto-silenced and stopSelf()'d — can still
+            // recover the real alarm from Room instead of silently no-op'ing
+            // against a null in-memory field. See dismiss()/snooze() below.
+            ACTION_DISMISS -> dismiss(intent.getLongExtra(EXTRA_ALARM_ID, -1))
+            ACTION_SNOOZE -> snooze(intent.getLongExtra(EXTRA_ALARM_ID, -1))
             else -> stopSelf()
         }
         return START_NOT_STICKY
@@ -216,6 +239,24 @@ class AlarmSoundService : Service() {
             if (loaded == null) {
                 Log.w(TAG, "Alarm $alarmId vanished"); stopSelf(); return@launch
             }
+            // isOneTime is EXCLUDED from this guard on purpose: start() itself
+            // deactivates a one-time alarm (isActive=false) right after its
+            // first ring, before the user has even had a chance to snooze —
+            // so a snoozed one-time alarm's re-ring legitimately arrives here
+            // with isActive already false. Rejecting that would silence a
+            // snooze the user explicitly asked for.
+            if (!loaded.isActive && !loaded.isOneTime) {
+                // Defends against a real, observed race: RescheduleWorker runs
+                // unsynchronized (multiple instances can overlap — see
+                // AlarmScheduler.rescheduleAll), so an in-flight run started
+                // BEFORE the user switched this alarm off can still arm it
+                // AFTER the switch-off already cancelled it. Re-validating the
+                // freshly-loaded row here means a PendingIntent that slipped
+                // through that race rings a stale alarm for nobody rather than
+                // a real one the user still wants.
+                Log.w(TAG, "Alarm $alarmId fired while inactive — ignoring")
+                stopSelf(); return@launch
+            }
             alarm = loaded
             ring(loaded)
             // Everything past this point is bookkeeping — it must never be
@@ -226,8 +267,7 @@ class AlarmSoundService : Service() {
             runCatching {
                 // WorkManager lives in credential-encrypted storage, so this
                 // is unavailable before the first unlock after a reboot.
-                WorkManager.getInstance(this@AlarmSoundService)
-                    .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+                RescheduleWorker.enqueueUnique(this@AlarmSoundService)
             }.onFailure { Log.e(TAG, "Reschedule enqueue failed", it) }
         }
     }
@@ -289,6 +329,14 @@ class AlarmSoundService : Service() {
 
         if (alarm.soundEnabled) startSound(alarm)
         if (alarm.vibrate) startVibration()
+        // Drop any PREVIOUSLY posted deadline before posting this alarm's own.
+        // Without this, two alarms firing near the same minute (distinct
+        // PendingIntents, both delivered to this one service) each post the
+        // SAME Runnable via postDelayed — Handler queues a second Message
+        // rather than replacing the first, so both fire, and the EARLIER
+        // (often much shorter) deadline silences whichever alarm is actually
+        // live by then, regardless of its own configured ring duration.
+        handler.removeCallbacks(autoSilence)
         handler.postDelayed(autoSilence, alarm.ringDurationSeconds.coerceIn(10, 180) * 1_000L)
         Log.i(TAG, "Ringing alarm ${alarm.id} ('${titleOf(alarm)}')")
     }
@@ -451,39 +499,107 @@ class AlarmSoundService : Service() {
         )
     }
 
-    private fun dismiss() {
+    /**
+     * [alarmId] recovers the real alarm from Room when this Service instance
+     * has no live ring for it — e.g. it already auto-silenced (autoSilence
+     * calls stopSelf(), tearing the instance down) and the tap arrived at a
+     * freshly-recreated instance whose [alarm] field starts null, from a
+     * stale screen still showing the old alarm. The old code only ever read
+     * the in-memory field here, so that tap silently did nothing at all: no
+     * snooze-count reset, no wake-check armed, and — worst of all — a
+     * previously auto-snoozed re-ring was left fully armed, so the alarm the
+     * user had just "acknowledged" rang again five minutes later regardless.
+     */
+    private fun dismiss(alarmId: Long) {
         if (previewMode) {
             Log.i(TAG, "Preview dismissed")
             stopRinging(); stopSelf(); return
         }
-        val a = alarm
-        Log.i(TAG, "Alarm ${a?.id} acknowledged")
-        stopRinging()
-        if (a != null) {
-            persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, 0) } }
-            // B1: schedule a wake-up check if enabled
-            if (a.wakeCheckMinutes > 0) {
-                WakeCheckReceiver.schedule(this, a.id, a.wakeCheckMinutes)
-            }
+        val current = alarm
+        if (current != null) {
+            performDismiss(current)
+            return
         }
+        if (alarmId < 0) { stopRinging(); stopSelf(); return }
+        scope.launch {
+            val loaded = runCatching { alarmDao.getAlarmById(alarmId) }.getOrNull()
+            if (loaded != null) performDismiss(loaded) else { stopRinging(); stopSelf() }
+        }
+    }
+
+    private fun performDismiss(a: AlarmEntity) {
+        Log.i(TAG, "Alarm ${a.id} acknowledged")
+        stopRinging()
+        cancelStuckNotification()
+        persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, 0) } }
+        // A dismissal always clears any pending snooze re-ring. Previously
+        // this never happened: if the alarm had already auto-snoozed once
+        // (ring duration elapsed, unattended) and the user then acknowledged
+        // it from the stale screen that was left behind, dismiss() stopped
+        // the (already-stopped) sound and returned — the armed SLOT_SNOOZE
+        // survived untouched and rang again on schedule regardless.
+        alarmScheduler.cancelSnooze(a.id)
+        if (a.wakeCheckMinutes > 0) {
+            WakeCheckReceiver.schedule(this, a.id, a.wakeCheckMinutes)
+        }
+        // Close a stale ringing screen for THIS alarm, if one is still up —
+        // see AlarmRingBus.
+        AlarmRingBus.ringEnded(a.id)
         stopSelf()
     }
 
-    private fun snooze() {
+    /** See [dismiss] — same Room-recovery reasoning applies to snooze. */
+    private fun snooze(alarmId: Long) {
         if (previewMode) { // a preview self-silences instead of snoozing
             stopRinging(); stopSelf(); return
         }
-        val a = alarm ?: run { stopRinging(); stopSelf(); return }
-        // B3: enforce the snooze limit (maxSnoozes: -1 = unlimited, 0 = none)
-        if (a.maxSnoozes in 0..a.snoozeCount) {
-            Log.i(TAG, "Alarm ${a.id} snooze limit reached (${a.maxSnoozes}) — ignoring")
-            return // keep ringing; the user must acknowledge
+        val current = alarm
+        if (current != null) {
+            // B3: enforce the snooze limit (maxSnoozes: -1 = unlimited, 0 = none)
+            if (current.maxSnoozes in 0..current.snoozeCount) {
+                Log.i(TAG, "Alarm ${current.id} snooze limit reached (${current.maxSnoozes}) — ignoring")
+                return // keep ringing; the user must acknowledge
+            }
+            performSnooze(current)
+            return
         }
+        if (alarmId < 0) { stopRinging(); stopSelf(); return }
+        // Nothing is actually ringing in THIS instance either way (it would
+        // be the `current != null` branch above if it were), so there is no
+        // "keep ringing" outcome to preserve here — recover the row purely
+        // for the bookkeeping and always finish afterward.
+        scope.launch {
+            val loaded = runCatching { alarmDao.getAlarmById(alarmId) }.getOrNull()
+            if (loaded != null && loaded.maxSnoozes !in 0..loaded.snoozeCount) {
+                performSnooze(loaded)
+            } else {
+                stopRinging(); stopSelf()
+            }
+        }
+    }
+
+    private fun performSnooze(a: AlarmEntity) {
         stopRinging()
+        cancelStuckNotification()
         persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, a.snoozeCount + 1) } }
         alarmScheduler.scheduleSnooze(a.id, a.snoozeMinutes)
         Log.i(TAG, "Alarm ${a.id} snoozed for ${a.snoozeMinutes} min (#${a.snoozeCount + 1})")
         stopSelf()
+    }
+
+    /**
+     * Belt-and-braces: the ONLY notification manager call that can leave
+     * [NotificationHelper.ALARM_NOTIFICATION_ID] stuck. stopForeground() (run
+     * implicitly by stopSelf() tearing down this service) clears it for the
+     * normal FGS-ringing path, but the exact-alarm-unavailable FALLBACK
+     * notification (AlarmTriggerReceiver) is posted directly via
+     * NotificationManager.notify — it was never tied to a foreground
+     * service — so dismissing/snoozing that one via this same service left
+     * an un-swipeable "שעון מעורר" sitting in the shade indefinitely.
+     */
+    private fun cancelStuckNotification() {
+        getSystemService<android.app.NotificationManager>()
+            ?.cancel(NotificationHelper.ALARM_NOTIFICATION_ID)
     }
 
     private fun stopRinging() {
@@ -565,6 +681,12 @@ class AlarmSoundService : Service() {
     }
 
     private fun acquireWakeLock() {
+        // A second alarm firing while the first is still ringing calls this a
+        // second time on the same Service instance. Overwriting `wakeLock`
+        // without releasing the old reference first orphaned the FIRST lock —
+        // nothing ever released it, and it stayed held for its full 35-minute
+        // timeout, showing up as a battery-drain warning on several OEMs.
+        wakeLock?.let { if (it.isHeld) it.release() }
         val pm = getSystemService<PowerManager>() ?: return
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "zmanimclock:alarm").apply {
             acquire(35 * 60_000L)
@@ -638,5 +760,18 @@ class AlarmSoundService : Service() {
         private const val BOOST_ATTACH_DELAY_MS = 500L
 
         private const val VOLUME_STEP_INTERVAL_MS = AlarmVolume.MAX_RAMP_STEP_MS
+
+        /**
+         * Caps how many times an UNATTENDED alarm may auto-snooze itself when
+         * maxSnoozes is -1 ("unlimited"). That setting is meant to describe the
+         * user's own נודניק-button budget, not how many times the app may
+         * re-ring itself with nobody there to answer — reusing it for both
+         * meant a phone left in another room rang for a minute every
+         * snoozeMinutes, forever. Manual button presses are unaffected: they
+         * are still genuinely unlimited (see the `current.maxSnoozes in
+         * 0..current.snoozeCount` gate in snooze(), which for -1 is always
+         * false).
+         */
+        private const val MAX_UNATTENDED_AUTO_SNOOZE_ROUNDS = 4
     }
 }

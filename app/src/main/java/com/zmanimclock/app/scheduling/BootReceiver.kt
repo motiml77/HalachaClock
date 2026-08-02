@@ -46,8 +46,7 @@ class BootReceiver : BroadcastReceiver() {
                 val unlocked = context.getSystemService<UserManager>()?.isUserUnlocked ?: true
                 if (unlocked) {
                     // Normal path — durable, retried
-                    WorkManager.getInstance(context)
-                        .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+                    RescheduleWorker.enqueueUnique(context)
                     StatusNotificationReceiver.ping(context)
                 } else {
                     // Pre-unlock: WorkManager unavailable — reschedule inline

@@ -66,22 +66,33 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
  */
 fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>> {
     val zone = ZoneId.of(location.timeZoneId)
-    val jc = JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone))).apply { inIsrael = true }
-    val isErevShabbatOrChag =
-        date.dayOfWeek == DayOfWeek.FRIDAY || jc.isErevYomTov || jc.isErevYomTovSheni
-    val isShabbatOrChag =
-        date.dayOfWeek == DayOfWeek.SATURDAY || jc.isYomTovAssurBemelacha
-
     return ZmanKind.entries
-        .filter { kind ->
-            when (kind) {
-                ZmanKind.CANDLE_LIGHTING -> isErevShabbatOrChag
-                ZmanKind.TZEIT_SHABBAT -> isShabbatOrChag
-                else -> true
-            }
-        }
+        .filter { kind -> isZmanRelevantOn(kind, date, zone) }
         .mapNotNull { kind -> instantOf(kind)?.let { kind to it } }
         .sortedBy { (_, instant) -> instant }
+}
+
+/**
+ * Whether [kind] exists at all on [date] — independent of any particular
+ * location's zmanim. Only two kinds are day-specific:
+ *  - הדלקת נרות only on erev Shabbat (Friday) / erev Yom Tov.
+ *  - צאת שבת only on Shabbat itself / a Yom Tov that is assur bemelacha.
+ * Everything else is relevant every day. Callers that need a fire INSTANT
+ * (the alarm scheduler) must still test the resulting instant's own local
+ * date, since a zman can straddle midnight relative to the date it was
+ * derived from (חצות לילה is the standing example) — this function alone
+ * only answers "is this kind meaningful on this calendar day at all".
+ */
+fun isZmanRelevantOn(kind: ZmanKind, date: LocalDate, zone: ZoneId): Boolean {
+    if (kind != ZmanKind.CANDLE_LIGHTING && kind != ZmanKind.TZEIT_SHABBAT) return true
+    val jc = JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone))).apply { inIsrael = true }
+    return when (kind) {
+        ZmanKind.CANDLE_LIGHTING ->
+            date.dayOfWeek == DayOfWeek.FRIDAY || jc.isErevYomTov || jc.isErevYomTovSheni
+        ZmanKind.TZEIT_SHABBAT ->
+            date.dayOfWeek == DayOfWeek.SATURDAY || jc.isYomTovAssurBemelacha
+        else -> true
+    }
 }
 
 /** The concrete time of [kind] on this day (visible-netz-based when available). */

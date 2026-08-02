@@ -70,8 +70,7 @@ class SettingsViewModel @Inject constructor(
                     ringDurationSeconds = 60,
                 )
             )
-            WorkManager.getInstance(context)
-                .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+            RescheduleWorker.enqueueUnique(context)
         }
     }
 }

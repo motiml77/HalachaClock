@@ -608,8 +608,17 @@ private fun FixedAnchorSection(alarm: AlarmEntity, update: ((AlarmEntity) -> Ala
     // rememberTimePickerState is keyless, so it latches the FIRST composition's
     // values. The alarm loads asynchronously, so when EDITING an existing alarm
     // the picker used to keep showing the placeholder 06:00. Key it to the
-    // loaded alarm so it re-initialises once the real values arrive.
-    val timeState = key(alarm.id, alarm.hour, alarm.minute) {
+    // loaded alarm's ROW ID ONLY — never to hour/minute. Those two values are
+    // written BACK into `alarm` by the LaunchedEffect right below, which makes
+    // them a moving target: keying on them meant every drag of the dial wrote
+    // a new value, which changed the key, which discarded and rebuilt the
+    // TimePickerState from scratch — freshly-built state always opens in Hour
+    // mode, so the picker snapped back to the hour ring after every tap and a
+    // continuous drag got redirected into the hour partway through. Keying on
+    // alarm.id alone still re-initialises the moment the async load replaces
+    // the id=0 placeholder with the real row, which is the only case this
+    // needs to handle, and never again after that for the SAME alarm.
+    val timeState = key(alarm.id) {
         rememberTimePickerState(
             initialHour = alarm.hour,
             initialMinute = alarm.minute,

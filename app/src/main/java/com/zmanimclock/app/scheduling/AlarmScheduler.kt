@@ -16,6 +16,7 @@ import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
+import com.zmanimclock.app.feature.zmanim.model.isZmanRelevantOn
 import com.zmanimclock.app.location.model.AppGeoLocation
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -79,8 +80,16 @@ class AlarmScheduler @Inject constructor(
             // Isolate each alarm: one bad row (missing zman, bad city data…) must
             // never stop every later alarm from being armed.
             runCatching {
-                // A fresh occurrence gets a fresh snooze budget (B3)
-                if (alarm.snoozeCount != 0) alarmDao.setSnoozeCount(alarm.id, 0)
+                // DELIBERATELY does not touch snoozeCount here any more. This
+                // used to blindly zero it for every active alarm on every
+                // reschedule — and rescheduleAll runs from a dozen unrelated
+                // triggers (midnight, any alarm edit, any toggle, boot…),
+                // including while THIS alarm is mid-ring after the user just
+                // snoozed. That raced the snooze's own increment and could
+                // silently restore a spent snooze budget. The budget is now
+                // reset only where an occurrence genuinely ends: on dismiss,
+                // and when autoSilence gives up unattended — see
+                // AlarmSoundService.
                 scheduleNextOccurrence(alarm, location, cityId, ZmanOffsets.from(prefs))
             }.onFailure { Log.e(TAG, "Failed to schedule alarm ${alarm.id}", it) }
         }
@@ -175,14 +184,29 @@ class AlarmScheduler @Inject constructor(
 
     /** Cancels every slot of this alarm (main occurrence, snooze, wake-check). */
     fun cancelAlarm(alarmId: Long) {
-        listOf(SLOT_MAIN, SLOT_SNOOZE, SLOT_WAKE_CHECK).forEach { slot ->
-            PendingIntent.getBroadcast(
-                context,
-                requestCode(alarmId, slot),
-                Intent(context, AlarmTriggerReceiver::class.java),
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
-            )?.let { alarmManager?.cancel(it) }
-        }
+        listOf(SLOT_MAIN, SLOT_SNOOZE, SLOT_WAKE_CHECK).forEach { cancelSlot(alarmId, it) }
+    }
+
+    /**
+     * Cancels only a pending SNOOZE re-ring, leaving the alarm's regular
+     * occurrence and wake-check untouched.
+     *
+     * Needed because dismiss() used to never call this at all: an alarm that
+     * auto-snoozed (ring duration elapsed, unattended) armed SLOT_SNOOZE: if
+     * the user then acknowledged the alarm from a stale ringing screen — one
+     * left over from that auto-silence — dismiss() stopped the (already
+     * stopped) sound and returned, but the armed snooze survived and rang
+     * again five minutes later regardless of the "acknowledgement".
+     */
+    fun cancelSnooze(alarmId: Long) = cancelSlot(alarmId, SLOT_SNOOZE)
+
+    private fun cancelSlot(alarmId: Long, slot: Int) {
+        PendingIntent.getBroadcast(
+            context,
+            requestCode(alarmId, slot),
+            Intent(context, AlarmTriggerReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )?.let { alarmManager?.cancel(it) }
     }
 
     /** The zman instant an alarm points at, for a given date (UI preview too). */
@@ -201,10 +225,27 @@ class AlarmScheduler @Inject constructor(
             candleLightingOffsetMinutes = offsets.candleLightingMinutes,
             tzeitShabbatMinutes = offsets.tzeitShabbatMinutes,
         )
-        val zmanTime = day.instantOf(kind) ?: return null
+        // Read directly, not through instantOf, so the 16.1°-degree fallback
+        // below only applies to SCHEDULING — the display screens still show a
+        // genuine blank when the sun never reaches 16.1° that day, which is
+        // the honest answer. An ALARM anchored to it must never simply stop
+        // firing: in London/Manchester/Antwerp latitudes 16.1° depression does
+        // not occur at all for weeks around midsummer, and the old code left
+        // the alarm silently disarmed — still shown as ON — for up to 47
+        // consecutive mornings. Fall back to the luach's own MGA (always
+        // defined whenever sunrise/sunset exist) so the alarm still rings,
+        // just not anchored to the shita that happens to be undefined today.
+        val zmanTime = day.instantOf(kind) ?: mgaFallback(day, kind) ?: return null
         val offset = alarm.offsetMinutes * 60_000L
         return if (alarm.offsetBefore) zmanTime.minusMillis(offset) else zmanTime.plusMillis(offset)
     }
+
+    private fun mgaFallback(day: com.zmanimclock.app.feature.zmanim.engine.DayZmanim, kind: ZmanKind): Instant? =
+        when (kind) {
+            ZmanKind.SOF_ZMAN_SHMA_MGA_72 -> day.sofZmanShmaMga
+            ZmanKind.SOF_ZMAN_TFILA_MGA_72 -> day.sofZmanTfilaMga
+            else -> null
+        }
 
     // === internals ===
 
@@ -217,11 +258,31 @@ class AlarmScheduler @Inject constructor(
         cacheOnly: Boolean,
         offsets: ZmanOffsets,
     ): Instant? {
+        val kind = ZmanKind.fromNameOrNull(alarm.zmanId) ?: return null
         var date = LocalDate.now(zone)
         repeat(AlarmTimeCalculator.MAX_LOOKAHEAD_DAYS) {
-            if (AlarmTimeCalculator.isDayAllowed(alarm, date, zone)) {
+            // Two SEPARATE gates, deliberately not merged:
+            //  1. Does this zman even exist on the ANCHOR date (הדלקת נרות /
+            //     צאת שבת only some days) — cheap, skips a real computation
+            //     for the days that plainly do not apply.
+            //  2. Is the user's day-of-week / skip-Shabbat / skip-Yom-Tov
+            //     selection satisfied on the date the alarm ACTUALLY FIRES —
+            //     which can differ from the anchor date. חצות לילה is the
+            //     standing example: it is defined as chatzot + 12h, so for
+            //     roughly half the year (whenever DST pushes chatzot past
+            //     12:00) the anchor date's midnight lands on the CALENDAR DAY
+            //     AFTER. Testing the day-of-week/Shabbat gate against the
+            //     anchor date used to silently fire the alarm a day early (or
+            //     late) around every DST boundary, and inverted skipShabbat/
+            //     skipYomTov to the wrong night. Gating on the fire instant's
+            //     own local date is correct for every zman, including the
+            //     ordinary daytime ones where the two dates always coincide.
+            if (isZmanRelevantOn(kind, date, zone)) {
                 val fire = zmanInstantFor(alarm, location, cityId, date, cacheOnly, offsets)
-                if (fire != null && fire.isAfter(now)) return fire
+                if (fire != null && fire.isAfter(now)) {
+                    val fireDate = LocalDate.ofInstant(fire, zone)
+                    if (AlarmTimeCalculator.isDayAllowed(alarm, fireDate, zone)) return fire
+                }
             }
             date = date.plusDays(1)
         }

@@ -186,8 +186,7 @@ class AlarmEditViewModel @Inject constructor(
             ) ?: edited
 
             alarmDao.insertAlarm(toSave)
-            WorkManager.getInstance(context)
-                .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+            com.zmanimclock.app.scheduling.RescheduleWorker.enqueueUnique(context)
             onDone()
         }
     }

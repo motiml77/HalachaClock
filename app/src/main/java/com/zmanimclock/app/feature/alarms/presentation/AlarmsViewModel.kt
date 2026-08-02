@@ -153,7 +153,6 @@ class AlarmsViewModel @Inject constructor(
     }
 
     private fun requestReschedule() {
-        WorkManager.getInstance(context)
-            .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+        com.zmanimclock.app.scheduling.RescheduleWorker.enqueueUnique(context)
     }
 }

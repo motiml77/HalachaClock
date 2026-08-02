@@ -61,8 +61,7 @@ class CityPickerViewModel @Inject constructor(
                 timeZoneId = city.timeZoneId,
             )
             // Re-arm alarms against the new location's zmanim
-            WorkManager.getInstance(context)
-                .enqueue(OneTimeWorkRequestBuilder<RescheduleWorker>().build())
+            RescheduleWorker.enqueueUnique(context)
             onDone()
         }
     }

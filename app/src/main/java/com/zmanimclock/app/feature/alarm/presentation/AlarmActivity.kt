@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -48,7 +49,33 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import com.zmanimclock.app.feature.alarm.MathChallenge
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
+import com.zmanimclock.app.scheduling.AlarmRingBus
 import com.zmanimclock.app.scheduling.AlarmSoundService
+
+/** Everything the ringing screen renders, captured from one intent. */
+private data class AlarmUiArgs(
+    val alarmId: Long,
+    val title: String,
+    val timeText: String,
+    val snoozeMinutes: Int,
+    val shabbatMode: Boolean,
+    val snoozesLeft: Int,
+    val challenge: DismissChallenge,
+) {
+    companion object {
+        fun from(intent: Intent) = AlarmUiArgs(
+            alarmId = intent.getLongExtra(AlarmSoundService.EXTRA_ALARM_ID, -1),
+            title = intent.getStringExtra(AlarmSoundService.EXTRA_TITLE) ?: "שעון מעורר",
+            timeText = intent.getStringExtra(AlarmSoundService.EXTRA_TIME_TEXT) ?: "",
+            snoozeMinutes = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 5),
+            shabbatMode = intent.getBooleanExtra(AlarmSoundService.EXTRA_SHABBAT, false),
+            snoozesLeft = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, -1),
+            challenge = intent.getStringExtra(AlarmSoundService.EXTRA_CHALLENGE)
+                ?.let { runCatching { DismissChallenge.valueOf(it) }.getOrNull() }
+                ?: DismissChallenge.NONE,
+        )
+    }
+}
 
 /**
  * Full-screen ringing UI over the lock screen — night-friendly designed
@@ -58,39 +85,60 @@ import com.zmanimclock.app.scheduling.AlarmSoundService
  *  - Regular: deep-night gradient, huge time, zman name.
  *  - Shabbat entry: warm sunset gradient + drawn candles — "שבת נכנסת!".
  * A math dismiss-challenge (when set) gates אישור only; snooze never.
+ *
+ * launchMode="singleInstance" (AndroidManifest.xml) means a SECOND alarm
+ * firing while this screen is already up does not create a new Activity —
+ * Android brings this instance forward and delivers the new alarm's extras
+ * via onNewIntent, not onCreate. [args] is therefore live Compose state, not
+ * a val captured once, so a re-fronted instance always redraws the alarm
+ * that is ACTUALLY ringing rather than silently keeping the first one's
+ * title, time and — critically — its dismiss challenge on screen.
  */
 class AlarmActivity : ComponentActivity() {
+
+    private lateinit var argsState: androidx.compose.runtime.MutableState<AlarmUiArgs>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         turnScreenOnOverLockscreen()
-
-        val title = intent.getStringExtra(AlarmSoundService.EXTRA_TITLE) ?: "שעון מעורר"
-        val timeText = intent.getStringExtra(AlarmSoundService.EXTRA_TIME_TEXT) ?: ""
-        val alarmId = intent.getLongExtra(AlarmSoundService.EXTRA_ALARM_ID, -1)
-        val snoozeMinutes = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 5)
-        val shabbatMode = intent.getBooleanExtra(AlarmSoundService.EXTRA_SHABBAT, false)
-        val snoozesLeft = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, -1)
-        val challenge = intent.getStringExtra(AlarmSoundService.EXTRA_CHALLENGE)
-            ?.let { runCatching { DismissChallenge.valueOf(it) }.getOrNull() }
-            ?: DismissChallenge.NONE
+        argsState = androidx.compose.runtime.mutableStateOf(AlarmUiArgs.from(intent))
 
         setContent {
             // ZmanimTheme forces RTL and provides typography; the screen's
             // night/shabbat gradients override its surfaces entirely.
             com.zmanimclock.app.ui.theme.ZmanimTheme {
+                val args by argsState
+
+                // The service tells us when THIS alarm's ring ended for any
+                // reason other than this screen's own buttons — an unattended
+                // auto-silence, or a dismiss/snooze recovered from Room by a
+                // freshly-restarted service instance. Without this the screen
+                // used to stay up, silent and stale, until the next alarm
+                // reused it (see the class doc above).
+                androidx.compose.runtime.LaunchedEffect(args.alarmId) {
+                    AlarmRingBus.closed.collect { endedId ->
+                        if (endedId == args.alarmId) finish()
+                    }
+                }
+
                 AlarmScreen(
-                    title = title,
-                    timeText = timeText,
-                    snoozeMinutes = snoozeMinutes,
-                    snoozesLeft = snoozesLeft,
-                    challenge = challenge,
-                    shabbatMode = shabbatMode,
-                    onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, alarmId); finish() },
-                    onSnooze = { sendCommand(AlarmSoundService.ACTION_SNOOZE, alarmId); finish() },
+                    title = args.title,
+                    timeText = args.timeText,
+                    snoozeMinutes = args.snoozeMinutes,
+                    snoozesLeft = args.snoozesLeft,
+                    challenge = args.challenge,
+                    shabbatMode = args.shabbatMode,
+                    onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, args.alarmId); finish() },
+                    onSnooze = { sendCommand(AlarmSoundService.ACTION_SNOOZE, args.alarmId); finish() },
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        argsState.value = AlarmUiArgs.from(intent)
     }
 
     private fun sendCommand(action: String, alarmId: Long) {
@@ -146,6 +194,17 @@ private fun AlarmScreen(
         kotlinx.coroutines.delay(60_000); safetyElapsed = true
     }
     val showSnooze = snoozesLeft != 0 || safetyElapsed
+    // snoozesLeft == 0 means the button is ONLY showing because the 60s
+    // safety valve forced it — and AlarmSoundService.snooze() computes that
+    // exact same condition (`maxSnoozes in 0..snoozeCount`) as its reason to
+    // REFUSE the request and keep ringing. The valve used to reveal a button
+    // that always did nothing: the screen closed (this composable's onClick
+    // called finish() unconditionally) while the alarm kept blaring with no
+    // full-screen control left to stop it — the opposite of what a safety
+    // valve is for. Once the budget is genuinely exhausted the revealed
+    // button now performs — and is labelled as — a real stop, not a snooze
+    // the service will silently ignore.
+    val budgetExhausted = snoozesLeft == 0
 
     fun tryDismiss() {
         val p = problem
@@ -159,6 +218,14 @@ private fun AlarmScreen(
             }
         }
     }
+
+    // Back is the reflex move of someone half-asleep trying to make the noise
+    // stop. It used to finish() the Activity with zero effect on the service
+    // — the alarm kept ringing with no full-screen UI left and no chance to
+    // reappear, and the snooze-count reset / wake-check that a real dismiss
+    // performs were both silently skipped. Route it through the SAME gated
+    // path as אישור so a deliberately-set math challenge still applies.
+    BackHandler(enabled = true) { tryDismiss() }
 
     val gradient = if (shabbatMode) {
         Brush.verticalGradient(listOf(ShabbatTop, ShabbatBottom))
@@ -279,14 +346,15 @@ private fun AlarmScreen(
             if (showSnooze) {
                 Spacer(Modifier.height(14.dp))
                 OutlinedButton(
-                    onClick = onSnooze,
+                    onClick = if (budgetExhausted) ::tryDismiss else onSnooze,
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
                 ) {
                     Text(
                         when {
+                            budgetExhausted -> "עצור"
                             snoozesLeft > 0 -> "נודניק ($snoozeMinutes ד' · נשארו $snoozesLeft)"
-                            else -> "נודניק ($snoozeMinutes ד')"
+                            else -> "נודניק ($snoozeMinutes ד')" // unlimited (-1)
                         }
                     )
                 }

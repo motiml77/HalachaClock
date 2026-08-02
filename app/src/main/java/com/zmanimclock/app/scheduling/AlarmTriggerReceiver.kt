@@ -51,9 +51,23 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
                         timeText = "",
                         snoozeMinutes = 0,
                         snoozesLeft = 0,
+                        // AlarmSoundService never runs on this path, so it is
+                        // the ONLY source of sound/vibration here — CHANNEL_ALARM
+                        // is deliberately silent for the normal path, which used
+                        // to mean this fallback rang the user's phone with
+                        // nothing audible or tactile at all.
+                        channelId = NotificationHelper.CHANNEL_ALARM_FALLBACK,
                     ),
                 )
             }.onFailure { Log.e(TAG, "FSI fallback also failed", it) }
+
+            // The service normally re-enqueues RescheduleWorker after every
+            // firing (AlarmSoundService.start()) — that never runs on this
+            // path, so without this the alarm's NEXT occurrence (and any
+            // repeat day after this one) is simply never armed again.
+            runCatching {
+                RescheduleWorker.enqueueUnique(context.applicationContext)
+            }.onFailure { Log.e(TAG, "Reschedule enqueue failed on fallback path", it) }
         }
     }
 
