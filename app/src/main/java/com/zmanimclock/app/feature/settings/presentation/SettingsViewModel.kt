@@ -36,6 +36,16 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { prefsRepository.setTzeitShabbatMinutes(minutes) }
     }
 
+    fun setNextZmanFilter(kinds: Set<String>) {
+        viewModelScope.launch {
+            prefsRepository.setNextZmanFilter(kinds)
+            // The headline also lives in the status notification and the
+            // widget; both recompute from a ping rather than observing prefs.
+            StatusNotificationReceiver.ping(context)
+            com.zmanimclock.app.feature.widget.ZmanWidgetProvider.refresh(context)
+        }
+    }
+
     fun setCandleLightingMinutes(minutes: Int) {
         viewModelScope.launch { prefsRepository.setCandleLightingMinutes(minutes) }
     }

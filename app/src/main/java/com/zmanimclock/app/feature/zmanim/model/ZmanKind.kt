@@ -115,9 +115,30 @@ fun nextRelevantZman(
     date: LocalDate,
     now: Instant,
     yesterday: DayZmanim?,
+    /**
+     * Which kinds may be the headline. EMPTY means "no preference" — every
+     * zman is eligible, which is the original behaviour and stays the
+     * default.
+     *
+     * A user who only cares about, say, שקיעה and ק"ש does not want the
+     * headline walking through עלות, משיכיר and הנץ on the way there: with
+     * those two selected, 06:30 already reads "הזמן הבא: ק״ש" even though
+     * other zmanim fall in between. Filtering here rather than at each call
+     * site keeps the home screen, the status notification and the widget
+     * showing the same answer.
+     *
+     * Names are [ZmanKind.name] strings, matching how the preference is
+     * persisted; an unknown name is simply ignored, so a selection saved by a
+     * newer build cannot break an older one.
+     */
+    eligible: Set<String> = emptySet(),
 ): Pair<ZmanKind, Instant>? {
-    val candidates = today.relevantTimedZmanim(date).filter { (_, instant) -> instant.isAfter(now) }
-    val fromYesterday = yesterday?.chatzotLayla?.takeIf { it.isAfter(now) }
+    fun allowed(kind: ZmanKind) = eligible.isEmpty() || kind.name in eligible
+
+    val candidates = today.relevantTimedZmanim(date)
+        .filter { (kind, instant) -> instant.isAfter(now) && allowed(kind) }
+    val fromYesterday = yesterday?.chatzotLayla
+        ?.takeIf { it.isAfter(now) && allowed(ZmanKind.CHATZOT_LAYLA) }
         ?.let { ZmanKind.CHATZOT_LAYLA to it }
     return (if (fromYesterday != null) candidates + fromYesterday else candidates)
         .minByOrNull { (_, instant) -> instant }

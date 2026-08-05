@@ -85,7 +85,9 @@ class StatusNotificationReceiver : BroadcastReceiver() {
                 location, cityId, today.minusDays(1), cacheOnly = true,
                 candleLightingOffsetMinutes = candle, tzeitShabbatMinutes = tzeitShabbat,
             )
-            com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(dayToday, today, now, dayYesterday)
+            com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(
+                dayToday, today, now, dayYesterday, prefs.nextZmanFilter,
+            )
         } ?: nextZman(location, cityId, today.plusDays(1), now, candle, tzeitShabbat)
         val zmanName = next?.first?.shortName ?: "—"
         val zmanTime = next?.let { (_, instant) -> timeFmt.format(instant.atZone(zone)) } ?: ""

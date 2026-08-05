@@ -14,6 +14,17 @@
     IMPORTANT: RemoteViews inflates only a fixed whitelist of view classes.
     A plain <View> is NOT on it and makes the entire widget fail to inflate
     ("Problem loading widget"), so dividers here are ImageViews.
+
+    The root is gravity=center_vertical, NOT top-aligned. The user picks how
+    many zmanim to show and resizes the widget independently, so the content
+    block and the frame are two unrelated sizes: a tall frame holding few rows
+    used to leave a large dead navy area below the last row, which reads as
+    "broken" rather than "spacious". Centring makes every size/row-count
+    combination look deliberate.
+
+    The picker tile is a SEPARATE layout (widget_preview.xml) — a preview is
+    inflated with no data bound, and every sample string here is tools:text,
+    which is stripped at build time.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -23,7 +34,8 @@
     android:orientation="vertical"
     android:layoutDirection="rtl"
     android:background="@drawable/widget_bg"
-    android:padding="14dp">
+    android:padding="14dp"
+    android:gravity="center_vertical">
 
     <!-- ===== Section 1: Hebrew date + city ===== -->
     <LinearLayout

@@ -56,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.settings.data.UserPreferences
 import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 
 /**
  * Settings: location (city picker entry), halachic prefs, display prefs,
@@ -136,6 +137,7 @@ fun SettingsScreen(
         onCityClick = onOpenCityPicker,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
         onTzeitShabbatMinutesChange = viewModel::setTzeitShabbatMinutes,
+        onNextZmanFilterChange = viewModel::setNextZmanFilter,
         onPersistentNotificationChange = ::onPersistentToggle,
         onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
@@ -167,6 +169,7 @@ fun SettingsContent(
     onCityClick: () -> Unit,
     onCandleMinutesChange: (Int) -> Unit,
     onTzeitShabbatMinutesChange: (Int) -> Unit = {},
+    onNextZmanFilterChange: (Set<String>) -> Unit = {},
     onPersistentNotificationChange: (Boolean) -> Unit,
     onRingTest: () -> Unit = {},
     onRequestExactAlarms: () -> Unit,
@@ -344,6 +347,12 @@ fun SettingsContent(
         TzeitShabbatCard(
             minutes = prefs.tzeitShabbatMinutes,
             onChange = onTzeitShabbatMinutesChange,
+        )
+
+        // Which zmanim may be the headline "הזמן הבא"
+        NextZmanFilterCard(
+            selected = prefs.nextZmanFilter,
+            onChange = onNextZmanFilterChange,
         )
 
         // Persistent status notification
@@ -539,5 +548,87 @@ private fun TzeitShabbatCard(minutes: Int, onChange: (Int) -> Unit) {
                 }
             },
         )
+    }
+}
+
+/**
+ * Which zmanim may be the headline "הזמן הבא".
+ *
+ * The app tracks ~19 zmanim, but most people watch only a handful. Without
+ * this, the headline walks through every one of them in order — a user who
+ * only cares about ק"ש and שקיעה still gets עלות, משיכיר and הנץ announced
+ * first. Narrowing the list makes the headline jump straight to the next
+ * zman that person actually wants: with ק"ש selected, 06:30 already reads
+ * "הזמן הבא: ק״ש" even though several zmanim fall in between.
+ *
+ * Nothing is hidden from the main list — this only governs the single
+ * headline (and the same one in the status notification and the widget).
+ * Selecting none means "all", which is the default.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NextZmanFilterCard(selected: Set<String>, onChange: (Set<String>) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val all = ZmanKind.entries
+
+    Card {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("מה יוצג כ\"הזמן הבא\"", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (selected.isEmpty()) {
+                            "כל הזמנים — לפי הסדר"
+                        } else {
+                            "${selected.size} זמנים נבחרו"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                TextButton(onClick = { expanded = !expanded }) {
+                    Text(if (expanded) "סגור" else "בחר")
+                }
+            }
+
+            if (!expanded) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "אפשר לצמצם כדי שהכותרת תקפוץ ישר לזמן שחשוב לך, " +
+                        "בלי לעבור דרך כל הזמנים שבדרך.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            } else {
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selected.isEmpty(),
+                        onClick = { onChange(emptySet()) },
+                        label = { Text("הכל") },
+                    )
+                    all.forEach { kind ->
+                        FilterChip(
+                            selected = kind.name in selected,
+                            onClick = {
+                                val next = selected.toMutableSet()
+                                if (!next.add(kind.name)) next.remove(kind.name)
+                                onChange(next)
+                            },
+                            label = { Text(kind.shortName) },
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "בלי בחירה — כל הזמנים נחשבים.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+        }
     }
 }

@@ -118,8 +118,14 @@ class WidgetRenderer @Inject constructor(
         // Next zman across yesterday's tail→today→tomorrow (candle-lighting/
         // tzeit-Shabbat only surface on their relevant days — never mid-week)
         val next = com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(
-            dayToday, today, now, dayYesterday,
-        ) ?: dayTomorrow.relevantTimedZmanim(today.plusDays(1)).minByOrNull { it.second }
+            dayToday, today, now, dayYesterday, prefs.nextZmanFilter,
+        ) ?: dayTomorrow.relevantTimedZmanim(today.plusDays(1))
+            // The same filter has to apply to the tomorrow fallback, or a
+            // narrow selection would still show an unwanted zman overnight.
+            .filter { (kind, _) ->
+                prefs.nextZmanFilter.isEmpty() || kind.name in prefs.nextZmanFilter
+            }
+            .minByOrNull { it.second }
 
         // Alarms are only queried if at least one widget actually asks for
         // them — this runs from a broadcast receiver on a goAsync budget.

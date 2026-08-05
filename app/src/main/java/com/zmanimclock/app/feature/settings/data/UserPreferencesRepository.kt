@@ -34,6 +34,14 @@ data class UserPreferences(
     /** צאת שבת — fixed minutes after shkia. Minhag, not a ruling; the
      *  Ohr HaChaim luach itself prints 30. See MaranZmanimEngine. */
     val tzeitShabbatMinutes: Int = 40,
+    /**
+     * Which zmanim may appear as the headline "הזמן הבא" — ZmanKind names.
+     * EMPTY means no preference: every zman is eligible, which is the
+     * original behaviour and the default. A user who only cares about a
+     * few zmanim can narrow it so the headline jumps straight to the next
+     * one they actually want, skipping the ones in between.
+     */
+    val nextZmanFilter: Set<String> = emptySet(),
     val nusach: String = "sephardi", // ashkenazi, sephardi
     val primaryShita: String = "both", // gra, mga, both
     val darkMode: String = "system", // light, dark, system
@@ -66,6 +74,7 @@ class UserPreferencesRepository @Inject constructor(
         val USE_ELEVATION = booleanPreferencesKey("use_elevation")
         val CANDLE_LIGHTING_MIN = intPreferencesKey("candle_lighting_min")
         val TZEIT_SHABBAT_MIN = intPreferencesKey("tzeit_shabbat_min")
+        val NEXT_ZMAN_FILTER = stringPreferencesKey("next_zman_filter")
         val NUSACH = stringPreferencesKey("nusach")
         val PRIMARY_SHITA = stringPreferencesKey("primary_shita")
         val DARK_MODE = stringPreferencesKey("dark_mode")
@@ -87,6 +96,8 @@ class UserPreferencesRepository @Inject constructor(
             useElevation = prefs[Keys.USE_ELEVATION] ?: true,
             candleLightingMinutes = prefs[Keys.CANDLE_LIGHTING_MIN] ?: 20,
             tzeitShabbatMinutes = prefs[Keys.TZEIT_SHABBAT_MIN] ?: 40,
+            nextZmanFilter = prefs[Keys.NEXT_ZMAN_FILTER]
+                ?.split(",")?.filter { it.isNotBlank() }?.toSet().orEmpty(),
             nusach = prefs[Keys.NUSACH] ?: "sephardi",
             primaryShita = prefs[Keys.PRIMARY_SHITA] ?: "both",
             darkMode = prefs[Keys.DARK_MODE] ?: "system",
@@ -117,6 +128,7 @@ class UserPreferencesRepository @Inject constructor(
             .putBoolean("useGps", p.useGps)
             .putInt("candle", p.candleLightingMinutes)
             .putInt("tzeitShabbat", p.tzeitShabbatMinutes)
+            .putString("nextZmanFilter", p.nextZmanFilter.joinToString(","))
             .putBoolean("persistent", p.persistentNotification)
             .apply()
     }
@@ -132,6 +144,8 @@ class UserPreferencesRepository @Inject constructor(
         useGps = dpsPrefs.getBoolean("useGps", false),
         candleLightingMinutes = dpsPrefs.getInt("candle", 20),
         tzeitShabbatMinutes = dpsPrefs.getInt("tzeitShabbat", 40),
+        nextZmanFilter = dpsPrefs.getString("nextZmanFilter", "")
+            .orEmpty().split(",").filter { it.isNotBlank() }.toSet(),
         persistentNotification = dpsPrefs.getBoolean("persistent", true),
     )
 
@@ -165,6 +179,10 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setTzeitShabbatMinutes(minutes: Int) {
         context.dataStore.edit { it[Keys.TZEIT_SHABBAT_MIN] = minutes }
+    }
+
+    suspend fun setNextZmanFilter(kinds: Set<String>) {
+        context.dataStore.edit { it[Keys.NEXT_ZMAN_FILTER] = kinds.joinToString(",") }
     }
 
     suspend fun setCandleLightingMinutes(minutes: Int) {

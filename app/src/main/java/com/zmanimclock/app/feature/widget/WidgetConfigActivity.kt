@@ -106,6 +106,24 @@ class WidgetConfigActivity : ComponentActivity() {
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
+                            // A live mock of the widget, updating as the user
+                            // toggles. Without it the whole screen is a list of
+                            // abstract switches whose effect only becomes
+                            // visible AFTER saving and returning to the home
+                            // screen — and (before the reconfigure flag was
+                            // added) getting back here meant deleting the
+                            // widget. Seeing the result while choosing is the
+                            // difference between configuring and guessing.
+                            item {
+                                WidgetMockPreview(
+                                    showDate = showDate,
+                                    showNext = showNext,
+                                    zmanim = if (showZmanim) selected.toList() else emptyList(),
+                                    showAlarms = showAlarms,
+                                    alarmCount = alarmCount,
+                                )
+                            }
+
                             item {
                                 SectionCard {
                                     ToggleRow(
@@ -140,7 +158,23 @@ class WidgetConfigActivity : ComponentActivity() {
                             }
 
                             if (showZmanim) {
-                                items(ZmanKind.entries.toList()) { kind ->
+                                // Grouped by time of day. A flat 19-row scroll
+                                // of similarly-worded halachic names is very
+                                // hard to scan — several differ only by a
+                                // shita suffix — so the user hunts rather than
+                                // picks. The buckets match how someone thinks
+                                // about their own day.
+                                ZMAN_GROUPS.forEach { (groupTitle, kinds) ->
+                                    item {
+                                        Text(
+                                            groupTitle,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+                                        )
+                                    }
+                                    items(kinds) { kind ->
                                     val checked = kind.name in selected
                                     val atLimit = selected.size >= WidgetPrefs.MAX_ZMANIM
                                     Row(
@@ -170,6 +204,7 @@ class WidgetConfigActivity : ComponentActivity() {
                                                 MaterialTheme.colorScheme.onSurfaceVariant
                                             },
                                         )
+                                        }
                                     }
                                 }
                             }

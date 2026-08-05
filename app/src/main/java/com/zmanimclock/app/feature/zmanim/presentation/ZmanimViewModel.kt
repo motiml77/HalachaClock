@@ -148,7 +148,9 @@ class ZmanimViewModel @Inject constructor(
                 candleLightingOffsetMinutes = prefs.candleLightingMinutes.toLong(),
                 tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
             )
-            val next = com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(day, today, now, yesterday)
+            val next = com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(
+                day, today, now, yesterday, prefs.nextZmanFilter,
+            )
 
             _uiState.value = UiState(
                 loading = false,
