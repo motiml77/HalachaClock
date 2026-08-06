@@ -118,7 +118,10 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     // KosherJava Zmanim (astronomical substrate only)
-    implementation(libs.kosherjava.zmanim)
+    // The halachic engine + the luach verification tests. KosherJava comes in
+    // transitively (declared `api` there), so it is not repeated here — one
+    // module owns the version.
+    implementation(project(":zmanim-engine"))
 
 
     // JSON (cities.json)

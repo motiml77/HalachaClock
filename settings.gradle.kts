@@ -20,4 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ZmanimClock"
+include(":zmanim-engine")
 include(":app")
