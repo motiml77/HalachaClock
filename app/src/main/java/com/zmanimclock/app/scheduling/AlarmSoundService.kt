@@ -29,7 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.time.format.DateTimeFormatter
+import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -739,8 +739,7 @@ class AlarmSoundService : Service() {
     private fun timeTextOf(alarm: AlarmEntity): String = when (alarm.type) {
         AlarmType.FIXED -> "%02d:%02d".format(alarm.hour, alarm.minute)
         AlarmType.ZMAN ->
-            DateTimeFormatter.ofPattern("HH:mm")
-                .format(java.time.Instant.now().atZone(ZoneId.systemDefault()))
+            java.time.Instant.now().asZmanTime(ZoneId.systemDefault())
     }
 
     companion object {

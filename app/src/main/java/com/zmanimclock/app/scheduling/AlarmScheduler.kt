@@ -20,6 +20,7 @@ import com.zmanimclock.app.feature.zmanim.model.isZmanRelevantOn
 import com.zmanimclock.app.location.model.AppGeoLocation
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import com.zmanimclock.app.feature.zmanim.format.ZmanTime
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -291,7 +292,7 @@ class AlarmScheduler @Inject constructor(
 
     private fun arm(alarm: AlarmEntity, fireTime: Instant, zone: ZoneId) {
         setExact(fireTime.toEpochMilli(), triggerPendingIntent(alarm.id))
-        val display = DateTimeFormatter.ofPattern("dd/MM HH:mm").format(fireTime.atZone(zone))
+        val display = DateTimeFormatter.ofPattern("dd/MM ${ZmanTime.PATTERN_24H}").format(fireTime.atZone(zone))
         Log.i(TAG, "Armed alarm ${alarm.id} (${alarm.type}) at $display")
     }
 

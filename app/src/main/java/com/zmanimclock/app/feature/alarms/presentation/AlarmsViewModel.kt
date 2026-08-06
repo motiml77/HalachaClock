@@ -18,9 +18,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /** When the alarm's next ring falls — drives the list's grouping tags. */
@@ -85,7 +85,7 @@ class AlarmsViewModel @Inject constructor(
                 FireBucket.TOMORROW -> "מחר"
                 else -> hebrewWeekday(local.dayOfWeek)
             }
-            val time = DateTimeFormatter.ofPattern("HH:mm").format(local)
+            val time = fire.asZmanTime(zone)
             AlarmListItem(
                 alarm = alarm,
                 nextFireLabel = "$day · ${remainingText(fire)}",

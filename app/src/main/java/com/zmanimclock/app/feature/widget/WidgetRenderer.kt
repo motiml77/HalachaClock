@@ -22,6 +22,7 @@ import com.zmanimclock.app.feature.zmanim.model.instantOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import com.zmanimclock.app.scheduling.AlarmScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -51,7 +52,6 @@ class WidgetRenderer @Inject constructor(
     private val alarmDao: AlarmDao,
     private val alarmScheduler: AlarmScheduler,
 ) {
-    private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
     private val dateFmt = DateTimeFormatter.ofPattern("d.M.yyyy")
 
     private val hebrewFormatter = HebrewDateFormatter().apply {
@@ -165,7 +165,7 @@ class WidgetRenderer @Inject constructor(
             if (config.showNextZman && next != null) {
                 views.setViewVisibility(R.id.widget_next_section, View.VISIBLE)
                 views.setTextViewText(R.id.widget_next_name, "הזמן הבא: ${next.first.hebrewName}")
-                views.setTextViewText(R.id.widget_next_time, timeFmt.format(next.second.atZone(zone)))
+                views.setTextViewText(R.id.widget_next_time, next.second.asZmanTime(zone))
                 // Chronometer counts DOWN to the zman
                 val base = SystemClock.elapsedRealtime() +
                     (next.second.toEpochMilli() - System.currentTimeMillis())
@@ -206,7 +206,7 @@ class WidgetRenderer @Inject constructor(
                 if (kind != null && instant != null) {
                     views.setViewVisibility(rowIds[i], View.VISIBLE)
                     views.setTextViewText(nameIds[i], kind.hebrewName)
-                    views.setTextViewText(timeIds[i], timeFmt.format(instant.atZone(zone)))
+                    views.setTextViewText(timeIds[i], instant.asZmanTime(zone))
                     anyZmanRowVisible = true
                 } else {
                     views.setViewVisibility(rowIds[i], View.GONE)
@@ -280,7 +280,7 @@ class WidgetRenderer @Inject constructor(
             }
             .sortedBy { (_, fire) -> fire }
             .map { (alarm, fire) ->
-                AlarmLine(label = alarmLabel(alarm), time = timeFmt.format(fire.atZone(zone)))
+                AlarmLine(label = alarmLabel(alarm), time = fire.asZmanTime(zone))
             }
     }
 

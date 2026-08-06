@@ -17,10 +17,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
@@ -68,7 +68,6 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         val cityId = if (prefs.useGps) null else prefs.cityId
         val zone = ZoneId.of(prefs.timeZoneId)
         val now = Instant.now()
-        val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
         // Next zman: first upcoming today (including yesterday's still-pending
         // חצות לילה, in the ~40min window right after midnight — see
@@ -90,7 +89,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
             )
         } ?: nextZman(location, cityId, today.plusDays(1), now, candle, tzeitShabbat)
         val zmanName = next?.first?.shortName ?: "—"
-        val zmanTime = next?.let { (_, instant) -> timeFmt.format(instant.atZone(zone)) } ?: ""
+        val zmanTime = next?.let { (_, instant) -> instant.asZmanTime(zone) } ?: ""
 
         // Next armed alarm
         // cacheOnly: a receiver has a ~10s goAsync budget — the zman lookups
@@ -98,7 +97,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         // dozens of HTTP requests and ANR the broadcast).
         val nextAlarm = alarmScheduler.nextAlarmOccurrence(cacheOnly = true)
         val nextAlarmText = nextAlarm?.let { (alarm, fire) ->
-            val time = timeFmt.format(fire.atZone(zone))
+            val time = fire.asZmanTime(zone)
             val what = when {
                 alarm.label.isNotBlank() -> alarm.label
                 alarm.type == AlarmType.ZMAN -> {

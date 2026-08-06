@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.zmanimclock.app.feature.zmanim.format.asZmanTime
+import com.zmanimclock.app.feature.zmanim.format.asZmanTimeOrNull
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -133,7 +135,6 @@ class ZmanimViewModel @Inject constructor(
                 tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
             )
 
-            val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
             val now = Instant.now()
 
             val timed = day.relevantTimedZmanim(today)
@@ -159,18 +160,18 @@ class ZmanimViewModel @Inject constructor(
                 gregorianDate = DateTimeFormatter.ofPattern("d.M.yyyy").format(today),
                 basedOnVisibleSunrise = day.basedOnVisibleSunrise,
                 nextName = next?.first?.hebrewName,
-                nextTime = next?.second?.let { timeFormat.format(it.atZone(zone)) },
+                nextTime = next?.second?.asZmanTimeOrNull(zone),
                 countdown = next?.second?.let { formatCountdown(now, it) },
                 rows = timed.map { (kind, instant) ->
                     ZmanRow(
                         kind = kind,
                         name = kind.hebrewName,
-                        time = timeFormat.format(instant.atZone(zone)),
+                        time = instant.asZmanTime(zone),
                         isNext = kind == next?.first,
                         isPast = instant.isBefore(now),
                     )
                 },
-                fastBanner = fastBanner(today, zone, day, timeFormat),
+                fastBanner = fastBanner(today, zone, day),
             )
         }
     }
@@ -186,9 +187,8 @@ class ZmanimViewModel @Inject constructor(
         today: LocalDate,
         zone: ZoneId,
         day: com.zmanimclock.app.feature.zmanim.engine.DayZmanim,
-        fmt: DateTimeFormatter,
     ): FastBanner? {
-        fun f(i: Instant?): String? = i?.let { fmt.format(it.atZone(zone)) }
+        fun f(i: Instant?): String? = i.asZmanTimeOrNull(zone)
 
         val fastToday = FastDays.fastOn(today, zone)
         if (fastToday != null) {

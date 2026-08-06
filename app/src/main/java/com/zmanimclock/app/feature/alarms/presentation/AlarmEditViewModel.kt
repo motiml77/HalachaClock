@@ -19,9 +19,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -245,7 +245,7 @@ class AlarmEditViewModel @Inject constructor(
                 offsets = com.zmanimclock.app.scheduling.ZmanOffsets.from(prefs),
             )
             _zmanPreview.value = fire?.let {
-                "מחר: ${DateTimeFormatter.ofPattern("HH:mm").format(it.atZone(zone))}"
+                "מחר: ${it.asZmanTime(zone)}"
             }
         }
     }
