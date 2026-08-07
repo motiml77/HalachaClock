@@ -57,6 +57,54 @@ class CalendarExternalDumpTest {
         println("WROTE ${File(out, "cal_markers.csv")}")
     }
 
+    /**
+     * The astronomical (mishor) netz on its own, for Israeli cities across
+     * several years — the row that is now displayed separately.
+     *
+     * Elevation is varied deliberately in the city list, from Tzfat at ~900m
+     * to Tiberias BELOW sea level, because the whole claim being checked is
+     * that elevation does not move this number.
+     */
+    @Test
+    fun `dump the mishor netz for Israeli cities across five years`() {
+        val cities = listOf(
+            Triple("Jerusalem", 31.7683, 35.2137),
+            Triple("Tzfat", 32.9646, 35.4960),
+            Triple("Karnei Shomron", 32.1747, 35.0917),
+            Triple("Bnei Brak", 32.0837, 34.8331),
+            Triple("Haifa", 32.7940, 34.9896),
+            Triple("Beer Sheva", 31.2530, 34.7915),
+            Triple("Tiberias", 32.7959, 35.5308),
+            Triple("Eilat", 29.5577, 34.9519),
+        )
+        // Four points a year — solstices, equinoxes — plus both DST edges,
+        // across five years.
+        val dates = buildList {
+            for (y in 2026..2030) {
+                add(LocalDate.of(y, 1, 15))
+                add(LocalDate.of(y, 3, 21))
+                add(LocalDate.of(y, 6, 21))
+                add(LocalDate.of(y, 9, 23))
+                add(LocalDate.of(y, 10, 30))
+            }
+        }
+        val zone = ZoneId.of("Asia/Jerusalem")
+        val sb = StringBuilder("city,lat,lng,date,netz_mishor,shkia\n")
+        for ((name, lat, lng) in cities) {
+            // elevation 0: the mishor doctrine, and what external sea-level
+            // sources compute too.
+            val loc = EngineLocation(name, lat, lng, 0.0, "Asia/Jerusalem")
+            for (d in dates) {
+                val day = MaranZmanimEngine().calculate(loc, d)
+                sb.append("$name,$lat,$lng,$d,")
+                    .append(day.hanetzMishor?.asZmanTimeOrNull(zone) ?: "").append(',')
+                    .append(day.shkia?.asZmanTimeOrNull(zone) ?: "").append('\n')
+            }
+        }
+        File(out, "netz_israel.csv").writeText(sb.toString())
+        println("WROTE ${File(out, "netz_israel.csv")}")
+    }
+
     @Test
     fun `dump zmanim for several cities and dates`() {
         // Spread deliberately: latitude, hemisphere-ish season, DST state, and
