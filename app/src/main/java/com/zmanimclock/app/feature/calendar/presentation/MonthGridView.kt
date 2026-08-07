@@ -3,8 +3,8 @@ package com.zmanimclock.app.feature.calendar.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,14 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,7 +72,10 @@ fun MonthHeader(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepArrow(forward = true, contentDescription = "החודש הבא", onClick = onNext)
+        // Declaration order matters and is the whole bug this fixes: under RTL
+        // the FIRST child of a Row is placed on the RIGHT. Backward-in-time
+        // belongs on the right (› pointing right), forward on the left (‹).
+        StepArrow(forward = false, contentDescription = "החודש הקודם", onClick = onPrevious)
         Column(
             modifier = Modifier.weight(1f).clickable(onClick = onTitleClick),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -90,7 +92,7 @@ fun MonthHeader(
                 color = cs.onSurfaceVariant,
             )
         }
-        StepArrow(forward = false, contentDescription = "החודש הקודם", onClick = onPrevious)
+        StepArrow(forward = true, contentDescription = "החודש הבא", onClick = onNext)
         if (showTodayButton) {
             TextButton(onClick = onToday) { Text("היום") }
         }
@@ -319,14 +321,15 @@ fun MonthEventRibbon(
     if (events.isEmpty()) return
     val cs = MaterialTheme.colorScheme
     val ext = Ext.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    // LazyRow rather than horizontalScroll: it lays items out RTL-first and
+    // takes contentPadding, so the row starts inset from the screen edge
+    // instead of a chip appearing sliced off by it.
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        events.forEach { event ->
+        items(events, key = { it.date.toString() }) { event ->
             val tint = when (event.kind) {
                 MonthEvent.Kind.FAST -> ext.deadlineContainer
                 MonthEvent.Kind.YOM_TOV -> cs.tertiaryContainer
@@ -335,11 +338,27 @@ fun MonthEventRibbon(
                 MonthEvent.Kind.MODERN -> cs.primaryContainer
                 MonthEvent.Kind.ROSH_CHODESH -> cs.surfaceVariant
             }
-            AssistChip(
-                onClick = { onSelect(event.date) },
-                label = { Text("${event.title} · ${event.hebrewDayLabel}") },
-                colors = AssistChipDefaults.assistChipColors(containerColor = tint),
-            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(tint)
+                    .clickable { onSelect(event.date) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = event.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    color = cs.onSurface,
+                )
+                Text(
+                    text = " · ${event.hebrewDayLabel}",
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    color = cs.onSurfaceVariant,
+                )
+            }
         }
     }
 }

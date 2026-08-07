@@ -234,7 +234,7 @@ private fun DayBar(
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepArrow(forward = true, contentDescription = "היום הבא", onClick = onNextDay)
+        StepArrow(forward = false, contentDescription = "היום הקודם", onClick = onPreviousDay)
         Text(
             text = detail.weekdayName,
             modifier = Modifier.weight(1f),
@@ -242,7 +242,7 @@ private fun DayBar(
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
         )
-        StepArrow(forward = false, contentDescription = "היום הקודם", onClick = onPreviousDay)
+        StepArrow(forward = true, contentDescription = "היום הבא", onClick = onNextDay)
     }
 }
 
