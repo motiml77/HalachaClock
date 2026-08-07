@@ -12,7 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Loads pre-bundled ChaiTables visible sunrise data from assets on first launch.
+ * Loads pre-bundled ChaiTables visible sunrise data from the shared module on first launch.
  *
  * The data covers 8 Israeli metro areas with 365 entries each (one per Gregorian day-of-year).
  * Cities without direct ChaiTables terrain data are mapped to the nearest metro area.
@@ -26,7 +26,9 @@ class ChaiTablesPreloader @Inject constructor(
 ) {
     companion object {
         private const val TAG = "ChaiTablesPreloader"
-        private const val ASSET_FILE = "chai_tables_preloaded.json"
+        // On the classpath, in :zmanim-engine — one copy, shared with the
+        // desktop build, for the same reason cities.json moved there.
+        private const val ASSET_FILE = "/chai_tables_preloaded.json"
         private const val MIN_ENTRIES_PER_METRO = 300
     }
 
@@ -45,8 +47,8 @@ class ChaiTablesPreloader @Inject constructor(
                 return@withContext true
             }
 
-            Log.i(TAG, "Loading pre-bundled ChaiTables data from assets...")
-            val jsonStr = context.assets.open(ASSET_FILE).bufferedReader().use { it.readText() }
+            Log.i(TAG, "Loading pre-bundled ChaiTables data...")
+            val jsonStr = javaClass.getResourceAsStream(ASSET_FILE)!!.bufferedReader().use { it.readText() }
             val json = JSONObject(jsonStr)
 
             // The Gregorian year whose day-of-year numbering the asset used.
@@ -121,7 +123,7 @@ class ChaiTablesPreloader @Inject constructor(
                 Log.d(TAG, "Loaded $cityId (mapped from $metroName): ${cityEntities.size} entries")
             }
 
-            Log.i(TAG, "Pre-loaded $totalEntries total entries from assets")
+            Log.i(TAG, "Pre-loaded $totalEntries total entries")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load pre-bundled ChaiTables data", e)

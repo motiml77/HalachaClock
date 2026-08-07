@@ -2,17 +2,16 @@ package com.zmanimclock.app.location
 
 import android.content.Context
 import android.util.Log
-import com.zmanimclock.app.R
+import com.zmanimclock.app.feature.location.CityCatalog
 import com.zmanimclock.app.location.model.CityInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Loads the bundled city list (res/raw/cities.json): 415 Israeli localities
+ * Loads the bundled city list (:zmanim-engine resources): 415 Israeli localities
  * sorted alef-bet (ids are exact ChaiTables cgi_MetroArea values) + world
  * cities. Loaded once and cached in memory.
  */
@@ -25,26 +24,22 @@ class CityRepository @Inject constructor(
 
     suspend fun allCities(): List<CityInfo> = cache ?: withContext(Dispatchers.IO) {
         try {
-            val json = context.resources.openRawResource(R.raw.cities)
-                .bufferedReader().use { it.readText() }
-            val arr = JSONArray(json)
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    add(
-                        CityInfo(
-                            id = o.getString("id"),
-                            nameHebrew = o.getString("nameHebrew"),
-                            nameEnglish = o.getString("nameEnglish"),
-                            country = o.getString("country"),
-                            latitude = o.getDouble("latitude"),
-                            longitude = o.getDouble("longitude"),
-                            elevation = o.optDouble("elevation", 0.0),
-                            timeZoneId = o.getString("timeZoneId"),
-                            region = o.optString("region", ""),
-                        )
-                    )
-                }
+            // Reads the SAME cities.json the desktop build reads — it lives
+            // in :zmanim-engine's resources, not in res/raw, because the
+            // coordinates are zmanim INPUT: two copies drifting apart would
+            // give one user different times on their phone and their computer.
+            CityCatalog.cities.map {
+                CityInfo(
+                    id = it.id,
+                    nameHebrew = it.nameHebrew,
+                    nameEnglish = it.nameEnglish,
+                    country = it.country,
+                    latitude = it.latitude,
+                    longitude = it.longitude,
+                    elevation = it.elevation,
+                    timeZoneId = it.timeZoneId,
+                    region = it.region,
+                )
             }.also { cache = it }
         } catch (e: Exception) {
             Log.e("CityRepository", "Failed to load cities.json", e)
