@@ -29,3 +29,6 @@ keystore.properties
 
 # Room exported schemas are kept out until stabilized
 /app/schemas
+
+# Agent worktrees — transient, and each is its own git repo
+.claude/worktrees/
