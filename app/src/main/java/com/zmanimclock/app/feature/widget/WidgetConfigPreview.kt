@@ -39,6 +39,7 @@ internal val ZMAN_GROUPS: List<Pair<String, List<ZmanKind>>> = listOf(
         ZmanKind.ALOT_HASHACHAR,
         ZmanKind.MISHEYAKIR,
         ZmanKind.HANETZ,
+        ZmanKind.HANETZ_MISHOR,
     ),
     "זמני תפילה" to listOf(
         ZmanKind.SOF_ZMAN_SHMA_MGA,
@@ -72,6 +73,7 @@ private val SAMPLE_TIMES = mapOf(
     ZmanKind.ALOT_HASHACHAR to "04:33",
     ZmanKind.MISHEYAKIR to "04:47",
     ZmanKind.HANETZ to "05:57",
+    ZmanKind.HANETZ_MISHOR to "05:54",
     ZmanKind.SOF_ZMAN_SHMA_MGA to "08:39",
     ZmanKind.SOF_ZMAN_SHMA_MGA_72 to "08:39",
     ZmanKind.SOF_ZMAN_SHMA_GRA to "09:21",

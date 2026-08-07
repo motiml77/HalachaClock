@@ -6,6 +6,7 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.GregorianCalendar
 
 /**
@@ -24,6 +25,13 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     ALOT_HASHACHAR("עלות השחר"),
     MISHEYAKIR("משיכיר"),
     HANETZ("הנץ החמה"),
+    // Display only. HANETZ already falls back to the mishor time when no
+    // ChaiTables data exists, so this row exists purely so that a user WITH
+    // terrain data can also see the plain astronomical sunrise. It feeds
+    // nothing: the seasonal-hour grid was always built on the mishor day
+    // regardless (see MaranZmanimEngine), so adding this row changes no
+    // computed value anywhere.
+    HANETZ_MISHOR("הנץ מישור (אסטרונומי)", "הנץ מישור"),
     // The CONSTANT NAMES are frozen: they are persisted as `alarm.zmanId` and
     // resolved back through fromNameOrNull, so renaming one would orphan every
     // alarm a user has already saved. Only the labels and the values behind
@@ -68,6 +76,12 @@ fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>
     val zone = ZoneId.of(location.timeZoneId)
     return ZmanKind.entries
         .filter { kind -> isZmanRelevantOn(kind, date, zone) }
+        // הנץ מישור earns a row only when the user would actually READ a
+        // different number. "A visible netz exists" is not that test: in
+        // Jerusalem the terrain time lands in the same minute as the mishor
+        // one, so gating on existence printed 05:58 twice. Gate on the
+        // displayed minute instead — the same unit the row is rendered in.
+        .filter { kind -> kind != ZmanKind.HANETZ_MISHOR || showsDistinctMishorNetz(zone) }
         .mapNotNull { kind -> instantOf(kind)?.let { kind to it } }
         .sortedBy { (_, instant) -> instant }
 }
@@ -144,12 +158,27 @@ fun nextRelevantZman(
         .minByOrNull { (_, instant) -> instant }
 }
 
+/**
+ * Whether הנץ מישור would render as a different clock time from הנץ.
+ *
+ * Compared at MINUTE resolution in the location's own zone, because that is
+ * what the list shows: two instants seconds apart are the same row to a
+ * reader, and printing them twice reads as a bug rather than as information.
+ */
+private fun DayZmanim.showsDistinctMishorNetz(zone: ZoneId): Boolean {
+    val visible = hanetzVisible ?: return false
+    val mishor = hanetzMishor ?: return false
+    return visible.atZone(zone).truncatedTo(ChronoUnit.MINUTES) !=
+        mishor.atZone(zone).truncatedTo(ChronoUnit.MINUTES)
+}
+
 /** The concrete time of [kind] on this day (visible-netz-based when available). */
 fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.CHATZOT_LAYLA -> chatzotLayla
     ZmanKind.ALOT_HASHACHAR -> alotHashachar
     ZmanKind.MISHEYAKIR -> misheyakir60 // luach standard: one shaah zmanit before the netz
     ZmanKind.HANETZ -> hanetzVisible ?: hanetzMishor
+    ZmanKind.HANETZ_MISHOR -> hanetzMishor
     ZmanKind.SOF_ZMAN_SHMA_MGA -> sofZmanShmaMga
     ZmanKind.SOF_ZMAN_SHMA_MGA_72 -> sofZmanShmaMga16
     ZmanKind.SOF_ZMAN_SHMA_GRA -> sofZmanShmaGra
