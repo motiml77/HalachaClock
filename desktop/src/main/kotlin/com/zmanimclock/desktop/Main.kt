@@ -2,7 +2,6 @@ package com.zmanimclock.desktop
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,10 +11,12 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -24,35 +25,65 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
+import com.zmanimclock.desktop.reminder.ReminderPopupWindow
+import com.zmanimclock.desktop.reminder.ReminderScheduler
+import com.zmanimclock.desktop.reminder.ZmanimTray
 import com.zmanimclock.desktop.ui.CalendarPane
 import com.zmanimclock.desktop.ui.SettingsPane
 import com.zmanimclock.desktop.ui.ZmanimPane
 
 /**
- * "שעון זמנים" for Windows — the main window.
+ * "שעון זמנים" for Windows.
  *
- * A wide window rather than a phone-shaped one, which removes a whole
- * mechanism: on Android the calendar has to collapse to a single week row so
- * that a month grid and seventeen zman rows can share a narrow screen. Here
- * they sit side by side and the collapsing machinery is simply not needed.
+ * A zmanim board and Hebrew calendar — NOT an alarm clock. No ringing, no
+ * vibration, no snooze; at most a silent pop-up reminder the user opted into.
  *
- * Deliberately a NORMAL, focusable window. The desktop widget (a separate,
- * borderless one) cannot take keyboard input, so anything involving typing or
- * arrow keys — the calendar, city search, settings — belongs here.
+ * The window is wide rather than phone-shaped, and that removes a whole
+ * mechanism: on Android the calendar must collapse to a single week row so a
+ * month grid and seventeen zman rows can share a narrow screen. Here they sit
+ * side by side, so the collapsing machinery does not exist at all.
+ *
+ * This is deliberately a NORMAL, focusable window. The desktop widget is a
+ * separate borderless one that cannot take keyboard input, so anything
+ * involving typing or arrow keys — the calendar, city search, settings —
+ * belongs here.
  */
-fun main() = application {
+fun main(args: Array<String>) = application {
+    // --tray: launched by the Windows Run key at logon. Start hidden in the
+    // tray rather than throwing a window in the user's face at every boot.
+    val startHidden = args.any { it.equals("--tray", ignoreCase = true) }
+
     val prefs = remember { DesktopPrefs.load() }
     val service = remember { DesktopZmanimService(prefs) }
+    val scheduler = remember { ReminderScheduler(service) }
 
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "שעון זמנים",
-        icon = painterResource("branding/logo.png"),
-        state = rememberWindowState(width = 860.dp, height = 600.dp),
-    ) {
-        ZmanimDesktopTheme {
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                MainWindowContent(service)
+    var mainVisible by remember { mutableStateOf(!startHidden) }
+
+    LaunchedEffect(scheduler) { scheduler.run() }
+    val pending by scheduler.pending.collectAsState()
+
+    ZmanimTray(
+        onShowMainWindow = { mainVisible = true },
+        onShowWidget = { service.update { it.copy(widgetVisible = true) } },
+        // Closing the last window would end the process, so exit lives here.
+        onExit = ::exitApplication,
+    )
+
+    ReminderPopupWindow(reminder = pending, onDismiss = scheduler::dismiss)
+
+    if (mainVisible) {
+        Window(
+            // Hide to the tray rather than quit: the reminder scheduler and
+            // the widget both need the process alive.
+            onCloseRequest = { mainVisible = false },
+            title = "שעון זמנים",
+            icon = painterResource("branding/logo.png"),
+            state = rememberWindowState(width = 860.dp, height = 600.dp),
+        ) {
+            ZmanimDesktopTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    MainWindowContent(service, scheduler)
+                }
             }
         }
     }
@@ -65,7 +96,7 @@ private enum class MainTab(val label: String) {
 }
 
 @Composable
-private fun MainWindowContent(service: DesktopZmanimService) {
+private fun MainWindowContent(service: DesktopZmanimService, scheduler: ReminderScheduler) {
     var tab by remember { mutableStateOf(MainTab.ZMANIM) }
 
     Column(Modifier.fillMaxSize()) {
@@ -73,7 +104,14 @@ private fun MainWindowContent(service: DesktopZmanimService) {
             MainTab.entries.forEach { t ->
                 Tab(
                     selected = tab == t,
-                    onClick = { tab = t },
+                    onClick = {
+                        // Leaving settings may have changed the city, the two
+                        // halachic offsets or the reminder set; tell the
+                        // scheduler now rather than making the user wait for
+                        // the next tick to notice.
+                        if (tab == MainTab.SETTINGS && t != MainTab.SETTINGS) scheduler.invalidate()
+                        tab = t
+                    },
                     text = { Text(t.label, style = MaterialTheme.typography.titleSmall) },
                 )
             }
