@@ -30,9 +30,22 @@ object FastDays {
     )
 
     /** The fast observed on [date] in Israel, or null. */
-    fun fastOn(date: LocalDate, zone: ZoneId): FastDay? {
-        val jc = JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone)))
-            .apply { inIsrael = true }
+    fun fastOn(date: LocalDate, zone: ZoneId): FastDay? =
+        fastOn(
+            JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone)))
+                .apply { inIsrael = true },
+        )
+
+    /**
+     * The fast on [jc], or null.
+     *
+     * The calendar grid already holds a Hebrew date and has no time zone (a
+     * Gregorian date maps to the same Hebrew date everywhere), so it enters
+     * here rather than going back through a zone. One implementation, two
+     * entry points — the grid and the zmanim banner can never disagree about
+     * which day is a fast.
+     */
+    fun fastOn(jc: JewishCalendar): FastDay? {
         if (!jc.isTaanis) return null
         return when (jc.yomTovIndex) {
             JewishCalendar.SEVENTEEN_OF_TAMMUZ ->
