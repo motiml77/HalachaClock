@@ -57,9 +57,15 @@ compose.desktop {
             targetFormats(TargetFormat.Msi)
             // ASCII: the installer identity. The product name shown in the UI
             // is Hebrew, but packageName feeds file paths and WiX.
+            // ASCII ONLY, all three of these. Verified by bisection: WiX's
+            // light.exe exits 311 with no diagnostic when menuGroup or
+            // description contain Hebrew — it links with -cultures:en-us and
+            // chokes on the non-ASCII literals. Hebrew menuGroup alone is
+            // enough to break it. The user-facing Hebrew lives in the window
+            // title and the whole UI; only the installer metadata is Latin.
             packageName = "HalachClock"
             packageVersion = "1.0.0"
-            description = "שעון זמנים — זמני היום ולוח שנה עברי"
+            description = "HalachClock - Zmanim and Hebrew calendar"
             vendor = "HalachClock"
 
             // jlink does not work these out on its own, and a missing module is
@@ -70,7 +76,7 @@ compose.desktop {
             modules("java.desktop", "java.naming", "java.prefs")
 
             windows {
-                menuGroup = "שעון זמנים"
+                menuGroup = "HalachClock"
                 perUserInstall = true   // no admin rights needed
                 dirChooser = true
                 shortcut = true

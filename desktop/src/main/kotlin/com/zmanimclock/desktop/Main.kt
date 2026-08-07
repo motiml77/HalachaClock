@@ -31,6 +31,7 @@ import com.zmanimclock.desktop.reminder.ZmanimTray
 import com.zmanimclock.desktop.ui.CalendarPane
 import com.zmanimclock.desktop.ui.SettingsPane
 import com.zmanimclock.desktop.ui.ZmanimPane
+import com.zmanimclock.desktop.widget.ZmanimWidgetWindow
 
 /**
  * "שעון זמנים" for Windows.
@@ -70,6 +71,9 @@ fun main(args: Array<String>) = application {
     )
 
     ReminderPopupWindow(reminder = pending, onDismiss = scheduler::dismiss)
+
+    // Returns early when prefs.widgetVisible is false, so no `if` here.
+    ZmanimWidgetWindow(service, onOpenMain = { mainVisible = true })
 
     if (mainVisible) {
         Window(
