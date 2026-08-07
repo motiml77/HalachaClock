@@ -21,6 +21,7 @@ import androidx.navigation.navArgument
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.presentation.AlarmEditScreen
 import com.zmanimclock.app.feature.alarms.presentation.AlarmsScreen
+import com.zmanimclock.app.feature.calendar.presentation.CalendarScreen
 import com.zmanimclock.app.feature.settings.presentation.CityPickerScreen
 import com.zmanimclock.app.feature.settings.presentation.SettingsScreen
 import com.zmanimclock.app.feature.zmanim.presentation.HomeScreen
@@ -47,7 +48,7 @@ fun AppNavigation() {
                             }
                         },
                         icon = { Icon(screen.icon, contentDescription = screen.labelHebrew) },
-                        label = { Text(screen.labelHebrew) },
+                        label = { Text(screen.labelHebrew, maxLines = 1, softWrap = false) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -67,6 +68,13 @@ fun AppNavigation() {
         ) {
             composable(Screen.Zmanim.route) {
                 HomeScreen(
+                    onCreateZmanAlarm = { zman ->
+                        navController.navigate("alarm_edit?type=ZMAN&zman=$zman")
+                    },
+                )
+            }
+            composable(Screen.Calendar.route) {
+                CalendarScreen(
                     onCreateZmanAlarm = { zman ->
                         navController.navigate("alarm_edit?type=ZMAN&zman=$zman")
                     },
