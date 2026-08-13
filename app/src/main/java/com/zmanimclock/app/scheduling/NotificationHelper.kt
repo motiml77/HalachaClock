@@ -2,6 +2,7 @@ package com.zmanimclock.app.scheduling
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -266,6 +267,59 @@ class NotificationHelper @Inject constructor(
             .addAction(0, "ביטול", dismissPi)
             .apply { snoozeLabel?.let { addAction(0, it, snoozePi) } }
             .build()
+    }
+
+    /**
+     * Replaces the ringing notification once the ring duration has elapsed but
+     * the user has not acknowledged yet.
+     *
+     * The service deliberately stays in the foreground at this point. The
+     * full-screen activity is still up, but if the user navigates away from it
+     * this notification is the only route back to acknowledging — a service
+     * that had stopped would have taken it with it, and the occurrence would
+     * vanish silently.
+     *
+     * Reuses ALARM_NOTIFICATION_ID so it REPLACES the ringing one rather than
+     * stacking a second entry, and drops to the silent status channel: the
+     * noise is over, and re-posting on the alarm channel could make it
+     * audible again on some OEM builds.
+     */
+    fun notifySilencedAwaitingAck(service: android.app.Service, alarm: AlarmEntity) {
+        val open = Intent(context, AlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(AlarmSoundService.EXTRA_ALARM_ID, alarm.id)
+            putExtra(AlarmSoundService.EXTRA_TITLE, alarm.label)
+        }
+        val openPi = PendingIntent.getActivity(
+            context,
+            alarm.id.toInt(),
+            open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_SERVICE)
+            .setSmallIcon(R.drawable.ic_stat_zman)
+            .setColor(ACCENT)
+            .setContentTitle(alarm.label.ifBlank { "שעון מעורר" })
+            .setContentText("הצלצול הסתיים — ממתין לאישור")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setSilent(true)
+            .setContentIntent(openPi)
+            .addAction(
+                0,
+                "אישור",
+                servicePendingIntent(alarm.id, AlarmSoundService.ACTION_DISMISS, 1),
+            )
+            .build()
+        runCatching {
+            service.startForeground(ALARM_NOTIFICATION_ID, notification)
+        }.onFailure {
+            context.getSystemService<NotificationManager>()
+                ?.notify(ALARM_NOTIFICATION_ID, notification)
+        }
     }
 
     /** A plain (non-ringing) reminder notification for notification-only alerts. */

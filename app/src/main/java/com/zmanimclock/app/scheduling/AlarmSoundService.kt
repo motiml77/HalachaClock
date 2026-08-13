@@ -147,18 +147,37 @@ class AlarmSoundService : Service() {
             Log.i(TAG, "Ring duration elapsed — auto-snoozing")
             performSnooze(a!!)
         } else {
-            Log.i(TAG, "Ring duration elapsed — stopping")
+            // The duration the user set governs the NOISE, and only the noise.
+            // The occurrence stays open until they acknowledge it: a ring that
+            // times out unattended used to also close its own screen, so
+            // someone who walked back to their phone found no trace that it
+            // had gone off at all.
+            Log.i(TAG, "Ring duration elapsed — silencing, screen stays until acknowledged")
             stopRinging()
-            // This occurrence is over — the budget resets here, not in
-            // rescheduleAll (which used to reset it unconditionally on every
-            // reschedule, for every active alarm, racing a live snooze
-            // increment from a completely unrelated trigger — see
-            // AlarmScheduler.rescheduleAll for the full story).
-            if (a != null) {
-                persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, 0) } }
+            // The budget resets here, not in rescheduleAll (which used to reset
+            // it unconditionally on every reschedule, for every active alarm,
+            // racing a live snooze increment from a completely unrelated
+            // trigger — see AlarmScheduler.rescheduleAll for the full story).
+            if (previewMode && a != null) {
+                // A preview is a demonstration, not an occurrence. Leaving it
+                // parked "awaiting acknowledgement" would strand a fake alarm
+                // in the notification shade with an אישור button for an alarm
+                // that never fired.
                 AlarmRingBus.ringEnded(a.id)
+                stopSelf()
+            } else if (a != null) {
+                persistScope.launch { runCatching { alarmDao.setSnoozeCount(a.id, 0) } }
+                AlarmRingBus.ringSilenced(a.id)
+                // Stay in the foreground with a changed notification rather
+                // than stopSelf(): if the user leaves the full-screen activity
+                // the notification is the only way back to acknowledge, and a
+                // service that stopped would take it with it.
+                runCatching {
+                    notificationHelper.notifySilencedAwaitingAck(this, a)
+                }
+            } else {
+                stopSelf()
             }
-            stopSelf()
         }
     }
 

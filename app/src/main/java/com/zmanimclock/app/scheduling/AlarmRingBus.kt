@@ -22,11 +22,29 @@ import kotlinx.coroutines.flow.asSharedFlow
  */
 object AlarmRingBus {
     private val _closed = MutableSharedFlow<Long>(extraBufferCapacity = 8)
+    private val _silenced = MutableSharedFlow<Long>(extraBufferCapacity = 8)
 
     /** Alarm ids whose ring just ended. A screen still showing that id should finish(). */
     val closed = _closed.asSharedFlow()
 
+    /**
+     * Alarm ids whose SOUND AND VIBRATION stopped, while the occurrence is
+     * still awaiting the user's acknowledgement.
+     *
+     * Deliberately separate from [closed]. "The noise is over" and "the screen
+     * may go away" used to be the same event, which meant a ring that timed
+     * out unattended also erased the only evidence it had ever happened: the
+     * user came back to a phone that had rung, stopped, and closed itself, with
+     * nothing on screen to say so. Now the duration the user configured governs
+     * only the noise, and the screen stays until they press אישור.
+     */
+    val silenced = _silenced.asSharedFlow()
+
     fun ringEnded(alarmId: Long) {
         _closed.tryEmit(alarmId)
+    }
+
+    fun ringSilenced(alarmId: Long) {
+        _silenced.tryEmit(alarmId)
     }
 }

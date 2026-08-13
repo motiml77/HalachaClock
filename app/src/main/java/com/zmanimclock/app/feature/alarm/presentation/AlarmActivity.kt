@@ -121,7 +121,22 @@ class AlarmActivity : ComponentActivity() {
                     }
                 }
 
+                // The ring duration the user configured governs the NOISE
+                // only. When it elapses the sound and vibration stop but this
+                // screen stays up — otherwise a ring nobody answered erased
+                // its own evidence, and someone returning to their phone found
+                // nothing to say it had gone off.
+                var silenced by androidx.compose.runtime.remember(args.alarmId) {
+                    androidx.compose.runtime.mutableStateOf(false)
+                }
+                androidx.compose.runtime.LaunchedEffect(args.alarmId) {
+                    AlarmRingBus.silenced.collect { id ->
+                        if (id == args.alarmId) silenced = true
+                    }
+                }
+
                 AlarmScreen(
+                    silenced = silenced,
                     title = args.title,
                     timeText = args.timeText,
                     snoozeMinutes = args.snoozeMinutes,
@@ -174,6 +189,8 @@ private val SoftWhite = Color(0xFFE6EAF4)
 
 @Composable
 private fun AlarmScreen(
+    /** Sound and vibration have stopped; the alarm is only awaiting אישור. */
+    silenced: Boolean = false,
     title: String,
     timeText: String,
     snoozeMinutes: Int,
@@ -286,6 +303,20 @@ private fun AlarmScreen(
                     style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
                     color = SoftWhite,
+                )
+            }
+
+            // Says why it went quiet. Without this the screen looks identical
+            // whether it is still ringing or has timed out, and a user who
+            // walks up to a silent phone cannot tell which — so they cannot
+            // tell whether pressing אישור is still doing anything.
+            if (silenced) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "הצלצול הסתיים — ממתין לאישור",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accent,
+                    textAlign = TextAlign.Center,
                 )
             }
 

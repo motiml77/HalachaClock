@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Alarm
@@ -824,33 +825,68 @@ private fun QuickRingtonePicker(
     if (tones.isEmpty()) return
 
     var playing by remember { mutableStateOf<android.media.Ringtone?>(null) }
+    var playingUri by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose { runCatching { playing?.stop() } }
+    }
+
+    fun stop() {
+        runCatching { playing?.stop() }
+        playing = null
+        playingUri = null
+    }
+
+    /** Preview [uri] for a few seconds, replacing whatever was playing. */
+    fun preview(uri: String) {
+        stop()
+        scope.launch {
+            val r = RingtoneManager.getRingtone(context, Uri.parse(uri))
+            playing = r
+            playingUri = uri
+            runCatching { r?.play() }
+            kotlinx.coroutines.delay(PREVIEW_MILLIS)
+            if (playing === r) stop()
+        }
     }
 
     androidx.compose.foundation.layout.FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         tones.forEach { (title, uri) ->
+            val isPlaying = playingUri == uri
             FilterChip(
                 selected = selectedUri == uri,
+                // The chip body still selects — and previews, so a single tap
+                // does the obvious thing, which is what Android's own ringtone
+                // picker does.
                 onClick = {
                     onSelect(uri)
-                    scope.launch {
-                        runCatching { playing?.stop() }
-                        val r = RingtoneManager.getRingtone(context, Uri.parse(uri))
-                        playing = r
-                        runCatching { r?.play() }
-                        kotlinx.coroutines.delay(4_000)
-                        if (playing == r) runCatching { r?.stop() }
-                    }
+                    preview(uri)
+                },
+                leadingIcon = {
+                    // The play control is separate on purpose: auditioning a
+                    // sound and committing to it are different intents. Without
+                    // this the only way to hear a ringtone was to pick it, so
+                    // comparing three of them meant changing the alarm three
+                    // times. Tapping here previews and leaves the selection
+                    // alone; tapping again stops it.
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "עצור השמעה" else "השמע את $title",
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable { if (isPlaying) stop() else preview(uri) },
+                    )
                 },
                 label = { Text(title, maxLines = 1) },
             )
         }
     }
 }
+
+/** Long enough to judge a ringtone, short enough not to become the alarm. */
+private const val PREVIEW_MILLIS = 5_000L
 
 /** "40 שניות" / "דקה" / "1:30 דקות" / "3 דקות". */
 private fun formatRingDuration(seconds: Int): String = when {

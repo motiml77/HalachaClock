@@ -368,11 +368,15 @@ private fun AlarmTypeChooserSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp)
-                .padding(bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 18.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Text("שעון מעורר חדש", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "שעון מעורר חדש",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 2.dp),
+            )
 
             TypeCard(
                 icon = Icons.Filled.Alarm,
@@ -416,34 +420,34 @@ private fun TypeCard(
     val cs = MaterialTheme.colorScheme
     Card(
         modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cs.surface),
         border = androidx.compose.foundation.BorderStroke(
-            2.dp,
+            if (highlighted) 2.dp else 1.dp,
             if (highlighted) cs.primary else cs.outlineVariant,
         ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(horizontal = 12.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
-                    .background(iconBg, RoundedCornerShape(16.dp)),
+                    .size(38.dp)
+                    .background(iconBg, RoundedCornerShape(11.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 icon?.let {
-                    Icon(it, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
+                    Icon(it, contentDescription = null, tint = iconTint, modifier = Modifier.size(21.dp))
                 }
             }
-            Column(modifier = Modifier.padding(horizontal = 14.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge)
+            Column(modifier = Modifier.padding(horizontal = 11.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = cs.onSurfaceVariant,
                 )
             }
