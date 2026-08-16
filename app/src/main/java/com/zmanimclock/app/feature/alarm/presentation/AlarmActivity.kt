@@ -204,35 +204,34 @@ private fun AlarmScreen(
     var answerText by remember { mutableStateOf("") }
     var wrongCount by remember { mutableStateOf(0) }
 
-    // Anti-snooze (B3): hide the snooze button when no snoozes remain — but as
-    // a safety valve reveal it after 60s so a distressed user is never trapped.
-    var safetyElapsed by remember { mutableStateOf(false) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(60_000); safetyElapsed = true
-    }
-    val showSnooze = snoozesLeft != 0 || safetyElapsed
-    // snoozesLeft == 0 means the button is ONLY showing because the 60s
-    // safety valve forced it — and AlarmSoundService.snooze() computes that
-    // exact same condition (`maxSnoozes in 0..snoozeCount`) as its reason to
-    // REFUSE the request and keep ringing. The valve used to reveal a button
-    // that always did nothing: the screen closed (this composable's onClick
-    // called finish() unconditionally) while the alarm kept blaring with no
-    // full-screen control left to stop it — the opposite of what a safety
-    // valve is for. Once the budget is genuinely exhausted the revealed
-    // button now performs — and is labelled as — a real stop, not a snooze
-    // the service will silently ignore.
-    val budgetExhausted = snoozesLeft == 0
+    // The snooze button appears only while there is a snooze to give: -1 is
+    // unlimited, >0 is a remaining budget, 0 is none.
+    //
+    // There used to be a 60-second "safety valve" that revealed the button
+    // anyway once the budget ran out, relabelled "עצור" and wired to the same
+    // ::tryDismiss as the primary button. It was a second control for exactly
+    // the action אישור already performs, with the same challenge gate — two
+    // buttons, one behaviour, no way for the user to tell them apart. The
+    // valve was protecting against being trapped with no way to stop the
+    // noise, and אישור is always on screen, so there was nothing to protect
+    // against.
+    val showSnooze = snoozesLeft != 0 && !silenced
+
+    // Once the ring duration has elapsed, the challenge has done its job. It
+    // exists to stop someone dismissing the alarm while half asleep and still
+    // being woken by it; the noise has already run for the full time the user
+    // configured, so continuing to demand arithmetic only risks trapping
+    // someone behind a screen they cannot dismiss — which is a trap this
+    // screen never had before it started outliving the ring.
+    val challengeActive = challengeVisible(silenced, problem != null)
 
     fun tryDismiss() {
-        val p = problem
-        when {
-            p == null -> onDismiss()
-            answerText.toIntOrNull() == p.answer -> onDismiss()
-            else -> {
-                wrongCount++
-                answerText = ""
-                problem = MathChallenge.generate(challenge)
-            }
+        if (canDismiss(silenced, problem?.answer, answerText)) {
+            onDismiss()
+        } else {
+            wrongCount++
+            answerText = ""
+            problem = MathChallenge.generate(challenge)
         }
     }
 
@@ -320,7 +319,7 @@ private fun AlarmScreen(
                 )
             }
 
-            problem?.let { p ->
+            problem?.takeIf { challengeActive }?.let { p ->
                 Spacer(Modifier.height(24.dp))
                 Text(
                     "כדי לכבות — פתור:",
@@ -377,16 +376,13 @@ private fun AlarmScreen(
             if (showSnooze) {
                 Spacer(Modifier.height(14.dp))
                 OutlinedButton(
-                    onClick = if (budgetExhausted) ::tryDismiss else onSnooze,
+                    onClick = onSnooze,
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite),
                 ) {
                     Text(
-                        when {
-                            budgetExhausted -> "עצור"
-                            snoozesLeft > 0 -> "נודניק ($snoozeMinutes ד' · נשארו $snoozesLeft)"
-                            else -> "נודניק ($snoozeMinutes ד')" // unlimited (-1)
-                        }
+                        if (snoozesLeft > 0) "נודניק ($snoozeMinutes ד' · נשארו $snoozesLeft)"
+                        else "נודניק ($snoozeMinutes ד')" // unlimited (-1)
                     )
                 }
             }
