@@ -56,16 +56,31 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
 /**
- * First-launch permissions wizard. Three grants the alarm engine needs to be
- * bullet-proof, each with a live granted/missing state (re-checked on every
- * resume, since two of them route through system settings):
+ * The permissions screen — shown once at first launch, and reachable from
+ * Settings forever after.
+ *
+ * That second entry point is not a nicety. Everything here routes through
+ * system dialogs and settings pages, so a user who taps "המשך בכל זאת" on
+ * first run — or who denies a system prompt, or later revokes a grant from
+ * Android's own settings — used to have no way back to this screen at all.
+ * The alarm engine then quietly under-performed with nothing in the app to
+ * explain why or to fix it.
+ *
+ * Grants, each with a live granted/missing state re-checked on every resume
+ * (most of them leave the app to be answered):
  *  1. Notifications (Android 13+)
  *  2. Exact alarms (Android 12+)
  *  3. Battery-optimization exemption (background reliability)
+ *  4. Full-screen intent (Android 14+)
+ *  5. Overlay — the ringing screen over other apps
  * Boot persistence needs no user action — stated as reassurance.
+ *
+ * @param isFirstRun true for the launch wizard, false when opened from
+ *   Settings; changes only the framing and the closing button, never which
+ *   permissions are offered.
  */
 @Composable
-fun OnboardingScreen(onDone: () -> Unit) {
+fun OnboardingScreen(onDone: () -> Unit, isFirstRun: Boolean = true) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -105,10 +120,19 @@ fun OnboardingScreen(onDone: () -> Unit) {
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.primary,
         )
-        Text("ברוכים הבאים לשעון זמנים", style = MaterialTheme.typography.headlineMedium)
         Text(
-            "כדי שההתראות והשעונים יעבדו תמיד — בזמן, גם כשהמסך כבוי — " +
-                "נאשר כמה הרשאות:",
+            if (isFirstRun) "ברוכים הבאים לשעון זמנים" else "הרשאות",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            if (isFirstRun) {
+                "כדי שההתראות והשעונים יעבדו תמיד — בזמן, גם כשהמסך כבוי — " +
+                    "נאשר כמה הרשאות:"
+            } else {
+                "אפשר לאשר כל אחת מהן בכל שלב. מה שלא מאושר מסומן כאן, " +
+                    "ובלעדיו השעון עלול לא לצלצל בזמן."
+            },
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
@@ -216,10 +240,20 @@ fun OnboardingScreen(onDone: () -> Unit) {
             batteryExempt && fullScreenGranted && overlayGranted
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
             Text(
-                if (allGranted) "הכל מאושר — נתחיל!" else "המשך בכל זאת",
+                when {
+                    !isFirstRun -> "סיום"
+                    allGranted -> "הכל מאושר — נתחיל!"
+                    // Deliberately not a dead end: Settings keeps a permanent
+                    // way back to this screen.
+                    else -> "המשך בכל זאת"
+                },
                 style = MaterialTheme.typography.titleMedium,
             )
         }
+        // Breathing room under the closing button. Harmless on first run,
+        // and from Settings it keeps the button clear of the bottom edge
+        // instead of ending flush against it.
+        Spacer(Modifier.height(32.dp))
     }
 }
 
@@ -262,21 +296,44 @@ private fun PermissionCard(
     }
 }
 
-private fun hasNotificationPermission(context: Context): Boolean =
+internal fun hasNotificationPermission(context: Context): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         ContextCompat.checkSelfPermission(
             context, Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
 
-private fun hasExactAlarms(context: Context): Boolean =
+internal fun hasExactAlarms(context: Context): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
         context.getSystemService<AlarmManager>()?.canScheduleExactAlarms() == true
 
-private fun isBatteryExempt(context: Context): Boolean =
+internal fun isBatteryExempt(context: Context): Boolean =
     context.getSystemService<PowerManager>()
         ?.isIgnoringBatteryOptimizations(context.packageName) == true
 
-private fun hasFullScreenIntent(context: Context): Boolean =
+internal fun hasFullScreenIntent(context: Context): Boolean =
     Build.VERSION.SDK_INT < 34 ||
         context.getSystemService<android.app.NotificationManager>()
             ?.canUseFullScreenIntent() == true
+
+/**
+ * How many of the five grants are in place right now.
+ *
+ * Read by Settings so a missing permission is VISIBLE rather than something
+ * the user has to go looking for. Computed from the same functions the wizard
+ * itself uses, so the two can never disagree about what "granted" means.
+ */
+data class PermissionSummary(val granted: Int, val total: Int) {
+    val allGranted: Boolean get() = granted == total
+    val missing: Int get() = total - granted
+}
+
+fun permissionSummary(context: Context): PermissionSummary {
+    val checks = listOf(
+        hasNotificationPermission(context),
+        hasExactAlarms(context),
+        isBatteryExempt(context),
+        hasFullScreenIntent(context),
+        Settings.canDrawOverlays(context),
+    )
+    return PermissionSummary(granted = checks.count { it }, total = checks.size)
+}

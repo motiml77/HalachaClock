@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AlarmOn
@@ -65,6 +68,7 @@ import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 @Composable
 fun SettingsScreen(
     onOpenCityPicker: () -> Unit,
+    onOpenPermissions: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
@@ -135,6 +139,7 @@ fun SettingsScreen(
             )
         },
         onCityClick = onOpenCityPicker,
+        onOpenPermissions = onOpenPermissions,
         onCandleMinutesChange = viewModel::setCandleLightingMinutes,
         onTzeitShabbatMinutesChange = viewModel::setTzeitShabbatMinutes,
         onNextZmanFilterChange = viewModel::setNextZmanFilter,
@@ -167,6 +172,7 @@ fun SettingsContent(
     overlayOk: Boolean = true,
     onRequestOverlay: () -> Unit = {},
     onCityClick: () -> Unit,
+    onOpenPermissions: () -> Unit = {},
     onCandleMinutesChange: (Int) -> Unit,
     onTzeitShabbatMinutesChange: (Int) -> Unit = {},
     onNextZmanFilterChange: (Set<String>) -> Unit = {},
@@ -378,6 +384,9 @@ fun SettingsContent(
                 )
             }
         }
+
+        // Permissions — always reachable, and loud when something is missing.
+        PermissionsCard(onOpen = onOpenPermissions)
 
         // Reliability self-test + OEM guidance (A6)
         Card {
@@ -628,6 +637,76 @@ private fun NextZmanFilterCard(selected: Set<String>, onChange: (Set<String>) ->
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A permanent way back into the permissions wizard, and a live count of what
+ * is still missing.
+ *
+ * Every grant the alarm engine needs is answered OUTSIDE the app — a system
+ * dialog or a settings page — so a user who declined on first launch, or who
+ * revoked one later from Android's own settings, previously had no route back
+ * and no indication anything was wrong. The alarm would simply be less
+ * reliable, silently.
+ *
+ * The count is re-read on every resume, because the user answers these
+ * somewhere else and comes back.
+ */
+@Composable
+private fun PermissionsCard(onOpen: () -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    var tick by remember { mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) tick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val summary = remember(tick) {
+        com.zmanimclock.app.feature.onboarding.permissionSummary(context)
+    }
+    val cs = MaterialTheme.colorScheme
+
+    Card(
+        // A missing permission is a real reliability problem, so it is
+        // coloured like one instead of sitting quietly in a list.
+        colors = CardDefaults.cardColors(
+            containerColor = if (summary.allGranted) cs.surface else cs.errorContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (summary.allGranted) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = if (summary.allGranted) cs.primary else cs.onErrorContainer,
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "הרשאות",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (summary.allGranted) cs.onSurface else cs.onErrorContainer,
+                    )
+                    Text(
+                        if (summary.allGranted) {
+                            "כל ${summary.total} ההרשאות מאושרות"
+                        } else {
+                            "חסרות ${summary.missing} מתוך ${summary.total} — " +
+                                "השעון עלול לא לצלצל בזמן"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (summary.allGranted) cs.secondary else cs.onErrorContainer,
+                    )
+                }
+            }
+            OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 10.dp)) {
+                Text(if (summary.allGranted) "בדוק הרשאות" else "אשר עכשיו")
             }
         }
     }

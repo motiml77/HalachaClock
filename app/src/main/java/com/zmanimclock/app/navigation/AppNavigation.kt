@@ -22,6 +22,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.presentation.AlarmEditScreen
 import com.zmanimclock.app.feature.alarms.presentation.AlarmsScreen
 import com.zmanimclock.app.feature.calendar.presentation.CalendarScreen
+import com.zmanimclock.app.feature.onboarding.OnboardingScreen
 import com.zmanimclock.app.feature.settings.presentation.CityPickerScreen
 import com.zmanimclock.app.feature.settings.presentation.SettingsScreen
 import com.zmanimclock.app.feature.zmanim.presentation.HomeScreen
@@ -94,7 +95,20 @@ fun AppNavigation() {
                 )
             }
             composable(Screen.Settings.route) {
-                SettingsScreen(onOpenCityPicker = { navController.navigate("city_picker") })
+                SettingsScreen(
+                    onOpenCityPicker = { navController.navigate("city_picker") },
+                    onOpenPermissions = { navController.navigate("permissions") },
+                )
+            }
+            composable("permissions") {
+                // The same wizard the first launch shows. Reachable forever,
+                // because every grant here is answered outside the app and can
+                // be denied on first run or revoked from Android's settings
+                // later — and until now that left no way back in.
+                OnboardingScreen(
+                    onDone = { navController.popBackStack() },
+                    isFirstRun = false,
+                )
             }
             composable("city_picker") {
                 CityPickerScreen(onBack = { navController.popBackStack() })
