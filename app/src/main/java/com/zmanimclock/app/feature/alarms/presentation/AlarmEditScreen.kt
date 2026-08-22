@@ -747,7 +747,19 @@ private fun DaysSelector(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEnti
                     modifier = Modifier
                         .size(40.dp)
                         .clickable {
-                            update { it.copy(daysOfWeek = it.daysOfWeek xor (1 shl index)) }
+                            update { a ->
+                                val next = a.daysOfWeek xor (1 shl index)
+                                // Clearing the LAST day used to write 0, and 0
+                                // is the one-time marker — which isEnabledOn
+                                // answers TRUE for on every weekday. So a user
+                                // who unticked everything, meaning "never",
+                                // silently got an alarm that rang on whatever
+                                // day came next: exactly the "it rings on days
+                                // I did not choose" complaint. These circles
+                                // now only ever describe a REPEATING schedule;
+                                // one-time is the explicit chip below.
+                                if (next == 0) a else a.copy(daysOfWeek = next)
+                            }
                         },
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -756,6 +768,17 @@ private fun DaysSelector(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEnti
                 }
             }
         }
+        // Says what the current selection actually means. Without it "no days
+        // ticked" and "rings once" looked identical on screen.
+        Text(
+            if (alarm.isOneTime) {
+                "חד-פעמי — יצלצל פעם אחת בלבד, בהזדמנות הקרובה, ואז ייכבה."
+            } else {
+                "יחזור על עצמו בימים המסומנים."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = alarm.daysOfWeek == AlarmEntity.ALL_DAYS,
@@ -771,6 +794,13 @@ private fun DaysSelector(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEnti
                 selected = alarm.daysOfWeek == AlarmEntity.SUNDAY_TO_THURSDAY,
                 onClick = { update { it.copy(daysOfWeek = AlarmEntity.SUNDAY_TO_THURSDAY) } },
                 label = { Text("א'-ה'") },
+            )
+            // One-time is now a deliberate choice rather than something a user
+            // falls into by clearing the day circles.
+            FilterChip(
+                selected = alarm.isOneTime,
+                onClick = { update { it.copy(daysOfWeek = 0) } },
+                label = { Text("חד-פעמי") },
             )
         }
         SwitchRow("דלג ביום טוב", alarm.skipYomTov) { v -> update { it.copy(skipYomTov = v) } }
