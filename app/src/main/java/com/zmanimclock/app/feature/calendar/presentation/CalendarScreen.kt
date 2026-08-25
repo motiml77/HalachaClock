@@ -166,7 +166,6 @@ private fun DayHero(detail: CalendarViewModel.DayDetail) {
                     color = ext.heroLabel,
                 )
             }
-            SunriseBasisTag(detail.basedOnVisibleSunrise)
         }
 
         if (detail.headlineLabel != null && detail.headlineTime != null) {
@@ -202,22 +201,6 @@ private fun DayHero(detail: CalendarViewModel.DayDetail) {
             )
         }
     }
-}
-
-@Composable
-private fun SunriseBasisTag(visible: Boolean) {
-    val ext = Ext.colors
-    val cs = MaterialTheme.colorScheme
-    Text(
-        text = if (visible) "הנץ הנראה" else "מישור",
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (visible) ext.accentGold else ext.heroInner)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        color = if (visible) ext.onAccentGold else ext.heroLabel,
-    )
 }
 
 /** Weekday plus arrows, so a day can be stepped without returning to the grid. */

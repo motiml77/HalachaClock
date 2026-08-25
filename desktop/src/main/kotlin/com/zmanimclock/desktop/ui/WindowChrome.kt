@@ -62,11 +62,16 @@ import java.awt.Cursor
  *    genuinely needs the real caption button, and it is the price of the
  *    change the owner asked for.
  *
- * The buttons keep Windows' ORDER and SIDE — minimise, maximise, close, at the
- * left — even though the app is RTL. Window controls are chrome, not content:
- * muscle memory says the close button is in the top-left corner of this
- * screen's windows, and honouring the app's text direction here would move a
- * destructive button under the cursor that was reaching for something else.
+ * LAYOUT, AND THE RTL RULE THAT DECIDES IT: under the app's forced RTL the
+ * FIRST child of a Row is placed on the RIGHT. So the title is declared first
+ * and sits on the right, where a Hebrew reader starts, and the caption buttons
+ * follow and sit on the left.
+ *
+ * Within that group the buttons are declared minimise, maximise, close, which
+ * RTL renders right-to-left — putting CLOSE in the outermost corner, exactly
+ * where a mirrored window puts it. That matters more than the order itself: a
+ * destructive button belongs at the edge the hand throws itself at, not in the
+ * middle where it can be hit on the way to something else.
  */
 @Composable
 fun WindowScope.AppTitleBar(state: WindowState, onClose: () -> Unit) {
@@ -82,8 +87,26 @@ fun WindowScope.AppTitleBar(state: WindowState, onClose: () -> Unit) {
         Modifier.fillMaxWidth().height(TITLE_BAR_HEIGHT).background(ext.heroTop),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // FIRST child, so under RTL it lands on the LEFT — where Windows keeps
-        // its caption buttons and where the hand already goes.
+        // FIRST child, so under RTL it lands on the RIGHT. Everything that is
+        // not a button also drags the window, which the system bar gave us for
+        // free and which has to be handed back deliberately.
+        WindowDraggableArea(Modifier.weight(1f)) {
+            Box(
+                Modifier.fillMaxWidth().height(TITLE_BAR_HEIGHT)
+                    .padding(horizontal = 12.dp),
+                // Start, not End: under RTL the start edge IS the right edge,
+                // so the name sits against the corner the reader begins at.
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    "שעון זמנים",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = ext.heroText,
+                )
+            }
+        }
+
         CaptionButton(Icons.Filled.Minimize, "מזער") { state.isMinimized = true }
         CaptionButton(
             if (state.placement == WindowPlacement.Maximized) Icons.Filled.FilterNone
@@ -91,23 +114,6 @@ fun WindowScope.AppTitleBar(state: WindowState, onClose: () -> Unit) {
             if (state.placement == WindowPlacement.Maximized) "שחזר" else "הגדל",
         ) { toggleMaximise() }
         CaptionButton(Icons.Filled.Close, "סגור", danger = true, onClick = onClose)
-
-        // Everything that is not a button drags the window, and double-clicking
-        // it maximises — both of which the system bar gave us for free.
-        WindowDraggableArea(Modifier.weight(1f)) {
-            Box(
-                Modifier.fillMaxWidth().height(TITLE_BAR_HEIGHT)
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                Text(
-                    "שעון זמנים",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = ext.heroLabel,
-                )
-            }
-        }
     }
 }
 

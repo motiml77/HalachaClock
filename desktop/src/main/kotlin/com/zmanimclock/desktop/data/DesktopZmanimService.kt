@@ -17,6 +17,7 @@ import com.zmanimclock.app.feature.zmanim.format.asZmanTimeOrNull
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
 import com.zmanimclock.app.feature.zmanim.model.nextRelevantZman
+import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import java.time.Instant
 import java.time.LocalDate
@@ -155,7 +156,7 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
             rows = timed.map { (kind, instant) ->
                 ZmanRow(
                     kind = kind,
-                    name = kind.hebrewName,
+                    name = d.hebrewNameOf(kind),
                     time = instant.asZmanTime(zone),
                     // Only meaningful for today; on any other day every row
                     // would read as "coming up shortly", which misleads.

@@ -10,6 +10,7 @@ import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.FastDays
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -161,13 +162,13 @@ class ZmanimViewModel @Inject constructor(
                 hebrewDate = hebrewDate(today, zone),
                 gregorianDate = DateTimeFormatter.ofPattern("d.M.yyyy").format(today),
                 basedOnVisibleSunrise = day.basedOnVisibleSunrise,
-                nextName = next?.first?.hebrewName,
+                nextName = next?.first?.let { day.hebrewNameOf(it) },
                 nextTime = next?.second?.asZmanTimeOrNull(zone),
                 countdown = next?.second?.let { formatCountdown(now, it) },
                 rows = timed.map { (kind, instant) ->
                     ZmanRow(
                         kind = kind,
-                        name = kind.hebrewName,
+                        name = day.hebrewNameOf(kind),
                         time = instant.asZmanTime(zone),
                         isNext = kind == next?.first,
                         isPast = instant.isBefore(now),

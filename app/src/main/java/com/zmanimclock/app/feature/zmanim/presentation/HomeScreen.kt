@@ -148,7 +148,6 @@ private fun NextHero(state: ZmanimViewModel.UiState) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SunriseTag(visible = state.basedOnVisibleSunrise)
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = state.hebrewDate,
@@ -202,41 +201,6 @@ private fun NextHero(state: ZmanimViewModel.UiState) {
 }
 
 /** §6.3 — sunrise-source tag: gold pill (visible) / muted outline (mishor). */
-@Composable
-private fun SunriseTag(visible: Boolean) {
-    val ext = Ext.colors
-    if (visible) {
-        Row(
-            modifier = Modifier
-                .background(ext.accentGold, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(
-                Icons.Filled.WbSunny,
-                contentDescription = null,
-                tint = ext.onAccentGold,
-                modifier = Modifier.size(15.dp),
-            )
-            Text(
-                "הנץ הנראה",
-                style = MaterialTheme.typography.labelMedium,
-                color = ext.onAccentGold,
-            )
-        }
-    } else {
-        Text(
-            "מישור",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.75f),
-            modifier = Modifier
-                .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 5.dp),
-        )
-    }
-}
-
 /** §6.1 — one zman row with next / reminder-active / past variants. */
 @Composable
 private fun ZmanRow(

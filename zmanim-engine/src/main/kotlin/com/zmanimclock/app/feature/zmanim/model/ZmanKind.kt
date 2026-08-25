@@ -131,6 +131,25 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
  * by the home screen, the status notification and the widget so "הזמן הבא"
  * never points at candle-lighting in the middle of the week.
  */
+/**
+ * The name to print for [kind] ON THIS DAY.
+ *
+ * Almost every zman's name is fixed, but the netz row's is not: the app shows
+ * either the terrain-corrected visible sunrise or the sea-level astronomical
+ * one, and which of the two it got depends on whether ChaiTables data exists
+ * for this place. That difference used to be announced by a "מישור" / "הנץ
+ * הנראה" badge at the top of the screen — a label parked over the WHOLE day
+ * to qualify exactly ONE of its seventeen rows, where it read as a claim about
+ * all of them.
+ *
+ * So the qualifier moved onto the row it actually qualifies. Only the netz row
+ * carries it, only when the value really is the mishor one, and the badge is
+ * gone. Both platforms call this, so neither can drift from the other.
+ */
+fun DayZmanim.hebrewNameOf(kind: ZmanKind): String =
+    if (kind == ZmanKind.HANETZ && !basedOnVisibleSunrise) "${kind.hebrewName} (מישורי)"
+    else kind.hebrewName
+
 fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>> {
     val zone = ZoneId.of(location.timeZoneId)
     return ZmanKind.entries

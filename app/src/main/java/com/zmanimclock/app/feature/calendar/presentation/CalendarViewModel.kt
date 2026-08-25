@@ -11,10 +11,12 @@ import com.zmanimclock.app.feature.calendar.model.MonthGrid
 import com.zmanimclock.app.feature.calendar.model.MonthGridBuilder
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
+import com.zmanimclock.app.feature.zmanim.engine.DayZmanim
 import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import com.zmanimclock.app.feature.zmanim.format.asZmanTimeOrNull
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.nextRelevantZman
+import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -209,7 +211,7 @@ class CalendarViewModel @Inject constructor(
             null
         }
 
-        val headline = headlineFor(isToday, next, timed, meta, zone)
+        val headline = headlineFor(isToday, next, timed, meta, zone, day)
 
         return DayDetail(
             date = date,
@@ -224,7 +226,7 @@ class CalendarViewModel @Inject constructor(
             rows = timed.map { (kind, instant) ->
                 ZmanRow(
                     kind = kind,
-                    name = kind.hebrewName,
+                    name = day.hebrewNameOf(kind),
                     time = instant.asZmanTime(zone),
                     // Highlighting only makes sense for today. On another day
                     // every row would read as "not past yet", i.e. "all of
@@ -246,13 +248,16 @@ class CalendarViewModel @Inject constructor(
         timed: List<Pair<ZmanKind, Instant>>,
         meta: CalendarDayMeta,
         zone: ZoneId,
+        // Carried in so the headline names the netz row the same way the list
+        // does — "(מישורי)" and all.
+        day: DayZmanim,
     ): Pair<String, String>? {
         fun timeOf(kind: ZmanKind) =
             timed.firstOrNull { it.first == kind }?.second?.asZmanTimeOrNull(zone)
 
         if (isToday) {
             next?.let { (kind, instant) ->
-                return "הזמן הבא — ${kind.hebrewName}" to instant.asZmanTime(zone)
+                return "הזמן הבא — ${day.hebrewNameOf(kind)}" to instant.asZmanTime(zone)
             }
         }
         // "The next zman" is meaningless three weeks out, so a non-today day

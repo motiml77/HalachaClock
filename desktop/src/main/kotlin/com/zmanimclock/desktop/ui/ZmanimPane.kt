@@ -93,7 +93,6 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
                     color = ext.heroLabel,
                 )
             }
-            SunriseBasisTag(view.basedOnVisibleSunrise)
         }
 
         if (view.headlineLabel != null && view.headlineTime != null) {
@@ -105,8 +104,14 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
             // there is no countdown, the entire left half was blank. A card
             // that hugs what it holds says the same thing without the hole.
             Row(
-                Modifier.padding(top = 8.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                // Pushed to the far side from the date above it. Under RTL the
+                // date starts at the right, so the card sits left and the two
+                // blocks bracket the hero instead of stacking against one edge.
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+            Row(
+                Modifier.clip(RoundedCornerShape(10.dp))
                     .background(ext.heroInner)
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -137,6 +142,7 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
                     }
                 }
             }
+            }
         }
 
         if (view.notes.isNotEmpty()) {
@@ -148,21 +154,6 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
             )
         }
     }
-}
-
-@Composable
-internal fun SunriseBasisTag(visible: Boolean) {
-    val ext = Ext.colors
-    Text(
-        text = if (visible) "הנץ הנראה" else "מישור",
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (visible) ext.accentGold else ext.heroInner)
-            .padding(horizontal = 9.dp, vertical = 3.dp),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        color = if (visible) ext.onAccentGold else ext.heroLabel,
-    )
 }
 
 /**

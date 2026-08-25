@@ -5,6 +5,7 @@ import com.zmanimclock.app.feature.zmanim.engine.EngineLocation
 import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
 import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -74,9 +75,13 @@ class DesktopMatchesPhoneTest {
         val c = CityCatalog.byId(cityId) ?: error("unknown city $cityId")
         val zone = ZoneId.of(c.timeZoneId)
         val loc = EngineLocation(c.nameHebrew, c.latitude, c.longitude, 0.0, c.timeZoneId)
-        return engine.calculate(loc, date)
-            .relevantTimedZmanim(date)
-            .map { (kind, instant) -> kind.hebrewName to instant.asZmanTime(zone) }
+        val day = engine.calculate(loc, date)
+        return day.relevantTimedZmanim(date)
+            // hebrewNameOf, not kind.hebrewName: the netz row is renamed per
+            // day depending on whether it is the visible or the mishor sunrise,
+            // and that rule is shared. If one platform ever stops calling it,
+            // this is where it shows up.
+            .map { (kind, instant) -> day.hebrewNameOf(kind) to instant.asZmanTime(zone) }
     }
 
     @Test
