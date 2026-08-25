@@ -145,8 +145,9 @@ private fun runApp(args: Array<String>) = application {
     // panel: flush against the same edge the tab lived on, vertically centred,
     // so the open motion reads as the tab expanding rather than a window
     // appearing somewhere unrelated.
-    if (docked) {
-        DockTabWindow(onOpen = {
+    DockTabWindow(
+        visible = docked,
+        onOpen = {
             docked = false
             mainVisible = true
             mainState.isMinimized = false
@@ -155,72 +156,77 @@ private fun runApp(args: Array<String>) = application {
                 0.dp,
                 (((screen.height - WINDOW_HEIGHT_PX).coerceAtLeast(0)) / 2).dp,
             )
-        })
-    }
+        },
+    )
 
-    if (mainVisible && !docked) {
-        Window(
-            // Hide to the tray rather than quit: the reminder scheduler and
-            // the widget both need the process alive.
-            onCloseRequest = { mainVisible = false },
-            title = "שעון זמנים",
-            icon = painterResource("branding/logo.png"),
-            state = mainState,
-            // ORDINARY WINDOW, STATED OUTRIGHT.
-            //
-            // This is the default, and it is written down anyway because the
-            // opposite was observed in the field: a running copy of this build
-            // was measured holding WS_EX_TOPMOST, which parks the zmanim board
-            // above every other program — nothing else can be brought in front
-            // of it, and the taskbar button stops behaving like a normal one
-            // because the window never properly leaves the foreground.
-            //
-            // Only two windows in this app may float: the widget, which the
-            // user asks for, and the reminder popup, which is a notification.
-            alwaysOnTop = false,
-            // The app draws its own title bar — see AppTitleBar. The system one
-            // is a strip of another design language, in the OS accent colour,
-            // with its buttons laid out left-to-right above a right-to-left
-            // window.
-            undecorated = true,
-            // Transparent so the ROUNDED CORNERS below are real: an opaque
-            // undecorated window is a hard rectangle and the corners would be
-            // painted-on fakes with the desktop showing through as black. The
-            // widget has shipped with this same combination since it existed.
-            transparent = true,
-        ) {
-            // Belt and braces for the same thing. `alwaysOnTop = false` covers
-            // what Compose sets; this covers the flag arriving from anywhere
-            // else, including a stale window from a previous run of the app.
-            LaunchedEffect(window) {
-                if (WindowPinning.clearTopmost(window)) {
-                    println("main window was always-on-top; cleared")
-                }
-                // A floor, not a preference. Below roughly this the month grid
-                // loses a column and the settings chips stop wrapping into
-                // anything readable, so dragging smaller is simply refused
-                // rather than allowed to produce a broken layout.
-                window.minimumSize = java.awt.Dimension(360, 420)
+    // The window is COMPOSED unconditionally and shown by flag, same as the
+    // bookmark. Folding used to dispose this window and reopening rebuilt it,
+    // which is why each transition sat on a blank desktop for seconds.
+    Window(
+        // Hide to the tray rather than quit: the reminder scheduler and
+        // the widget both need the process alive.
+        onCloseRequest = { mainVisible = false },
+        visible = mainVisible && !docked,
+        title = "שעון זמנים",
+        icon = painterResource("branding/logo.png"),
+        state = mainState,
+        // ORDINARY WINDOW, STATED OUTRIGHT.
+        //
+        // This is the default, and it is written down anyway because the
+        // opposite was observed in the field: a running copy of this build
+        // was measured holding WS_EX_TOPMOST, which parks the zmanim board
+        // above every other program — nothing else can be brought in front
+        // of it, and the taskbar button stops behaving like a normal one
+        // because the window never properly leaves the foreground.
+        //
+        // Only two windows in this app may float: the widget, which the
+        // user asks for, and the reminder popup, which is a notification.
+        alwaysOnTop = false,
+        // The app draws its own title bar — see AppTitleBar. The system one
+        // is a strip of another design language, in the OS accent colour,
+        // with its buttons laid out left-to-right above a right-to-left
+        // window.
+        undecorated = true,
+        // Transparent so the ROUNDED CORNERS below are real: an opaque
+        // undecorated window is a hard rectangle and the corners would be
+        // painted-on fakes with the desktop showing through as black. The
+        // widget has shipped with this same combination since it existed.
+        transparent = true,
+    ) {
+        // Belt and braces for the same thing. `alwaysOnTop = false` covers
+        // what Compose sets; this covers the flag arriving from anywhere
+        // else, including a stale window from a previous run of the app.
+        // Keyed on visibility, not just the window: the window is now composed
+        // before it is ever shown, and an invisible window has no HWND to
+        // clear — the pass has to re-run once it actually appears.
+        LaunchedEffect(window, mainVisible, docked) {
+            if (WindowPinning.clearTopmost(window)) {
+                println("main window was always-on-top; cleared")
             }
+            // A floor, not a preference. Below roughly this the month grid
+            // loses a column and the settings chips stop wrapping into
+            // anything readable, so dragging smaller is simply refused
+            // rather than allowed to produce a broken layout.
+            window.minimumSize = java.awt.Dimension(360, 420)
+        }
 
-            ZmanimDesktopTheme {
-                val shape = RoundedCornerShape(WINDOW_CORNER)
-                Surface(
-                    Modifier.fillMaxSize().clip(shape)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    Column(Modifier.fillMaxSize()) {
-                        AppTitleBar(
-                            mainState,
-                            onDock = {
-                                docked = true
-                                mainVisible = false
-                            },
-                            onClose = { mainVisible = false },
-                        )
-                        MainWindowContent(service, scheduler, tab) { tab = it }
-                    }
+        ZmanimDesktopTheme {
+            val shape = RoundedCornerShape(WINDOW_CORNER)
+            Surface(
+                Modifier.fillMaxSize().clip(shape)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    AppTitleBar(
+                        mainState,
+                        onDock = {
+                            docked = true
+                            mainVisible = false
+                        },
+                        onClose = { mainVisible = false },
+                    )
+                    MainWindowContent(service, scheduler, tab) { tab = it }
                 }
             }
         }

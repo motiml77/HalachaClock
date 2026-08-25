@@ -1,15 +1,12 @@
 package com.zmanimclock.desktop.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +23,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
@@ -63,7 +59,7 @@ import java.awt.Toolkit
  *    never lives and where the eye finds it without hunting the corners.
  */
 @Composable
-fun ApplicationScope.DockTabWindow(onOpen: () -> Unit) {
+fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
     // AWT reports the LOGICAL screen size (it applies the display scale
     // itself), which is the same unit Compose's dp positions use here.
     val screen = remember { Toolkit.getDefaultToolkit().screenSize }
@@ -75,6 +71,12 @@ fun ApplicationScope.DockTabWindow(onOpen: () -> Unit) {
     Window(
         onCloseRequest = onOpen,
         state = state,
+        // ALWAYS composed, shown by flag. Creating a transparent window from
+        // scratch at the moment of folding cost seconds of blank screen —
+        // Windows builds a layered window, Skiko attaches a surface, and only
+        // then does the first frame land. A window that already exists and
+        // merely becomes visible appears immediately.
+        visible = visible,
         title = "שעון זמנים",
         undecorated = true,
         transparent = true,
@@ -101,27 +103,20 @@ fun ApplicationScope.DockTabWindow(onOpen: () -> Unit) {
                     .clickable(onClick = onOpen),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Image(
-                        painterResource("branding/logo.png"),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Icon(
-                        Icons.Filled.ChevronRight,
-                        contentDescription = "פתח את שעון זמנים",
-                        tint = ext.accentGold,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+                // The arrow alone. The logo was tried here and dropped at the
+                // owner's request — at bookmark size it renders as a smudged
+                // square, and the tab needs to say exactly one thing: "open".
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = "פתח את שעון זמנים",
+                    tint = ext.accentGold,
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
     }
 }
 
 private val TAB_WIDTH = 36.dp
-private val TAB_HEIGHT = 128.dp
-private const val TAB_HEIGHT_PX = 128
+private val TAB_HEIGHT = 96.dp
+private const val TAB_HEIGHT_PX = 96
