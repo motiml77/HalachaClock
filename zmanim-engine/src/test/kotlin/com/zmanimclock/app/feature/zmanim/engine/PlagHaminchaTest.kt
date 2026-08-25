@@ -173,8 +173,10 @@ class PlagHaminchaTest {
         val summerGap = Duration.between(summer.plagHaminchaGra!!, summer.plagHaminchaYalkutYosef!!)
         val winterGap = Duration.between(winter.plagHaminchaGra!!, winter.plagHaminchaYalkutYosef!!)
 
-        assertTrue("the luach plag must be the later of the two", summerGap.isPositive)
-        assertTrue(winterGap.isPositive)
+        // Compared against ZERO rather than Duration.isPositive(), which is
+        // JDK 18+ while this module compiles against 17.
+        assertTrue("the luach plag must be the later of the two", summerGap > Duration.ZERO)
+        assertTrue(winterGap > Duration.ZERO)
         // A longer summer day means a longer seasonal hour, so 13.5 of its
         // minutes are worth more wall-clock time. If this ever inverts, the
         // gap has stopped tracking the seasonal hour and something is wrong.
