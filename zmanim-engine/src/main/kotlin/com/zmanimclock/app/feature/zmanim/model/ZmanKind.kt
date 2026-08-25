@@ -47,14 +47,18 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     CHATZOT("חצות היום"),
     MINCHA_GEDOLA("מנחה גדולה"),
     MINCHA_KETANA("מנחה קטנה"),
-    PLAG_HAMINCHA("פלג המנחה"),
+    // Both plag rows say which end of the day they measure back from. The
+    // app shows two tzeit values and only one of them defines the halachic
+    // day for the seasonal-hour divisions, so an unqualified "פלג המנחה" left
+    // the reader no way to tell which — see PlagHaminchaTest.
+    PLAG_HAMINCHA("פלג המנחה (מצאת הכוכבים)", "פלג המנחה"),
     // A second shita, shown alongside — not instead of — the luach's own.
     // The luach measures plag back from TZEIT; the GRA reckoning measures it
     // back from SHKIA, which is what most Religious-Zionist calendars publish.
     // Both are verified against their own authorities; the ~11-16 minute gap
     // between them is the 13.5 zmaniyot minutes of tzeit and is a machloket,
     // not a defect.
-    PLAG_HAMINCHA_GRA("פלג המנחה (גר\"א)", "פלג גר\"א"),
+    PLAG_HAMINCHA_GRA("פלג המנחה (גר\"א — מהשקיעה)", "פלג גר\"א"),
     SHKIA("שקיעה"),
     // Naming per the user's ruling: the DEFAULT tzeit shown is the 6.2° one
     // (three medium stars); the 13.5-zmaniyot Geonim time is the kulah.
