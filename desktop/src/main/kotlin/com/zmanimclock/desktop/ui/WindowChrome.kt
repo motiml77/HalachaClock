@@ -74,7 +74,17 @@ import java.awt.Cursor
  * middle where it can be hit on the way to something else.
  */
 @Composable
-fun WindowScope.AppTitleBar(state: WindowState, onClose: () -> Unit) {
+fun WindowScope.AppTitleBar(
+    state: WindowState,
+    /**
+     * The minimise button DOCKS rather than minimises, at the owner's request:
+     * the window folds into a slim bookmark on the left edge of the screen
+     * (see DockTabWindow) instead of dropping to the taskbar. The taskbar
+     * button still minimises the normal way, so both behaviours exist.
+     */
+    onDock: () -> Unit,
+    onClose: () -> Unit,
+) {
     val ext = Ext.colors
 
     fun toggleMaximise() {
@@ -107,7 +117,7 @@ fun WindowScope.AppTitleBar(state: WindowState, onClose: () -> Unit) {
             }
         }
 
-        CaptionButton(Icons.Filled.Minimize, "מזער") { state.isMinimized = true }
+        CaptionButton(Icons.Filled.Minimize, "קפל לצד המסך", onClick = onDock)
         CaptionButton(
             if (state.placement == WindowPlacement.Maximized) Icons.Filled.FilterNone
             else Icons.Filled.CropSquare,

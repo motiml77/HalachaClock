@@ -1,14 +1,18 @@
 package com.zmanimclock.desktop
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,13 +21,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
@@ -32,6 +41,7 @@ import com.zmanimclock.desktop.reminder.ReminderScheduler
 import com.zmanimclock.desktop.reminder.ZmanimTray
 import com.zmanimclock.desktop.ui.AppTitleBar
 import com.zmanimclock.desktop.ui.CalendarPane
+import com.zmanimclock.desktop.ui.DockTabWindow
 import com.zmanimclock.desktop.ui.SettingsPane
 import com.zmanimclock.desktop.ui.ZmanimPane
 import androidx.compose.runtime.DisposableEffect
@@ -73,6 +83,8 @@ private fun runApp(args: Array<String>) = application {
     val scheduler = remember { ReminderScheduler(service) }
 
     var mainVisible by remember { mutableStateOf(!startHidden) }
+    // Folded against the left edge of the screen as a bookmark (DockTabWindow).
+    var docked by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(MainTab.ZMANIM) }
 
     // Sized to the CONTENT, not to what a desktop can spare, and the content
@@ -95,6 +107,7 @@ private fun runApp(args: Array<String>) = application {
     // surfaces THIS window rather than starting a second copy.
     DisposableEffect(Unit) {
         SingleInstance.onShowRequested {
+            docked = false
             mainVisible = true
             mainState.isMinimized = false
         }
@@ -103,10 +116,11 @@ private fun runApp(args: Array<String>) = application {
 
     ZmanimTray(
         onShowMainWindow = {
-            // Three separate states can hide this window and all three have to
-            // be undone, or the tray item does nothing and looks broken: it can
-            // be closed to the tray, minimised to the taskbar, or simply behind
-            // something. `toFront` alone fixes only the third.
+            // Every state that can hide this window has to be undone here, or
+            // the tray item does nothing and looks broken: closed to the tray,
+            // minimised to the taskbar, folded to the edge, or simply behind
+            // something. `toFront` alone fixes only the last.
+            docked = false
             mainVisible = true
             mainState.isMinimized = false
         },
@@ -121,12 +135,30 @@ private fun runApp(args: Array<String>) = application {
     ZmanimWidgetWindow(
         service,
         onOpenMain = {
+            docked = false
             mainVisible = true
             mainState.isMinimized = false
         },
     )
 
-    if (mainVisible) {
+    // The folded state. Clicking the bookmark reopens the window as a side
+    // panel: flush against the same edge the tab lived on, vertically centred,
+    // so the open motion reads as the tab expanding rather than a window
+    // appearing somewhere unrelated.
+    if (docked) {
+        DockTabWindow(onOpen = {
+            docked = false
+            mainVisible = true
+            mainState.isMinimized = false
+            val screen = java.awt.Toolkit.getDefaultToolkit().screenSize
+            mainState.position = WindowPosition(
+                0.dp,
+                (((screen.height - WINDOW_HEIGHT_PX).coerceAtLeast(0)) / 2).dp,
+            )
+        })
+    }
+
+    if (mainVisible && !docked) {
         Window(
             // Hide to the tray rather than quit: the reminder scheduler and
             // the widget both need the process alive.
@@ -151,6 +183,11 @@ private fun runApp(args: Array<String>) = application {
             // with its buttons laid out left-to-right above a right-to-left
             // window.
             undecorated = true,
+            // Transparent so the ROUNDED CORNERS below are real: an opaque
+            // undecorated window is a hard rectangle and the corners would be
+            // painted-on fakes with the desktop showing through as black. The
+            // widget has shipped with this same combination since it existed.
+            transparent = true,
         ) {
             // Belt and braces for the same thing. `alwaysOnTop = false` covers
             // what Compose sets; this covers the flag arriving from anywhere
@@ -167,9 +204,21 @@ private fun runApp(args: Array<String>) = application {
             }
 
             ZmanimDesktopTheme {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                val shape = RoundedCornerShape(WINDOW_CORNER)
+                Surface(
+                    Modifier.fillMaxSize().clip(shape)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
                     Column(Modifier.fillMaxSize()) {
-                        AppTitleBar(mainState) { mainVisible = false }
+                        AppTitleBar(
+                            mainState,
+                            onDock = {
+                                docked = true
+                                mainVisible = false
+                            },
+                            onClose = { mainVisible = false },
+                        )
                         MainWindowContent(service, scheduler, tab) { tab = it }
                     }
                 }
@@ -203,24 +252,49 @@ private fun MainWindowContent(
     tab: MainTab,
     onTabChange: (MainTab) -> Unit,
 ) {
+    val cs = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.fillMaxWidth()) {
+        // A segmented pill rather than Material's TabRow. The stock TabRow is
+        // a full-width strip with an underline — the visual language of a
+        // browser, not of a small always-there panel. A pill track with a
+        // filled thumb reads instantly as "one of three", costs less height,
+        // and gives the top of the window a shape that matches the rounded
+        // shell it now lives in.
+        Row(
+            Modifier.fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(50))
+                .background(cs.surfaceVariant.copy(alpha = 0.55f))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             MainTab.entries.forEach { t ->
-                Tab(
-                    selected = tab == t,
-                    onClick = {
-                        // Leaving settings may have changed the city, the two
-                        // halachic offsets or the reminder set; tell the
-                        // scheduler now rather than making the user wait for
-                        // the next tick to notice.
-                        if (tab == MainTab.SETTINGS && t != MainTab.SETTINGS) scheduler.invalidate()
-                        onTabChange(t)
-                    },
-                    text = { Text(t.label, style = MaterialTheme.typography.titleSmall) },
-                )
+                val selected = tab == t
+                Box(
+                    Modifier.weight(1f)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (selected) cs.primaryContainer else Color.Transparent)
+                        .clickable {
+                            // Leaving settings may have changed the city, the
+                            // halachic offsets or the reminder set; tell the
+                            // scheduler now rather than making the user wait
+                            // for the next tick to notice.
+                            if (tab == MainTab.SETTINGS && t != MainTab.SETTINGS) scheduler.invalidate()
+                            onTabChange(t)
+                        }
+                        .padding(vertical = 7.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        t.label,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) cs.onPrimaryContainer else cs.onSurfaceVariant,
+                    )
+                }
             }
         }
-        Box(Modifier.fillMaxSize().padding(top = 4.dp)) {
+        Box(Modifier.fillMaxSize()) {
             when (tab) {
                 MainTab.ZMANIM -> ZmanimPane(service)
                 MainTab.CALENDAR -> CalendarPane(service)
@@ -232,3 +306,7 @@ private fun MainWindowContent(
 
 /** One height for every tab; only the width moves. */
 private val WINDOW_HEIGHT = 560.dp
+private const val WINDOW_HEIGHT_PX = 560
+
+/** The window's corner radius — the shell is transparent so these are real. */
+private val WINDOW_CORNER = 14.dp

@@ -1,5 +1,6 @@
 package com.zmanimclock.desktop.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,11 +60,21 @@ fun ZmanimPane(service: DesktopZmanimService) {
 
     val view = service.view(LocalDate.now(service.zone), now)
 
-    Column(Modifier.fillMaxSize()) {
+    // Two floating cards on the window's background — the hero and the list —
+    // rather than edge-to-edge strips separated by rules. The rounded shell
+    // the window now has demands rounded content; a hard full-width divider
+    // inside a 14dp-cornered window reads as two designs stapled together.
+    Column(Modifier.fillMaxSize().padding(horizontal = 10.dp)) {
         DayHero(view, service, now)
-        HorizontalDivider()
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(view.rows, key = { it.kind.name }) { ZmanListRow(it) }
+        Surface(
+            Modifier.fillMaxSize().padding(top = 8.dp, bottom = 10.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        ) {
+            LazyColumn(Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+                items(view.rows, key = { it.kind.name }) { ZmanListRow(it) }
+            }
         }
     }
 }
@@ -72,6 +85,8 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
     val cs = MaterialTheme.colorScheme
     Column(
         Modifier.fillMaxWidth()
+            .padding(top = 2.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(Brush.verticalGradient(listOf(ext.heroTop, ext.heroBottom)))
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
@@ -178,8 +193,13 @@ internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
     Column {
         Row(
             Modifier.fillMaxWidth()
-                .background(if (row.isNext) ext.nextRow else cs.surface)
-                .padding(horizontal = 14.dp, vertical = if (compact) 2.dp else 4.dp),
+                .padding(horizontal = 6.dp)
+                // The next-zman highlight is a rounded pill INSIDE the card,
+                // not a full-bleed stripe across it — a stripe would cut the
+                // card's own rounded corners flat.
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (row.isNext) ext.nextRow else Color.Transparent)
+                .padding(horizontal = 8.dp, vertical = if (compact) 2.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             // Centred rather than pushed to the reading edge: whatever width
             // the user drags the window to, the leftover space splits evenly
@@ -208,7 +228,11 @@ internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
                 )
             }
         }
-        HorizontalDivider(thickness = 1.dp, color = cs.outlineVariant)
+        HorizontalDivider(
+            Modifier.padding(horizontal = 16.dp),
+            thickness = 1.dp,
+            color = cs.outlineVariant.copy(alpha = 0.55f),
+        )
     }
 }
 
