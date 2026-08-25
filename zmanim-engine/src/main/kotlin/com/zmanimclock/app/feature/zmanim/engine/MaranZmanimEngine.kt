@@ -326,6 +326,34 @@ class MaranZmanimEngine @Inject constructor() {
         const val RABBEINU_TAM_FIXED_MINUTES = 72L
 
         /** פלג המנחה (ילקוט יוסף) — hour + 15 zmaniyot minutes before tzeit. */
+        /**
+         * Plag hamincha — 1¼ seasonal hours before the END OF THE DAY. The
+         * whole machloket is what "end of the day" means, and BOTH readings
+         * are computed and displayed by this app.
+         *
+         * FROM TZEIT — the luach's own, and this constant's use site.
+         *   Rav Yitzchak Yosef, verbatim: "פלג המנחה – שהוא שעה ורבע לפני
+         *   צאת הכוכבים". Tzeit here is ¾ mil after shkia; Terumat HaDeshen
+         *   (123, 167) puts a mil at 18 minutes, which the Shulchan Aruch
+         *   adopts, giving 13.5 zmaniyot minutes — hence TZEIT_ZMANIYOT_MINUTES.
+         *   The seasonal hour is the GRA one (netz→shkia), NOT the MGA one.
+         *   Peninei Halacha attributes this side to Tosafot and others.
+         *
+         * FROM SHKIA — the GRA reckoning, exposed as plagHaminchaGra.
+         *   Peninei Halacha, verbatim: "המנהג לעניין קבלת שבת להחשיב את פלג
+         *   המנחה משקיעת החמה", citing the Gra, the Magen Avraham and the
+         *   majority custom — the day ends at sunset. Its practical argument
+         *   is that measuring from tzeit leaves almost no window at northern
+         *   latitudes.
+         *
+         * The two differ by exactly those 13.5 zmaniyot minutes: ~16 min in
+         * midsummer, ~11 in midwinter. Neither is MGA, which would use the
+         * alot→tzeit day and land three quarters of an hour later still.
+         *
+         * Verified: the tzeit form against the Ohr HaChaim reference (25
+         * points, 5 cities); the shkia form against Hebcal (240 points, 8
+         * Israeli cities, 6 years). See PlagHaminchaTest.
+         */
         const val PLAG_YY_SHAOS_BEFORE_TZEIT = 1.25
 
         const val DEFAULT_CANDLE_OFFSET_MINUTES = 20L
