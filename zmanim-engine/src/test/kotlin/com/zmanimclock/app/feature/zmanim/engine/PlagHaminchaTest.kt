@@ -78,6 +78,54 @@ class PlagHaminchaTest {
         }
     }
 
+    @Test
+    fun `plag is measured from the 13 and a half zmaniyot tzeit, NOT the later 6 point 2 degree one`() {
+        // The obvious-looking "fix": this app's DEFAULT displayed tzeit is the
+        // 6.2° one (three medium stars) and the 13.5-zmaniyot time is labelled
+        // לקולא, so pointing plag at the default row looks like tidying up an
+        // inconsistency. It is not — it moves plag 12-17 minutes later and off
+        // the luach entirely.
+        //
+        // The two tzeit values answer different questions. 6.2° is when night
+        // has certainly fallen (melacha, Shema at night). The 13.5 zmaniyot is
+        // the Geonim's ¾-mil tzeit — Terumat HaDeshen's 18-minute mil, adopted
+        // by the Shulchan Aruch — and it is the one that closes the halachic
+        // DAY that the seasonal-hour divisions are built on. Rav Yitzchak
+        // Yosef derives exactly that chain inside the plag discussion itself.
+        listOf(
+            Triple(jerusalem, LocalDate.of(2026, 7, 29), "18:27:31"),
+            Triple(jerusalem, LocalDate.of(2026, 12, 15), "15:45:08"),
+            Triple(telAviv, LocalDate.of(2026, 9, 21), "17:36:44"),
+            Triple(tzfat, LocalDate.of(2027, 3, 22), "16:48:18"),
+        ).forEach { (loc, date, published) ->
+            val d = engine.calculate(loc, date)
+            val shaah = d.shaahZmanisGra!!
+            val expected = date.atTime(
+                published.substring(0, 2).toInt(),
+                published.substring(3, 5).toInt(),
+                published.substring(6, 8).toInt(),
+            ).atZone(zone).toInstant()
+
+            val fromGeonim = d.tzeitHakochavim!!.minusMillis((shaah * 1.25).toLong())
+            val fromLechumra = d.tzeitLechumra!!.minusMillis((shaah * 1.25).toLong())
+
+            assertTrue(
+                "${loc.name} $date: the luach's plag must come from the 13.5-zmaniyot tzeit",
+                kotlin.math.abs(Duration.between(expected, fromGeonim).seconds) <= 30,
+            )
+            assertTrue(
+                "${loc.name} $date: the 6.2° tzeit would put plag " +
+                    "${Duration.between(expected, fromLechumra).toMinutes()} min off the luach",
+                Duration.between(expected, fromLechumra).toMinutes() >= 10,
+            )
+            // And the shipped value is the correct one.
+            assertEquals(
+                fromGeonim.toEpochMilli() / 1000,
+                d.plagHaminchaYalkutYosef!!.toEpochMilli() / 1000,
+            )
+        }
+    }
+
     // ---------------------------------------------- the GRA plag
 
     @Test
