@@ -36,10 +36,18 @@ import kotlin.math.abs
  *
  * TRUNCATION IS DELIBERATE, AND IS WHY SOME ROWS SIT ONE MINUTE APART.
  * `asZmanTime` formats HH:mm, which truncates; Hebcal and most luchot round.
- * A truncated zman lands EARLIER, and an earlier displayed zman never carries
- * a user past a deadline. Where this test tolerates a minute it also proves
- * the tolerance is only that: the external value must be exactly one minute
- * later AND our own seconds must be 30-59.
+ * For an END boundary — sof zman shma, sof zman tfila — truncating is the safe
+ * direction, because an earlier displayed zman never carries a user past a
+ * deadline. Note that PLAG IS A START BOUNDARY (earliest arvit, early kabbalat
+ * Shabbat), so for these two rows truncation is the LESS safe direction and the
+ * luach itself rounds them up. That is under a minute and is an open question
+ * for the app's owner, recorded in docs/PLAG_COMPARISON.md — not something to
+ * change here silently.
+ *
+ * Where this test tolerates a minute it also proves the tolerance is only that:
+ * the external value must be exactly one minute later AND our own seconds must
+ * be 30-59. The second-resolution test then closes the question entirely — the
+ * two engines agree to within a couple of seconds at the instant level.
  */
 class AppDisplayVsExternalTest {
 
@@ -240,6 +248,110 @@ class AppDisplayVsExternalTest {
         // rather than as a quiet one-minute drift across the whole app.
         assertEquals("identical to the minute", 40, identical)
         assertEquals("differing only by truncation", 32, truncation)
+    }
+
+    /**
+     * The same 72 Hebcal points at SECOND resolution (`sec=1`).
+     *
+     * The minute-level test above can only ever prove "within a minute", which
+     * is exactly the resolution at which a real disagreement would hide. This
+     * one compares the instants, and the whole spread collapses to seconds —
+     * which is what actually retires the question of whether the one-minute
+     * rows mean anything.
+     */
+    private val hebcalPlagGraSeconds = listOf(
+        Ext("ירושלים", "2026-01-15", "15:53:22"),
+        Ext("ירושלים", "2026-03-21", "16:35:13"),
+        Ext("ירושלים", "2026-06-21", "18:18:48"),
+        Ext("ירושלים", "2026-07-29", "18:12:05"),
+        Ext("ירושלים", "2026-08-23", "17:52:20"),
+        Ext("ירושלים", "2026-09-21", "17:21:16"),
+        Ext("ירושלים", "2026-12-15", "15:33:51"),
+        Ext("ירושלים", "2027-03-22", "16:35:34"),
+        Ext("ירושלים", "2028-02-29", "16:24:42"),
+        Ext("תל אביב", "2026-01-15", "15:54:33"),
+        Ext("תל אביב", "2026-03-21", "16:36:57"),
+        Ext("תל אביב", "2026-06-21", "18:21:11"),
+        Ext("תל אביב", "2026-07-29", "18:14:18"),
+        Ext("תל אביב", "2026-08-23", "17:54:21"),
+        Ext("תל אביב", "2026-09-21", "17:23:01"),
+        Ext("תל אביב", "2026-12-15", "15:34:59"),
+        Ext("תל אביב", "2027-03-22", "16:37:20"),
+        Ext("תל אביב", "2028-02-29", "16:26:15"),
+        Ext("חיפה", "2026-01-15", "15:52:31"),
+        Ext("חיפה", "2026-03-21", "16:36:11"),
+        Ext("חיפה", "2026-06-21", "18:21:48"),
+        Ext("חיפה", "2026-07-29", "18:14:35"),
+        Ext("חיפה", "2026-08-23", "17:54:10"),
+        Ext("חיפה", "2026-09-21", "17:22:14"),
+        Ext("חיפה", "2026-12-15", "15:32:46"),
+        Ext("חיפה", "2027-03-22", "16:36:33"),
+        Ext("חיפה", "2028-02-29", "16:25:01"),
+        Ext("באר שבע", "2026-01-15", "15:55:55"),
+        Ext("באר שבע", "2026-03-21", "16:36:52"),
+        Ext("באר שבע", "2026-06-21", "18:19:27"),
+        Ext("באר שבע", "2026-07-29", "18:12:59"),
+        Ext("באר שבע", "2026-08-23", "17:53:33"),
+        Ext("באר שבע", "2026-09-21", "17:22:55"),
+        Ext("באר שבע", "2026-12-15", "15:36:32"),
+        Ext("באר שבע", "2027-03-22", "16:37:13"),
+        Ext("באר שבע", "2028-02-29", "16:26:41"),
+        Ext("צפת", "2026-01-15", "15:50:11"),
+        Ext("צפת", "2026-03-21", "16:34:10"),
+        Ext("צפת", "2026-06-21", "18:20:08"),
+        Ext("צפת", "2026-07-29", "18:12:50"),
+        Ext("צפת", "2026-08-23", "17:52:19"),
+        Ext("צפת", "2026-09-21", "17:20:14"),
+        Ext("צפת", "2026-12-15", "15:30:25"),
+        Ext("צפת", "2027-03-22", "16:34:33"),
+        Ext("צפת", "2028-02-29", "16:22:54"),
+        Ext("טבריה", "2026-01-15", "15:50:21"),
+        Ext("טבריה", "2026-03-21", "16:34:01"),
+        Ext("טבריה", "2026-06-21", "18:19:38"),
+        Ext("טבריה", "2026-07-29", "18:12:25"),
+        Ext("טבריה", "2026-08-23", "17:52:01"),
+        Ext("טבריה", "2026-09-21", "17:20:05"),
+        Ext("טבריה", "2026-12-15", "15:30:36"),
+        Ext("טבריה", "2027-03-22", "16:34:24"),
+        Ext("טבריה", "2028-02-29", "16:22:51"),
+        Ext("אשדוד", "2026-01-15", "15:55:33"),
+        Ext("אשדוד", "2026-03-21", "16:37:27"),
+        Ext("אשדוד", "2026-06-21", "18:21:07"),
+        Ext("אשדוד", "2026-07-29", "18:14:22"),
+        Ext("אשדוד", "2026-08-23", "17:54:36"),
+        Ext("אשדוד", "2026-09-21", "17:23:30"),
+        Ext("אשדוד", "2026-12-15", "15:36:01"),
+        Ext("אשדוד", "2027-03-22", "16:37:48"),
+        Ext("אשדוד", "2028-02-29", "16:26:55"),
+        Ext("אילת", "2026-01-15", "15:58:04"),
+        Ext("אילת", "2026-03-21", "16:36:07"),
+        Ext("אילת", "2026-06-21", "18:15:30"),
+        Ext("אילת", "2026-07-29", "18:09:47"),
+        Ext("אילת", "2026-08-23", "17:51:24"),
+        Ext("אילת", "2026-09-21", "17:22:10"),
+        Ext("אילת", "2026-12-15", "15:39:01"),
+        Ext("אילת", "2027-03-22", "16:36:25"),
+        Ext("אילת", "2028-02-29", "16:26:56"),
+    )
+
+    @Test
+    fun `at second resolution our GRA plag and Hebcal's agree to within seconds`() {
+        var worst = 0L
+        var worstAt = ""
+        for ((city, date, exact) in hebcalPlagGraSeconds) {
+            val d = LocalDate.parse(date)
+            val ours = shownInstant(city, d, ZmanKind.PLAG_HAMINCHA_GRA)!!.atZone(zone)
+            val theirs = d.atTime(
+                exact.substring(0, 2).toInt(),
+                exact.substring(3, 5).toInt(),
+                exact.substring(6, 8).toInt(),
+            ).atZone(zone)
+            val off = abs(Duration.between(theirs, ours).seconds)
+            if (off > worst) { worst = off; worstAt = "$city $date (ours $ours, Hebcal $exact)" }
+        }
+        // Two independent NOAA implementations, so a couple of seconds is the
+        // floor. Anything above this is a real disagreement, not a convention.
+        assertTrue("worst gap ${worst}s at $worstAt", worst <= 5)
     }
 
     // ------------------------------------------------------------------
