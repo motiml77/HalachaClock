@@ -1,7 +1,6 @@
 package com.zmanimclock.desktop.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,6 +18,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -97,16 +100,45 @@ fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
                     // Hover brightens the whole tab, not just the arrow: the
                     // affordance is "this entire thing is a button".
                     .background(Color.White.copy(alpha = if (hovered) 0.10f else 0f), shape)
-                    // GOLD, at the owner's request: a navy sliver on a busy
-                    // desktop disappears against dark wallpaper and dark
-                    // windows alike. The gold frame — same colour as the arrow
-                    // — is what makes the bookmark read as OURS at a glance,
-                    // and it brightens with the rest of the tab on hover.
-                    .border(
-                        1.5.dp,
-                        if (hovered) ext.accentGold else ext.accentGold.copy(alpha = 0.75f),
-                        shape,
-                    )
+                    // GOLD ON THREE SIDES — top, the rounded desktop-facing
+                    // side, and bottom. NOT on the left, which is the screen
+                    // edge the tab grows out of: a line there would draw the
+                    // tab's own boundary against the edge and make it read as
+                    // a small window PARKED at the edge rather than something
+                    // emerging FROM it. Leaving that side open lets the shape
+                    // run off the screen, which is what "attached" looks like.
+                    //
+                    // Hand-drawn because Modifier.border has no per-side
+                    // option: it strokes the whole outline or nothing.
+                    .drawBehind {
+                        val stroke = 1.5.dp.toPx()
+                        val half = stroke / 2f
+                        val r = 16.dp.toPx()
+                        val right = size.width - half
+                        val top = half
+                        val bottom = size.height - half
+                        val path = Path().apply {
+                            // Flush at the screen edge, top corner...
+                            moveTo(0f, top)
+                            lineTo(right - r, top)
+                            arcTo(
+                                Rect(right - 2 * r, top, right, top + 2 * r),
+                                270f, 90f, false,
+                            )
+                            lineTo(right, bottom - r)
+                            arcTo(
+                                Rect(right - 2 * r, bottom - 2 * r, right, bottom),
+                                0f, 90f, false,
+                            )
+                            // ...and back to the screen edge along the bottom.
+                            lineTo(0f, bottom)
+                        }
+                        drawPath(
+                            path,
+                            if (hovered) ext.accentGold else ext.accentGold.copy(alpha = 0.75f),
+                            style = Stroke(width = stroke),
+                        )
+                    }
                     .hoverable(interaction)
                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
                     .clickable(onClick = onOpen),

@@ -44,7 +44,7 @@ class RenderShotTest {
      * clipping bugs this project shipped would have been visible here, and
      * neither was, because the shots were being taken at the wrong width.
      */
-    private val windowW = 400
+    private val windowW = 320
     private val windowH = 560
 
     private fun shot(name: String, dark: Boolean, w: Int, h: Int = windowH, content: @Composable () -> Unit) {
@@ -80,9 +80,10 @@ class RenderShotTest {
     // MainTab. Shooting them all at one width is what let the near-black
     // palette and the clipped labels through: a pane looks fine at a size
     // nobody ever sees it at.
-    @Test fun zmanim() = both("desk_zmanim", 400) { ZmanimPane(service()) }
-    @Test fun calendar() = both("desk_calendar", 780) { CalendarPane(service()) }
-    @Test fun settings() = both("desk_settings", 620) { SettingsPane(service()) }
+    @Test fun zmanim() = both("desk_zmanim", 320) { ZmanimPane(service()) }
+
+    @Test fun calendar() = both("desk_calendar", 620) { CalendarPane(service()) }
+    @Test fun settings() = both("desk_settings", 560) { SettingsPane(service()) }
 
     // At the menu's own real size, not the window's — a small popup shot at
     // 400x560 is mostly a screenshot of empty space and would not have shown

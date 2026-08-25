@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowScope
@@ -116,6 +117,12 @@ fun WindowScope.AppTitleBar(
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = ext.heroText,
+                    // The panel is 320dp at its narrowest and the product's
+                    // name is long. Ellipsis rather than clipping: a name that
+                    // trails off reads as a name too long for the bar, while a
+                    // name sliced mid-letter reads as a broken window.
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -151,7 +158,10 @@ private fun CaptionButton(
     val hovered by interaction.collectIsHoveredAsState()
 
     Box(
-        Modifier.size(width = 44.dp, height = TITLE_BAR_HEIGHT)
+        // 38, not Windows' 44: three of them cost 132dp of a 320dp panel,
+        // which is more than a third of the bar spent on chrome. Still a
+        // comfortable mouse target.
+        Modifier.size(width = 38.dp, height = TITLE_BAR_HEIGHT)
             .background(
                 when {
                     // Red on hover, like every Windows close button. The colour

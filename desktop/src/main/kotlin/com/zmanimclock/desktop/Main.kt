@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -87,13 +88,12 @@ private fun runApp(args: Array<String>) = application {
     var docked by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(MainTab.ZMANIM) }
 
-    // Sized to the CONTENT, not to what a desktop can spare, and the content
-    // is different per tab — see [MainTab].
-    val mainState = rememberWindowState(width = MainTab.ZMANIM.width, height = WINDOW_HEIGHT)
+    // Width per tab; the height is the WORK AREA's, set by snapToEdge below.
+    val mainState = rememberWindowState(width = MainTab.ZMANIM.width, height = 560.dp)
 
     // The window follows the tab. Only the width moves: a changing height as
-    // well would make the whole window jump around, and the row count is what
-    // sets the height anyway.
+    // well would make the whole window jump around, and the panel's height
+    // belongs to the screen edge anyway.
     LaunchedEffect(tab) {
         if (mainState.placement == WindowPlacement.Floating) {
             mainState.size = mainState.size.copy(width = tab.width)
@@ -160,14 +160,11 @@ private fun runApp(args: Array<String>) = application {
     DockTabWindow(
         visible = docked,
         onOpen = {
+            // Just the flags: the snap-to-edge effect above fires on the
+            // visibility transition and does the positioning.
             docked = false
             mainVisible = true
             mainState.isMinimized = false
-            val screen = java.awt.Toolkit.getDefaultToolkit().screenSize
-            mainState.position = WindowPosition(
-                0.dp,
-                (((screen.height - WINDOW_HEIGHT_PX).coerceAtLeast(0)) / 2).dp,
-            )
         },
     )
 
@@ -215,15 +212,59 @@ private fun runApp(args: Array<String>) = application {
             if (WindowPinning.clearTopmost(window)) {
                 println("main window was always-on-top; cleared")
             }
+
+            // A SIDE PANEL, not a floating window — the owner's ask, and the
+            // bookmark already implied it: the folded state lives flush
+            // against the left edge, so the open state grows out of that same
+            // edge instead of appearing as an unrelated window in the middle
+            // of the screen. Flush left, the full height of the WORK AREA
+            // (screen minus taskbar), like a system flyout.
+            //
+            // Set from INSIDE the window, keyed on the AWT window itself. The
+            // first attempt snapped from the application scope and did
+            // nothing: that effect runs before Compose has created the window,
+            // so the initial rememberWindowState values were applied on top of
+            // it and the panel opened at Windows' cascade position (measured:
+            // 48,48 at 400x560 instead of 0,0 at 400x<work area>).
+            if (mainVisible && !docked) {
+                val wa = java.awt.GraphicsEnvironment
+                    .getLocalGraphicsEnvironment().maximumWindowBounds
+                mainState.placement = WindowPlacement.Floating
+                mainState.position = WindowPosition(wa.x.dp, wa.y.dp)
+                mainState.size = DpSize(tab.width, wa.height.dp)
+
+                // AND the AWT window directly, which is what actually makes
+                // this stick. Setting the Compose state alone loses a race on
+                // the FIRST open: when Compose realises a window whose
+                // position is still PlatformDefault it writes the window's
+                // real bounds BACK into the state, and that write can land
+                // after this effect. Traced live — the state went from my
+                // Absolute(0,0) to Absolute(48,48) and the window never moved;
+                // only the second time the effect ran did it snap.
+                //
+                // Dp and AWT's user-space units are 1:1 here (a 400.dp window
+                // reports width=400 in window.bounds even at 275% scaling),
+                // which is the same assumption maximumWindowBounds is read
+                // under, so no conversion belongs in either direction.
+                window.setBounds(wa.x, wa.y, tab.width.value.toInt(), wa.height)
+            }
             // A floor, not a preference. Below roughly this the month grid
             // loses a column and the settings chips stop wrapping into
             // anything readable, so dragging smaller is simply refused
             // rather than allowed to produce a broken layout.
-            window.minimumSize = java.awt.Dimension(360, 420)
+            // Must sit below the narrowest tab (320) or AWT silently clamps
+            // the panel wider than asked and the measurement above is moot.
+            window.minimumSize = java.awt.Dimension(300, 400)
         }
 
         ZmanimDesktopTheme {
-            val shape = RoundedCornerShape(WINDOW_CORNER)
+            // Rounded ONLY on the side that faces the desktop. The left side
+            // is the screen edge the panel grows out of, and a rounded corner
+            // there would read as a window hovering NEAR the edge rather than
+            // a panel attached to it — the same rule the bookmark follows.
+            // Under the app's forced RTL, topStart/bottomStart ARE the right-
+            // hand corners.
+            val shape = RoundedCornerShape(topStart = WINDOW_CORNER, bottomStart = WINDOW_CORNER)
             Surface(
                 Modifier.fillMaxSize().clip(shape)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
@@ -256,11 +297,16 @@ private fun runApp(args: Array<String>) = application {
  * window sized for a different tab.
  */
 private enum class MainTab(val label: String, val width: Dp) {
-    ZMANIM("זמני היום", 400.dp),
-    CALENDAR("לוח שנה", 780.dp),
-    // Two columns — the city list and the filters — and they stop being
-    // readable much below this.
-    SETTINGS("הגדרות", 620.dp),
+    // Every width here is the MEASURED floor, not a guess: each pane was
+    // rendered offscreen at a sweep of widths and read for clipping.
+    //   320 — the zman list. At 300 the long labels ("פלג המנחה (מהשקיעה)",
+    //         "הנץ החמה (מישורי)") touch the row edge with no margin left.
+    //   620 — the calendar. At 560 the month header wraps onto two lines and
+    //         the day cells crush their parsha labels.
+    //   560 — settings. Verified clean; the two card columns still breathe.
+    ZMANIM("זמני היום", 320.dp),
+    CALENDAR("לוח שנה", 620.dp),
+    SETTINGS("הגדרות", 560.dp),
 }
 
 @Composable
@@ -335,10 +381,6 @@ private fun MainWindowContent(
         }
     }
 }
-
-/** One height for every tab; only the width moves. */
-private val WINDOW_HEIGHT = 560.dp
-private const val WINDOW_HEIGHT_PX = 560
 
 /** The window's corner radius — the shell is transparent so these are real. */
 private val WINDOW_CORNER = 14.dp
