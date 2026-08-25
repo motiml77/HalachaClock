@@ -131,7 +131,7 @@ fun ApplicationScope.ZmanimWidgetWindow(
         // main window are still there.
         onCloseRequest = { service.update { it.copy(widgetVisible = false) } },
         state = state,
-        title = "שעון זמנים",
+        title = "שעון מעורר - זמנים הלכתיים",
         undecorated = true,
         transparent = true,
         resizable = true,

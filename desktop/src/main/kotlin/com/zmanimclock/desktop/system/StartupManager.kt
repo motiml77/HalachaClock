@@ -11,7 +11,7 @@ import java.io.File
  * The value written is:
  *
  *     HKCU\Software\Microsoft\Windows\CurrentVersion\Run
- *         ZmanimClock = "C:\...\HalachClock.exe" --tray
+ *         ZmanimClock = "C:\...\Halacha Clock.exe" --tray
  *
  * HKCU, not HKLM. Per-user means no administrator rights are needed and it
  * lines up with the installer's `perUserInstall = true`; HKLM would demand
@@ -105,7 +105,7 @@ object StartupManager {
      *     registering the JVM would produce a Run value that survives the build
      *     directory it depends on.
      *  3. The app-image layout, where the launcher sits one level above the
-     *     bundled runtime: `<app>/HalachClock.exe` next to `<app>/runtime/`.
+     *     bundled runtime: `<app>/Halacha Clock.exe` next to `<app>/runtime/`.
      */
     fun executablePath(): String? {
         fromProperty()?.let { return it }

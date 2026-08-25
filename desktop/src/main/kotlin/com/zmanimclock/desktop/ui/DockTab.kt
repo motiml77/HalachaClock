@@ -77,7 +77,7 @@ fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
         // then does the first frame land. A window that already exists and
         // merely becomes visible appears immediately.
         visible = visible,
-        title = "שעון זמנים",
+        title = "שעון מעורר - זמנים הלכתיים",
         undecorated = true,
         transparent = true,
         resizable = false,
@@ -97,7 +97,16 @@ fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
                     // Hover brightens the whole tab, not just the arrow: the
                     // affordance is "this entire thing is a button".
                     .background(Color.White.copy(alpha = if (hovered) 0.10f else 0f), shape)
-                    .border(1.dp, cs.outlineVariant, shape)
+                    // GOLD, at the owner's request: a navy sliver on a busy
+                    // desktop disappears against dark wallpaper and dark
+                    // windows alike. The gold frame — same colour as the arrow
+                    // — is what makes the bookmark read as OURS at a glance,
+                    // and it brightens with the rest of the tab on hover.
+                    .border(
+                        1.5.dp,
+                        if (hovered) ext.accentGold else ext.accentGold.copy(alpha = 0.75f),
+                        shape,
+                    )
                     .hoverable(interaction)
                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
                     .clickable(onClick = onOpen),
@@ -108,7 +117,7 @@ fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
                 // square, and the tab needs to say exactly one thing: "open".
                 Icon(
                     Icons.Filled.ChevronRight,
-                    contentDescription = "פתח את שעון זמנים",
+                    contentDescription = "פתח את שעון מעורר - זמנים הלכתיים",
                     tint = ext.accentGold,
                     modifier = Modifier.size(22.dp),
                 )

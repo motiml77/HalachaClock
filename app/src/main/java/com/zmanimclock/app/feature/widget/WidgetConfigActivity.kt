@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.ui.components.ZmanChecklistLogic
+import com.zmanimclock.app.ui.components.ZmanGroupedChecklist
 import com.zmanimclock.app.ui.theme.ZmanimTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -163,47 +162,38 @@ class WidgetConfigActivity : ComponentActivity() {
                                 // hard to scan — several differ only by a
                                 // shita suffix — so the user hunts rather than
                                 // picks. The buckets match how someone thinks
-                                // about their own day.
-                                ZMAN_GROUPS.forEach { (groupTitle, kinds) ->
-                                    item {
-                                        Text(
-                                            groupTitle,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(top = 6.dp, start = 4.dp),
-                                        )
-                                    }
-                                    items(kinds) { kind ->
-                                    val checked = kind.name in selected
+                                // about their own day. Each row carries the
+                                // same illustrative time as the mock above, so
+                                // the two halves of the screen visibly agree.
+                                item {
                                     val atLimit = selected.size >= WidgetPrefs.MAX_ZMANIM
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable(enabled = checked || !atLimit) {
-                                                if (checked) selected.remove(kind.name)
-                                                else if (!atLimit) selected.add(kind.name)
-                                            }
-                                            .padding(horizontal = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Checkbox(
-                                            checked = checked,
-                                            enabled = checked || !atLimit,
-                                            onCheckedChange = { on ->
-                                                if (on) { if (!atLimit) selected.add(kind.name) }
-                                                else selected.remove(kind.name)
+                                    SectionCard {
+                                        ZmanGroupedChecklist(
+                                            groups = ZMAN_GROUPS,
+                                            isChecked = { it.name in selected },
+                                            enabled = { it.name in selected || !atLimit },
+                                            onToggle = { kind ->
+                                                val next = ZmanChecklistLogic.toggleCapped(
+                                                    selected.toList(),
+                                                    kind.name,
+                                                    WidgetPrefs.MAX_ZMANIM,
+                                                )
+                                                selected.clear()
+                                                selected.addAll(next)
                                             },
+                                            trailing = { SAMPLE_TIMES[it] },
+                                            modifier = Modifier.padding(vertical = 6.dp),
                                         )
-                                        Text(
-                                            kind.hebrewName,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = if (checked || !atLimit) {
-                                                MaterialTheme.colorScheme.onSurface
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                        )
+                                        if (atLimit) {
+                                            Text(
+                                                "נבחרו ${WidgetPrefs.MAX_ZMANIM} הזמנים המרביים — " +
+                                                    "כדי להוסיף זמן אחר, בטל קודם סימון של אחד",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(
+                                                    start = 12.dp, end = 12.dp, bottom = 10.dp,
+                                                ),
+                                            )
                                         }
                                     }
                                 }

@@ -48,8 +48,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.zmanimclock.app.R
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.Lifecycle
@@ -121,7 +123,10 @@ fun OnboardingScreen(onDone: () -> Unit, isFirstRun: Boolean = true) {
             tint = MaterialTheme.colorScheme.primary,
         )
         Text(
-            if (isFirstRun) "ברוכים הבאים לשעון זמנים" else "הרשאות",
+            // stringResource, not a literal: the app's name now lives in ONE
+            // place (values/values-iw strings.xml) and this follows it rather
+            // than carrying a copy that could drift from the real name.
+            if (isFirstRun) "ברוכים הבאים ל${stringResource(R.string.app_name)}" else "הרשאות",
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
         )

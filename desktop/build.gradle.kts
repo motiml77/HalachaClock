@@ -2,11 +2,17 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 /**
- * "שעון זמנים" for Windows.
+ * "Halacha Clock" (שעון מעורר - זמנים הלכתיים) for Windows.
  *
  * A zmanim board and Hebrew calendar — NOT an alarm clock. No ringing, no
  * vibration, no snooze; at most a silent pop-up reminder the user opted into.
  * See docs/DESKTOP_PLAN.md.
+ *
+ * The BRAND changed (Aug 2026); the internal `%LOCALAPPDATA%\HalachClock\`
+ * data folder and the `ZmanimClock` registry value name (StartupManager) did
+ * NOT, and must not. Those are plumbing an existing install already has on
+ * disk — renaming them would orphan a user's saved city and reminders on their
+ * next update, not rebrand anything they can see.
  *
  * Every halachic value comes from :zmanim-engine, the same module the Android
  * app uses, so the two can never show different times.
@@ -55,18 +61,23 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
-            // ASCII: the installer identity. The product name shown in the UI
-            // is Hebrew, but packageName feeds file paths and WiX.
-            // ASCII ONLY, all three of these. Verified by bisection: WiX's
-            // light.exe exits 311 with no diagnostic when menuGroup or
-            // description contain Hebrew — it links with -cultures:en-us and
-            // chokes on the non-ASCII literals. Hebrew menuGroup alone is
-            // enough to break it. The user-facing Hebrew lives in the window
-            // title and the whole UI; only the installer metadata is Latin.
-            packageName = "HalachClock"
-            packageVersion = "1.0.0"
-            description = "HalachClock - Zmanim and Hebrew calendar"
-            vendor = "HalachClock"
+            // ASCII: the installer identity. The product's real name inside
+            // the app is Hebrew, but packageName/menuGroup/description feed
+            // file paths and WiX. ASCII ONLY, all three of these — verified by
+            // bisection: WiX's light.exe exits 311 with no diagnostic when
+            // menuGroup or description contain Hebrew, because it links with
+            // -cultures:en-us and chokes on the non-ASCII literals. Hebrew
+            // menuGroup alone is enough to break it. "Halacha Clock" is the
+            // ASCII form of the brand for exactly this reason — the Hebrew
+            // form lives in the window title and the whole in-app UI.
+            packageName = "Halacha Clock"
+            // Bumped from 1.0.0: same-version reinstall fails with MSI error
+            // 1638 ("another version of this product is already installed"),
+            // confirmed in practice — an update MUST raise this or nobody can
+            // upgrade in place.
+            packageVersion = "1.1.0"
+            description = "Halacha Clock - Zmanim and Hebrew calendar"
+            vendor = "Halacha Clock"
 
             // jlink does not work these out on its own, and a missing module is
             // a ClassNotFoundException at RUNTIME, not at build time.
@@ -76,7 +87,7 @@ compose.desktop {
             modules("java.desktop", "java.naming", "java.prefs")
 
             windows {
-                menuGroup = "HalachClock"
+                menuGroup = "Halacha Clock"
                 perUserInstall = true   // no admin rights needed
                 dirChooser = true
                 shortcut = true

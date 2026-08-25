@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -210,6 +212,18 @@ internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
                 Modifier.widthIn(max = ROW_CONTENT_MAX),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // A short gold bar against the reading edge of the NEXT row —
+                // the same accent the countdown uses, so "הזמן הבא" is findable
+                // from across the room without reading anything. First child
+                // of an RTL Row, so it lands on the RIGHT.
+                if (row.isNext) {
+                    Box(
+                        Modifier.width(3.dp).height(14.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(ext.accentGold),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                }
                 Text(
                     row.name,
                     Modifier.weight(1f),

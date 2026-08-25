@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">שעון זמנים</string>
+    <!-- The default/fallback name, used on any device NOT set to Hebrew — the
+         launcher, App Info, notification settings, permission dialogs. The
+         Hebrew name lives in values-iw/strings.xml; this is the ASCII one. -->
+    <string name="app_name">Halacha Clock</string>
     <string name="tab_home">זמנים</string>
     <string name="tab_calendar">לוח</string>
     <string name="tab_alerts">התראות</string>

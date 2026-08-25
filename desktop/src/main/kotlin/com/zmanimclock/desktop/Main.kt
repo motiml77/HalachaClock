@@ -50,7 +50,7 @@ import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.widget.ZmanimWidgetWindow
 
 /**
- * "שעון זמנים" for Windows.
+ * "שעון מעורר - זמנים הלכתיים" for Windows.
  *
  * A zmanim board and Hebrew calendar — NOT an alarm clock. No ringing, no
  * vibration, no snooze; at most a silent pop-up reminder the user opted into.
@@ -102,6 +102,18 @@ private fun runApp(args: Array<String>) = application {
 
     LaunchedEffect(scheduler) { scheduler.run() }
     val pending by scheduler.pending.collectAsState()
+
+    // Re-assert the Run key on every start while the setting is on. This is
+    // not paranoia: the launcher was RENAMED (HalachClock.exe -> Halacha
+    // Clock.exe), so every registry value written before the rename points at
+    // an executable that no longer exists, and autostart would silently die on
+    // the first boot after the upgrade. Rewriting from the current process
+    // repairs any stale path, every launch, for free.
+    LaunchedEffect(Unit) {
+        if (prefs.startWithWindows && com.zmanimclock.desktop.system.StartupManager.isSupported()) {
+            com.zmanimclock.desktop.system.StartupManager.setEnabled(true)
+        }
+    }
 
     // Launching the app again — from the Start menu, the shortcut, anywhere —
     // surfaces THIS window rather than starting a second copy.
@@ -167,7 +179,7 @@ private fun runApp(args: Array<String>) = application {
         // the widget both need the process alive.
         onCloseRequest = { mainVisible = false },
         visible = mainVisible && !docked,
-        title = "שעון זמנים",
+        title = "שעון מעורר - זמנים הלכתיים",
         icon = painterResource("branding/logo.png"),
         state = mainState,
         // ORDINARY WINDOW, STATED OUTRIGHT.
@@ -280,6 +292,20 @@ private fun MainWindowContent(
                     Modifier.weight(1f)
                         .clip(RoundedCornerShape(50))
                         .background(if (selected) cs.primaryContainer else Color.Transparent)
+                        // The gold ring marks the ACTIVE tab the way the gold
+                        // arrow marks the bookmark — one accent, used for "this
+                        // is where you are", nowhere else on the strip.
+                        .then(
+                            if (selected) {
+                                Modifier.border(
+                                    1.dp,
+                                    Ext.colors.accentGold.copy(alpha = 0.8f),
+                                    RoundedCornerShape(50),
+                                )
+                            } else {
+                                Modifier
+                            },
+                        )
                         .clickable {
                             // Leaving settings may have changed the city, the
                             // halachic offsets or the reminder set; tell the

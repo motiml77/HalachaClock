@@ -59,7 +59,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.settings.data.UserPreferences
 import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
-import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.feature.widget.ZMAN_GROUPS
+import com.zmanimclock.app.ui.components.ZmanChecklistLogic
+import com.zmanimclock.app.ui.components.ZmanChecklistRow
+import com.zmanimclock.app.ui.components.ZmanGroupedChecklist
 
 /**
  * Settings: location (city picker entry), halachic prefs, display prefs,
@@ -574,11 +577,9 @@ private fun TzeitShabbatCard(minutes: Int, onChange: (Int) -> Unit) {
  * headline (and the same one in the status notification and the widget).
  * Selecting none means "all", which is the default.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NextZmanFilterCard(selected: Set<String>, onChange: (Set<String>) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    val all = ZmanKind.entries
 
     Card {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -612,25 +613,26 @@ private fun NextZmanFilterCard(selected: Set<String>, onChange: (Set<String>) ->
                     color = MaterialTheme.colorScheme.secondary,
                 )
             } else {
-                Spacer(modifier = Modifier.height(10.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = selected.isEmpty(),
-                        onClick = { onChange(emptySet()) },
-                        label = { Text("הכל") },
-                    )
-                    all.forEach { kind ->
-                        FilterChip(
-                            selected = kind.name in selected,
-                            onClick = {
-                                val next = selected.toMutableSet()
-                                if (!next.add(kind.name)) next.remove(kind.name)
-                                onChange(next)
-                            },
-                            label = { Text(kind.shortName) },
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.height(6.dp))
+                // Master row first: checked while the filter is empty, which
+                // has always meant "all zmanim". Ticking any specific zman
+                // narrows the filter (and visibly unticks this row); ticking
+                // this row clears the filter back to all. The empty-set
+                // meaning is unchanged from the old chip UI.
+                ZmanChecklistRow(
+                    label = "כל הזמנים",
+                    checked = selected.isEmpty(),
+                    onToggle = { onChange(emptySet()) },
+                    bold = true,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ZmanGroupedChecklist(
+                    groups = ZMAN_GROUPS,
+                    isChecked = { it.name in selected },
+                    onToggle = { kind ->
+                        onChange(ZmanChecklistLogic.toggleUncapped(selected, kind.name))
+                    },
+                )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     "בלי בחירה — כל הזמנים נחשבים.",

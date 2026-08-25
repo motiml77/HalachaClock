@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">שעון זמנים</string>
+    <string name="app_name">שעון מעורר - זמנים הלכתיים</string>
     <string name="tab_home">זמנים</string>
     <string name="tab_calendar">לוח</string>
     <string name="tab_alerts">התראות</string>

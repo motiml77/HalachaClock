@@ -27,7 +27,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.ApplicationScope
-import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
@@ -52,8 +51,10 @@ import java.time.Duration
  * that file at all, and `NIIF_NONE` means "no icon", not "no sound". There is
  * no seam to inject it through. A zmanim board that chimes is an alarm clock,
  * and this application is explicitly not one, so that whole path is off the
- * table for the reminder itself. `Tray()` below is still used — for the ICON
- * and the MENU, which have no sound to suppress.
+ * table for the reminder itself. The tray icon itself is still used — for the
+ * ICON and the click events, which have no sound to suppress; see
+ * ZmanimTray.kt for why its MENU is no longer the `Tray()` composable's
+ * built-in one.
  *
  * So v1's reminder surface is a small, always-on-top, undecorated Compose
  * window near the bottom-right of the primary screen: the zman's name, its
@@ -106,7 +107,7 @@ fun ApplicationScope.ReminderPopupWindow(
             // above the taskbar rather than under it.
             position = WindowPosition.Aligned(AbsoluteAlignment.BottomRight),
         ),
-        title = "שעון זמנים",
+        title = "שעון מעורר - זמנים הלכתיים",
         icon = painterResource("branding/logo.png"),
         undecorated = true,
         resizable = false,
@@ -149,7 +150,7 @@ private fun ReminderCard(reminder: PendingReminder, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "שעון זמנים",
+                    "שעון מעורר - זמנים הלכתיים",
                     style = MaterialTheme.typography.labelMedium,
                     color = cs.onSurfaceVariant,
                 )
@@ -182,41 +183,5 @@ private fun ReminderCard(reminder: PendingReminder, onDismiss: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-/**
- * The tray icon and its menu.
- *
- * `TrayState` is deliberately NOT taken as a parameter and
- * `TrayState.sendNotification` is deliberately NOT called anywhere in this
- * file. It is the one API that would look like the obvious way to deliver a
- * reminder, and it is the one API that cannot do it without a sound — see the
- * file header. Keeping the tray free of any notification surface is what stops
- * that from being "fixed" back in later.
- *
- * [onShowMainWindow] is also wired to a plain click on the icon, which is what
- * Windows users expect of a tray application.
- */
-@Composable
-fun ApplicationScope.ZmanimTray(
-    onShowMainWindow: () -> Unit,
-    onShowWidget: () -> Unit,
-    onExit: () -> Unit,
-    tooltip: String = "שעון זמנים",
-) {
-    Tray(
-        icon = painterResource("branding/logo.png"),
-        tooltip = tooltip,
-        onAction = onShowMainWindow,
-    ) {
-        // AWT renders these, not Compose, so they use the system font and get
-        // no HiDPI scaling of their own. Hebrew is not CJK and no mangling has
-        // been reported for it, but this is a "verify on a real machine at 125%
-        // and 150%" item rather than a settled one.
-        Item("הצג חלון ראשי", onClick = onShowMainWindow)
-        Item("הצג ווידג'ט", onClick = onShowWidget)
-        Separator()
-        Item("יציאה", onClick = onExit)
     }
 }

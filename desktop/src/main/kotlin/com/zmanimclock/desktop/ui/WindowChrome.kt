@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.Minimize
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -93,6 +95,7 @@ fun WindowScope.AppTitleBar(
             else WindowPlacement.Maximized
     }
 
+    Column {
     Row(
         Modifier.fillMaxWidth().height(TITLE_BAR_HEIGHT).background(ext.heroTop),
         verticalAlignment = Alignment.CenterVertically,
@@ -109,7 +112,7 @@ fun WindowScope.AppTitleBar(
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
-                    "שעון זמנים",
+                    "שעון מעורר - זמנים הלכתיים",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = ext.heroText,
@@ -124,6 +127,12 @@ fun WindowScope.AppTitleBar(
             if (state.placement == WindowPlacement.Maximized) "שחזר" else "הגדל",
         ) { toggleMaximise() }
         CaptionButton(Icons.Filled.Close, "סגור", danger = true, onClick = onClose)
+    }
+    // A single gold hairline under the caption — the one line of the brand's
+    // accent on the window frame itself. It does the visual work the OS
+    // accent-coloured bar used to do (separating chrome from content) in the
+    // app's own colour instead of Windows'.
+    HorizontalDivider(thickness = 1.dp, color = ext.accentGold.copy(alpha = 0.55f))
     }
 }
 

@@ -47,6 +47,7 @@ import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanNumberFamily
 import com.zmanimclock.desktop.data.DesktopZmanimService
+import com.zmanimclock.desktop.system.StartupManager
 import java.util.Locale
 
 /**
@@ -343,12 +344,16 @@ private fun FiltersHalf(service: DesktopZmanimService, modifier: Modifier) {
                 "צמצום הרשימה גורם לכותרת לקפוץ ישר לזמן שחשוב לך, בלי לעבור " +
                     "דרך כל הזמנים שבדרך. שום זמן לא נעלם מהרשימה הראשית.",
             )
-            ZmanChipGrid(
+            // "Empty means all" is not discoverable on its own, so the reset
+            // is a plain action link that both states it and clears the set.
+            if (prefs.nextZmanFilter.isNotEmpty()) {
+                ActionLink("הצג את הכל") {
+                    service.update { it.copy(nextZmanFilter = emptySet()) }
+                }
+            }
+            ZmanChecklist(
                 selected = prefs.nextZmanFilter,
                 onChange = { service.update { p -> p.copy(nextZmanFilter = it) } },
-                // "Empty means all" is not discoverable on its own, so it gets a
-                // chip of its own that both states it and clears the selection.
-                allChip = true,
             )
             Hint("בלי בחירה — כל הזמנים נחשבים.")
         }
@@ -364,16 +369,15 @@ private fun FiltersHalf(service: DesktopZmanimService, modifier: Modifier) {
             // notifications switched off wholesale, and then the ones they DID
             // want are gone too. Opt-in, one at a time.
             Hint("תזכורות הן בבחירה בלבד — כברירת מחדל שום זמן לא מתריע.")
-            ZmanChipGrid(
-                selected = prefs.reminderZmanim,
-                onChange = { service.update { p -> p.copy(reminderZmanim = it) } },
-                allChip = false,
-            )
             if (prefs.reminderZmanim.isNotEmpty()) {
-                SmallChip("נקה הכל", selected = false) {
+                ActionLink("נקה הכל") {
                     service.update { it.copy(reminderZmanim = emptySet()) }
                 }
             }
+            ZmanChecklist(
+                selected = prefs.reminderZmanim,
+                onChange = { service.update { p -> p.copy(reminderZmanim = it) } },
+            )
             Spacer(Modifier.height(2.dp))
             // Stated plainly rather than discovered later: a desktop app cannot
             // promise delivery the way a phone alarm can, and this build is a
@@ -388,48 +392,32 @@ private fun FiltersHalf(service: DesktopZmanimService, modifier: Modifier) {
     }
 }
 
-/**
- * One chip per [ZmanKind].
- *
- * Labelled with [ZmanKind.hebrewName], not shortName: two pairs of kinds share
- * a shortName (both מג"א shitot for ק"ש, and both for תפילה), and a grid with
- * two identical chips — one lit, one not — is unusable. The desktop has the
- * width for the full label, so it uses it.
- */
-@Composable
-private fun ZmanChipGrid(
-    selected: Set<String>,
-    onChange: (Set<String>) -> Unit,
-    allChip: Boolean,
-) {
-    ChipFlow {
-        if (allChip) {
-            SmallChip("הכל", selected = selected.isEmpty()) { onChange(emptySet()) }
-        }
-        ZmanKind.entries.forEach { kind ->
-            SmallChip(kind.hebrewName, selected = kind.name in selected) {
-                val next = selected.toMutableSet()
-                if (!next.add(kind.name)) next.remove(kind.name)
-                onChange(next)
-            }
-        }
-    }
-}
 
 // ------------------------------------------------------------------ shared --
 
 @Composable
 private fun AutostartPanel(service: DesktopZmanimService) {
     val prefs = service.prefs
+    // Whether autostart can work AT ALL from this process: under Gradle there
+    // is no launcher .exe to register, so the checkbox would be a lie.
+    val supported = remember { StartupManager.isSupported() }
+    // The last toggle that could not be applied, for an honest message. The
+    // earlier version of this pane persisted the flag and never touched the
+    // registry at all — the checkbox looked on and the machine did nothing —
+    // so the rule now is REGISTRY FIRST, pref second, and the pref only moves
+    // if the registry write succeeded.
+    var failed by remember { mutableStateOf(false) }
+
     Panel("הפעלה עם Windows") {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
-                checked = prefs.startWithWindows,
-                // Persist only. The HKCU\...\Run entry is written elsewhere off
-                // the back of this flag, so this pane never touches the
-                // registry itself.
-                // TODO(desktop): wired to the Run key by StartupManager
-                onCheckedChange = { on -> service.update { it.copy(startWithWindows = on) } },
+                checked = prefs.startWithWindows && supported,
+                enabled = supported,
+                onCheckedChange = { on ->
+                    val ok = StartupManager.setEnabled(on)
+                    failed = !ok
+                    if (ok) service.update { it.copy(startWithWindows = on) }
+                },
             )
             Column(Modifier.weight(1f)) {
                 Text(
@@ -437,7 +425,14 @@ private fun AutostartPanel(service: DesktopZmanimService) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Hint("נדרש כדי שתזכורות יעבדו בלי לפתוח את האפליקציה ידנית.")
+                when {
+                    !supported -> Hint("זמין רק בגרסה המותקנת של התוכנה.")
+                    failed -> Hint(
+                        "Windows דחתה את הבקשה — ייתכן שמדיניות או אנטי-וירוס חוסמים זאת.",
+                        MaterialTheme.colorScheme.error,
+                    )
+                    else -> Hint("נדרש כדי שתזכורות יעבדו בלי לפתוח את האפליקציה ידנית.")
+                }
             }
         }
     }
@@ -446,6 +441,26 @@ private fun AutostartPanel(service: DesktopZmanimService) {
 @Composable
 private fun Hint(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+}
+
+/**
+ * A small inline action, styled as a link rather than a chip: it DOES
+ * something ("clear", "show all") instead of BEING something, and dressing it
+ * like the selectable items around it was exactly how the old chip grid made
+ * every action look like one more zman.
+ */
+@Composable
+private fun ActionLink(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.bodySmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+    )
 }
 
 /**

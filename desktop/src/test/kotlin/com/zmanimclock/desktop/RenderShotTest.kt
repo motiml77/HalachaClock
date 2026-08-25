@@ -13,6 +13,9 @@ import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.ui.CalendarPane
 import com.zmanimclock.desktop.ui.SettingsPane
+import com.zmanimclock.desktop.ui.TrayMenuContent
+import com.zmanimclock.desktop.ui.TrayMenuDivider
+import com.zmanimclock.desktop.ui.TrayMenuItem
 import com.zmanimclock.desktop.ui.ZmanimPane
 import org.jetbrains.skia.Image
 import org.junit.Test
@@ -44,8 +47,8 @@ class RenderShotTest {
     private val windowW = 400
     private val windowH = 560
 
-    private fun shot(name: String, dark: Boolean, w: Int, content: @Composable () -> Unit) {
-        ImageComposeScene(width = w, height = windowH, density = Density(1f)).use { scene ->
+    private fun shot(name: String, dark: Boolean, w: Int, h: Int = windowH, content: @Composable () -> Unit) {
+        ImageComposeScene(width = w, height = h, density = Density(1f)).use { scene ->
             scene.setContent {
                 ZmanimDesktopTheme(dark = dark) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -80,4 +83,21 @@ class RenderShotTest {
     @Test fun zmanim() = both("desk_zmanim", 400) { ZmanimPane(service()) }
     @Test fun calendar() = both("desk_calendar", 780) { CalendarPane(service()) }
     @Test fun settings() = both("desk_settings", 620) { SettingsPane(service()) }
+
+    // At the menu's own real size, not the window's — a small popup shot at
+    // 400x560 is mostly a screenshot of empty space and would not have shown
+    // whether the three rows and the divider actually fit inside 132dp.
+    @Test
+    fun trayMenu() {
+        for (dark in listOf(false, true)) {
+            shot("desk_tray_menu", dark = dark, w = 190, h = 132) {
+                TrayMenuContent(onDismiss = {}) {
+                    TrayMenuItem("הצג חלון ראשי") {}
+                    TrayMenuItem("הצג ווידג'ט") {}
+                    TrayMenuDivider()
+                    TrayMenuItem("יציאה") {}
+                }
+            }
+        }
+    }
 }

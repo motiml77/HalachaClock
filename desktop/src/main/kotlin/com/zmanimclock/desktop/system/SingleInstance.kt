@@ -7,7 +7,7 @@ import java.net.Socket
 import javax.swing.SwingUtilities
 
 /**
- * One copy of "שעון זמנים" at a time.
+ * One copy of "שעון מעורר - זמנים הלכתיים" at a time.
  *
  * This is not tidiness. The app keeps living in the tray after its window is
  * closed and it starts itself at logon, so the ways to end up with two copies
