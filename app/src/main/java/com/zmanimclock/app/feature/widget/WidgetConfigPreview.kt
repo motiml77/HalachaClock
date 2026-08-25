@@ -38,8 +38,10 @@ internal val ZMAN_GROUPS: List<Pair<String, List<ZmanKind>>> = listOf(
         ZmanKind.CHATZOT_LAYLA,
         ZmanKind.ALOT_HASHACHAR,
         ZmanKind.MISHEYAKIR,
-        ZmanKind.HANETZ,
+        // Mishor before visible: the terrain pushes the visible netz LATER, so
+        // this is the order the widget itself renders them in.
         ZmanKind.HANETZ_MISHOR,
+        ZmanKind.HANETZ,
     ),
     "זמני תפילה" to listOf(
         ZmanKind.SOF_ZMAN_SHMA_MGA_72_ZMANIYOT,
@@ -53,8 +55,11 @@ internal val ZMAN_GROUPS: List<Pair<String, List<ZmanKind>>> = listOf(
         ZmanKind.CHATZOT,
         ZmanKind.MINCHA_GEDOLA,
         ZmanKind.MINCHA_KETANA,
-        ZmanKind.PLAG_HAMINCHA,
+        // GRA before the luach's: the gap between them is exactly the 13.5
+        // zmaniyot minutes from shkia to tzeit, so the GRA one is always
+        // earlier and always renders first.
         ZmanKind.PLAG_HAMINCHA_GRA,
+        ZmanKind.PLAG_HAMINCHA,
     ),
     "שקיעה וצאת הכוכבים" to listOf(
         ZmanKind.SHKIA,
@@ -68,13 +73,25 @@ internal val ZMAN_GROUPS: List<Pair<String, List<ZmanKind>>> = listOf(
     ),
 )
 
-/** Illustrative times for the mock, in the order the real widget lists them. */
-private val SAMPLE_TIMES = mapOf(
+/**
+ * Illustrative times for the mock, in the order the real widget lists them.
+ *
+ * Illustrative, but not arbitrary: they are internally consistent with a netz
+ * of 05:57 and a shkia of 19:32, so every derived row really is what that day
+ * would produce. Someone who knows these zmanim will read the mock and check
+ * it against the ones next to it, and a set that does not hold together reads
+ * as a bug in the times themselves.
+ *
+ * Every kind in [ZMAN_GROUPS] must have an entry, and each group must stay in
+ * time order — both pinned by WidgetConfigGroupsTest, because the fallback
+ * here is a literal "--:--" appearing in the picker.
+ */
+internal val SAMPLE_TIMES = mapOf(
     ZmanKind.CHATZOT_LAYLA to "00:45",
     ZmanKind.ALOT_HASHACHAR to "04:33",
     ZmanKind.MISHEYAKIR to "04:47",
-    ZmanKind.HANETZ to "05:57",
     ZmanKind.HANETZ_MISHOR to "05:54",
+    ZmanKind.HANETZ to "05:57",
     ZmanKind.SOF_ZMAN_SHMA_MGA_72_ZMANIYOT to "08:39",
     ZmanKind.SOF_ZMAN_SHMA_MGA_16_1_DEG to "08:39",
     ZmanKind.SOF_ZMAN_SHMA_GRA to "09:21",
@@ -84,7 +101,11 @@ private val SAMPLE_TIMES = mapOf(
     ZmanKind.CHATZOT to "12:45",
     ZmanKind.MINCHA_GEDOLA to "13:20",
     ZmanKind.MINCHA_KETANA to "16:42",
-    ZmanKind.PLAG_HAMINCHA to "18:12",
+    // shaah = (19:32 - 05:57) / 12 = 67:55, so 1¼ of them is 1:25.
+    // GRA:   shkia 19:32 - 1:25 = 18:07
+    // luach: tzeit 19:47 - 1:25 = 18:22
+    ZmanKind.PLAG_HAMINCHA_GRA to "18:07",
+    ZmanKind.PLAG_HAMINCHA to "18:22",
     ZmanKind.SHKIA to "19:32",
     ZmanKind.TZEIT_HAKOCHAVIM to "19:47",
     ZmanKind.TZEIT_LECHUMRA to "19:58",
