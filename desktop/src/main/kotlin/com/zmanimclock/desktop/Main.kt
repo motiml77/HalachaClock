@@ -31,6 +31,9 @@ import com.zmanimclock.desktop.reminder.ZmanimTray
 import com.zmanimclock.desktop.ui.CalendarPane
 import com.zmanimclock.desktop.ui.SettingsPane
 import com.zmanimclock.desktop.ui.ZmanimPane
+import androidx.compose.runtime.DisposableEffect
+import com.zmanimclock.desktop.system.SingleInstance
+import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.widget.ZmanimWidgetWindow
 
 /**
@@ -49,7 +52,15 @@ import com.zmanimclock.desktop.widget.ZmanimWidgetWindow
  * involving typing or arrow keys — the calendar, city search, settings —
  * belongs here.
  */
-fun main(args: Array<String>) = application {
+fun main(args: Array<String>) {
+    // Before anything is built. A second copy hands its request to the copy
+    // already running and exits, so the user gets the window they asked for
+    // instead of a duplicate of the whole app.
+    if (!SingleInstance.claim()) return
+    runApp(args)
+}
+
+private fun runApp(args: Array<String>) = application {
     // --tray: launched by the Windows Run key at logon. Start hidden in the
     // tray rather than throwing a window in the user's face at every boot.
     val startHidden = args.any { it.equals("--tray", ignoreCase = true) }
@@ -59,12 +70,30 @@ fun main(args: Array<String>) = application {
     val scheduler = remember { ReminderScheduler(service) }
 
     var mainVisible by remember { mutableStateOf(!startHidden) }
+    val mainState = rememberWindowState(width = 720.dp, height = 560.dp)
 
     LaunchedEffect(scheduler) { scheduler.run() }
     val pending by scheduler.pending.collectAsState()
 
+    // Launching the app again — from the Start menu, the shortcut, anywhere —
+    // surfaces THIS window rather than starting a second copy.
+    DisposableEffect(Unit) {
+        SingleInstance.onShowRequested {
+            mainVisible = true
+            mainState.isMinimized = false
+        }
+        onDispose { SingleInstance.release() }
+    }
+
     ZmanimTray(
-        onShowMainWindow = { mainVisible = true },
+        onShowMainWindow = {
+            // Three separate states can hide this window and all three have to
+            // be undone, or the tray item does nothing and looks broken: it can
+            // be closed to the tray, minimised to the taskbar, or simply behind
+            // something. `toFront` alone fixes only the third.
+            mainVisible = true
+            mainState.isMinimized = false
+        },
         onShowWidget = { service.update { it.copy(widgetVisible = true) } },
         // Closing the last window would end the process, so exit lives here.
         onExit = ::exitApplication,
@@ -73,7 +102,13 @@ fun main(args: Array<String>) = application {
     ReminderPopupWindow(reminder = pending, onDismiss = scheduler::dismiss)
 
     // Returns early when prefs.widgetVisible is false, so no `if` here.
-    ZmanimWidgetWindow(service, onOpenMain = { mainVisible = true })
+    ZmanimWidgetWindow(
+        service,
+        onOpenMain = {
+            mainVisible = true
+            mainState.isMinimized = false
+        },
+    )
 
     if (mainVisible) {
         Window(
@@ -82,8 +117,29 @@ fun main(args: Array<String>) = application {
             onCloseRequest = { mainVisible = false },
             title = "שעון זמנים",
             icon = painterResource("branding/logo.png"),
-            state = rememberWindowState(width = 860.dp, height = 600.dp),
+            state = mainState,
+            // ORDINARY WINDOW, STATED OUTRIGHT.
+            //
+            // This is the default, and it is written down anyway because the
+            // opposite was observed in the field: a running copy of this build
+            // was measured holding WS_EX_TOPMOST, which parks the zmanim board
+            // above every other program — nothing else can be brought in front
+            // of it, and the taskbar button stops behaving like a normal one
+            // because the window never properly leaves the foreground.
+            //
+            // Only two windows in this app may float: the widget, which the
+            // user asks for, and the reminder popup, which is a notification.
+            alwaysOnTop = false,
         ) {
+            // Belt and braces for the same thing. `alwaysOnTop = false` covers
+            // what Compose sets; this covers the flag arriving from anywhere
+            // else, including a stale window from a previous run of the app.
+            LaunchedEffect(window) {
+                if (WindowPinning.clearTopmost(window)) {
+                    println("main window was always-on-top; cleared")
+                }
+            }
+
             ZmanimDesktopTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainWindowContent(service, scheduler)

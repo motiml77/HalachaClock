@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -156,6 +157,21 @@ internal fun SunriseBasisTag(visible: Boolean) {
     )
 }
 
+/**
+ * How wide the name+time pair is allowed to grow.
+ *
+ * The pair used to stretch to the full window: the name took `weight(1f)` and
+ * shoved the time against the opposite edge, so on a desktop-width window the
+ * two ends of a single row sat hundreds of pixels apart with nothing between
+ * them. A zman and its time have to be readable as ONE line — the eye should
+ * not have to travel to pair them up — and that dead space was also the only
+ * reason the window had to be as wide as it was.
+ *
+ * Capping the pair rather than the row keeps the highlight and the divider
+ * spanning the full width, which is what makes the list read as a list.
+ */
+private val ROW_CONTENT_MAX = 260.dp
+
 @Composable
 internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
     val cs = MaterialTheme.colorScheme
@@ -164,25 +180,34 @@ internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
         Row(
             Modifier.fillMaxWidth()
                 .background(if (row.isNext) ext.nextRow else cs.surface)
-                .padding(horizontal = 16.dp, vertical = if (compact) 3.dp else 6.dp),
+                .padding(horizontal = 14.dp, vertical = if (compact) 2.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically,
+            // Centred rather than pushed to the reading edge: whatever width
+            // the user drags the window to, the leftover space splits evenly
+            // instead of piling up on one side as a single dead margin.
+            horizontalArrangement = Arrangement.Center,
         ) {
-            Text(
-                row.name,
-                Modifier.weight(1f),
-                style = if (compact) MaterialTheme.typography.bodySmall
-                else MaterialTheme.typography.bodyMedium,
-                color = if (row.isPast) cs.onSurfaceVariant else cs.onSurface,
-            )
-            Text(
-                row.time,
-                fontFamily = ZmanNumberFamily,
-                fontSize = if (compact) 12.sp else 15.sp,
-                fontWeight = if (row.isNext) FontWeight.Bold else FontWeight.Normal,
-                textAlign = TextAlign.End,
-                color = if (row.isPast) cs.onSurfaceVariant else cs.onSurface,
-                modifier = Modifier.width(if (compact) 44.dp else 56.dp),
-            )
+            Row(
+                Modifier.widthIn(max = ROW_CONTENT_MAX),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    row.name,
+                    Modifier.weight(1f),
+                    style = if (compact) MaterialTheme.typography.bodySmall
+                    else MaterialTheme.typography.bodyMedium,
+                    color = if (row.isPast) cs.onSurfaceVariant else cs.onSurface,
+                )
+                Text(
+                    row.time,
+                    fontFamily = ZmanNumberFamily,
+                    fontSize = if (compact) 12.sp else 14.sp,
+                    fontWeight = if (row.isNext) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.End,
+                    color = if (row.isPast) cs.onSurfaceVariant else cs.onSurface,
+                    modifier = Modifier.width(if (compact) 42.dp else 50.dp),
+                )
+            }
         }
         HorizontalDivider(thickness = 1.dp, color = cs.outlineVariant)
     }

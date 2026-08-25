@@ -33,24 +33,44 @@ class RenderShotTest {
 
     private val out = File(System.getProperty("shot.dir") ?: "C:/gtmp/shots").apply { mkdirs() }
 
-    private fun shot(name: String, w: Int = 860, h: Int = 600, content: @Composable () -> Unit) {
-        ImageComposeScene(width = w, height = h, density = Density(1f)).use { scene ->
+    /**
+     * The real window size, so a shot shows what the user will actually get.
+     * Rendering at some other size hides exactly the class of bug these shots
+     * exist to catch — text that fits at 860 wide and clips at 720.
+     */
+    private val windowW = 720
+    private val windowH = 560
+
+    private fun shot(name: String, dark: Boolean, content: @Composable () -> Unit) {
+        ImageComposeScene(width = windowW, height = windowH, density = Density(1f)).use { scene ->
             scene.setContent {
-                ZmanimDesktopTheme(dark = false) {
+                ZmanimDesktopTheme(dark = dark) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Box(Modifier.fillMaxSize()) { content() }
                     }
                 }
             }
             val img: Image = scene.render()
-            File(out, "$name.png").writeBytes(img.encodeToData()!!.bytes)
-            println("SHOT ${File(out, "$name.png")}")
+            val file = File(out, "${name}_${if (dark) "dark" else "light"}.png")
+            file.writeBytes(img.encodeToData()!!.bytes)
+            println("SHOT $file")
         }
     }
 
     private fun service() = DesktopZmanimService(DesktopPrefs())
 
-    @Test fun zmanim() = shot("desk_zmanim") { ZmanimPane(service()) }
-    @Test fun calendar() = shot("desk_calendar") { CalendarPane(service()) }
-    @Test fun settings() = shot("desk_settings") { SettingsPane(service()) }
+    /**
+     * Both themes, every time. The app follows the OS setting, so half the
+     * users see the dark palette and a light-only shot cannot tell you whether
+     * their window is legible — which is how the dark surfaces stayed at
+     * near-black long enough to ship.
+     */
+    private fun both(name: String, content: @Composable () -> Unit) {
+        shot(name, dark = false, content = content)
+        shot(name, dark = true, content = content)
+    }
+
+    @Test fun zmanim() = both("desk_zmanim") { ZmanimPane(service()) }
+    @Test fun calendar() = both("desk_calendar") { CalendarPane(service()) }
+    @Test fun settings() = both("desk_settings") { SettingsPane(service()) }
 }

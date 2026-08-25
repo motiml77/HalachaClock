@@ -43,23 +43,34 @@ private val LightColors = lightColorScheme(
     outlineVariant = Color(0xFFE4E9F2),
 )
 
+/**
+ * Lifted deliberately off near-black.
+ *
+ * The first pass ran the surfaces down at #0B1220/#121B2E, which reads as a
+ * black window with faint blue in it rather than as the navy the brand is. On
+ * a desktop monitor — bigger, brighter and usually further from the eye than a
+ * phone — that came out heavy and muddy, and the dividers at #243154 all but
+ * vanished. Everything here is raised by roughly one step while the ROLES stay
+ * ordered: background darkest, then surface, then surfaceVariant, so elevation
+ * still reads. Text sits lighter to hold contrast against the raised ground.
+ */
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFA9C2F5),
+    primary = Color(0xFFBFD2FA),
     onPrimary = Color(0xFF0B2352),
-    primaryContainer = Color(0xFF1C3B7A),
-    onPrimaryContainer = Color(0xFFD6E2FF),
-    secondary = Color(0xFFB6C4E4),
+    primaryContainer = Color(0xFF2A4C93),
+    onPrimaryContainer = Color(0xFFE3ECFF),
+    secondary = Color(0xFFC6D2EE),
     tertiary = Gold,
-    tertiaryContainer = Color(0xFF4A3B00),
-    onTertiaryContainer = Color(0xFFFFE08A),
-    background = Color(0xFF0B1220),
-    onBackground = Color(0xFFE6EAF4),
-    surface = Color(0xFF121B2E),
-    onSurface = Color(0xFFE6EAF4),
-    surfaceVariant = Color(0xFF1C2740),
-    onSurfaceVariant = Color(0xFFA6B2CC),
-    outline = Color(0xFF34405C),
-    outlineVariant = Color(0xFF243154),
+    tertiaryContainer = Color(0xFF5C4A00),
+    onTertiaryContainer = Color(0xFFFFE9A6),
+    background = Color(0xFF16203A),
+    onBackground = Color(0xFFF0F4FC),
+    surface = Color(0xFF1E2A48),
+    onSurface = Color(0xFFF0F4FC),
+    surfaceVariant = Color(0xFF2A3859),
+    onSurfaceVariant = Color(0xFFBCC7E0),
+    outline = Color(0xFF4A5980),
+    outlineVariant = Color(0xFF35446B),
 )
 
 /** Extended roles the M3 scheme has no slot for — mirrors the Android app. */
@@ -90,13 +101,16 @@ private val ExtrasLight = DesktopExtras(
 private val ExtrasDark = DesktopExtras(
     accentGold = Gold,
     onAccentGold = Color(0xFF12203A),
-    deadline = Color(0xFFFF9A62),
-    deadlineContainer = Color(0xFF4A2100),
-    heroTop = Color(0xFF12224C),
-    heroBottom = Color(0xFF0E1B3C),
-    heroInner = Color(0xFF0A1530),
-    heroLabel = Color(0xFF8FA6D8),
-    nextRow = Color(0xFF16305C),
+    deadline = Color(0xFFFFAE7E),
+    deadlineContainer = Color(0xFF5E2C00),
+    // The hero is the one block that must stay DARKER than the list under it,
+    // or the page loses its top and the eye has nothing to start from. Raised
+    // with the rest, but the gradient and the inner card keep their order.
+    heroTop = Color(0xFF23417F),
+    heroBottom = Color(0xFF1A3164),
+    heroInner = Color(0xFF14274F),
+    heroLabel = Color(0xFFAFC4EC),
+    nextRow = Color(0xFF2A4E8C),
 )
 
 val LocalExtras = staticCompositionLocalOf { ExtrasLight }

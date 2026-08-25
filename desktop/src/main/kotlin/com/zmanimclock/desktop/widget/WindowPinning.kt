@@ -59,6 +59,9 @@ internal object WindowPinning {
     /** Never take focus on click. A widget must not interrupt someone typing. */
     private const val WS_EX_NOACTIVATE = 0x0800_0000
 
+    /** Always above non-topmost windows. Correct for the widget, never for the main window. */
+    private const val WS_EX_TOPMOST = 0x0000_0008
+
     private const val SWP_NOSIZE = 0x0001
     private const val SWP_NOMOVE = 0x0002
     private const val SWP_NOZORDER = 0x0004
@@ -73,6 +76,9 @@ internal object WindowPinning {
 
     /** (HWND)1 — the bottom of the z-order. */
     private val HWND_BOTTOM: HWND = HWND(Pointer.createConstant(1L))
+
+    /** (HWND)-2 — above nothing in particular; clears the topmost band. */
+    private val HWND_NOTOPMOST: HWND = HWND(Pointer.createConstant(-2L))
 
     /** Slow enough to be free, fast enough that a stray raise is not noticed. */
     private const val POLL_MILLIS = 1_500
@@ -131,6 +137,35 @@ internal object WindowPinning {
             // PREVIOUS value, so its result says nothing about whether the new
             // one took.
             user32.GetWindowLong(hwnd, GWL_EXSTYLE) and wanted == wanted
+        }
+    }
+
+    /**
+     * Takes a window OUT of the always-on-top band, and says whether it was in
+     * it to begin with.
+     *
+     * The main window is an ordinary application window and must never be
+     * topmost — a zmanim board that floats over everything cannot be worked
+     * behind, and on this machine one was measured sitting at
+     * WS_EX_TOPMOST while a second instance of the same build was not. Rather
+     * than chase which of the tray, the reminder popup or the widget leaked the
+     * flag onto the wrong HWND, the main window asserts NOTOPMOST for itself
+     * once it is displayable. Asserting a property you depend on is cheaper
+     * than proving nothing can ever set it.
+     *
+     * Returns true when the flag had to be cleared, so a caller can log that it
+     * actually happened rather than assume the problem is gone.
+     */
+    fun clearTopmost(window: Window): Boolean {
+        val hwnd = hwndOf(window) ?: return false
+        return guard("clear always-on-top") {
+            val user32 = User32.INSTANCE
+            val was = user32.GetWindowLong(hwnd, GWL_EXSTYLE) and WS_EX_TOPMOST != 0
+            user32.SetWindowPos(
+                hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE,
+            )
+            was
         }
     }
 
