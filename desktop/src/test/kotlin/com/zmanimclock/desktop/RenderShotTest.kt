@@ -34,12 +34,15 @@ class RenderShotTest {
     private val out = File(System.getProperty("shot.dir") ?: "C:/gtmp/shots").apply { mkdirs() }
 
     /**
-     * The real window size, so a shot shows what the user will actually get.
-     * Rendering at some other size hides exactly the class of bug these shots
-     * exist to catch — text that fits at 860 wide and clips at 720.
+     * THE REAL WINDOW SIZE. Keep it in step with Main.kt's rememberWindowState.
+     *
+     * Rendering at any other size hides the exact class of bug these shots
+     * exist to catch: text that fits at 860 wide and clips at 620. Both of the
+     * clipping bugs this project shipped would have been visible here, and
+     * neither was, because the shots were being taken at the wrong width.
      */
-    private val windowW = 720
-    private val windowH = 560
+    private val windowW = 620
+    private val windowH = 540
 
     private fun shot(name: String, dark: Boolean, content: @Composable () -> Unit) {
         ImageComposeScene(width = windowW, height = windowH, density = Density(1f)).use { scene ->

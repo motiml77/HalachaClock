@@ -70,7 +70,14 @@ private fun runApp(args: Array<String>) = application {
     val scheduler = remember { ReminderScheduler(service) }
 
     var mainVisible by remember { mutableStateOf(!startHidden) }
-    val mainState = rememberWindowState(width = 720.dp, height = 560.dp)
+
+    // Sized to the CONTENT, not to what a desktop can spare. Once the zman
+    // rows stopped stretching their name and time to opposite edges there was
+    // nothing left asking for width, and a zmanim board has no business taking
+    // half a monitor. Every pane was rendered at this size and checked for
+    // clipping — the month grid still reads, the settings chips still wrap,
+    // and the longest zman label still fits on one line.
+    val mainState = rememberWindowState(width = 620.dp, height = 540.dp)
 
     LaunchedEffect(scheduler) { scheduler.run() }
     val pending by scheduler.pending.collectAsState()
@@ -138,6 +145,11 @@ private fun runApp(args: Array<String>) = application {
                 if (WindowPinning.clearTopmost(window)) {
                     println("main window was always-on-top; cleared")
                 }
+                // A floor, not a preference. Below roughly this the month grid
+                // loses a column and the settings chips stop wrapping into
+                // anything readable, so dragging smaller is simply refused
+                // rather than allowed to produce a broken layout.
+                window.minimumSize = java.awt.Dimension(560, 460)
             }
 
             ZmanimDesktopTheme {
