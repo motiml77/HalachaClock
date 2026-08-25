@@ -70,12 +70,16 @@ import java.util.Locale
  */
 @Composable
 fun SettingsPane(service: DesktopZmanimService) {
-    Row(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
+    // Two columns of CARDS on the window background, with space between them
+    // instead of a rule. A vertical divider between two dense columns was one
+    // more line in a pane that already had too many; the gap does the same
+    // separating and lets each card read as its own object, the way the
+    // zmanim list and the hero do on the other tab.
+    Row(
+        Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         LocationHalf(service, Modifier.weight(1f).fillMaxHeight())
-        VerticalDivider(
-            Modifier.padding(horizontal = 10.dp),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
         FiltersHalf(service, Modifier.weight(1f).fillMaxHeight())
     }
 }
@@ -89,19 +93,27 @@ private fun LocationHalf(service: DesktopZmanimService, modifier: Modifier) {
     val city = service.city
     val results = remember(query) { service.searchCities(query) }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // Scrolls, like the filters column opposite it. Without this the city
+    // picker below took weight(1f) in a column that already overflowed and
+    // collapsed to nothing — the card vanished entirely.
+    Column(
+        modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
 
         // ---- 1. מיקום ----
-        SectionTitle("מיקום")
-
-        Panel {
+        Panel("מיקום") {
             Text(
                 city.nameHebrew,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            if (city.region.isNotBlank()) Hint(city.region, MaterialTheme.colorScheme.primary)
+            // Only when it ADDS something. For Jerusalem the region is
+            // "ירושלים" too, and the card printed the same word twice.
+            if (city.region.isNotBlank() && city.region != city.nameHebrew) {
+                Hint(city.region, MaterialTheme.colorScheme.primary)
+            }
 
             Spacer(Modifier.height(2.dp))
 
@@ -123,31 +135,35 @@ private fun LocationHalf(service: DesktopZmanimService, modifier: Modifier) {
             Hint("הגובה אינו נכנס לחישוב — הכל לפי היום המישורי.")
         }
 
-        SearchBox(query, { query = it }, "חיפוש יישוב…")
-
-        Hint(
-            if (query.isBlank()) "${service.allCities.size} יישובים"
-            else "${results.size} תוצאות",
-        )
-
-        // weight() rather than a fixed height: the list takes whatever the
-        // other sections leave, so nothing below it is ever pushed off-screen.
-        Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(8.dp))) {
-            LazyColumn(Modifier.fillMaxSize()) {
-                items(results, key = { it.id }) { c ->
-                    CityRow(c, selected = c.id == city.id) {
-                        service.update { p -> p.copy(cityId = c.id) }
+        // The search box, the count and the list are ONE thing — picking a
+        // city — so they sit in one card. They used to float bare on the
+        // window background between two cards, which made the search field
+        // look like it belonged to neither.
+        Panel("בחירת יישוב") {
+            SearchBox(query, { query = it }, "חיפוש יישוב…")
+            Hint(
+                if (query.isBlank()) "${service.allCities.size} יישובים"
+                else "${results.size} תוצאות",
+            )
+            // A fixed height, because the column around this one scrolls and
+            // weight() has nothing to divide there. 190dp is about six cities
+            // — enough to show that the list IS a list and scrolls, without
+            // pushing the calculation settings off the bottom.
+            Box(Modifier.height(190.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp))) {
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(results, key = { it.id }) { c ->
+                        CityRow(c, selected = c.id == city.id) {
+                            service.update { p -> p.copy(cityId = c.id) }
+                        }
                     }
                 }
             }
         }
 
         // ---- 2. הגדרות חישוב ----
-        SectionTitle("הגדרות חישוב")
         CalculationPanel(service)
 
         // ---- 5. הפעלה עם Windows ----
-        SectionTitle("הפעלה עם Windows")
         AutostartPanel(service)
     }
 }
@@ -221,7 +237,7 @@ private fun CityRow(city: CityInfo, selected: Boolean, onClick: () -> Unit) {
 private fun CalculationPanel(service: DesktopZmanimService) {
     val prefs = service.prefs
 
-    Panel {
+    Panel("הגדרות חישוב") {
         // --- הדלקת נרות ---
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -318,8 +334,7 @@ private fun FiltersHalf(service: DesktopZmanimService, modifier: Modifier) {
     ) {
 
         // ---- 3. "הזמן הבא" ----
-        SectionTitle("\"הזמן הבא\"")
-        Panel {
+        Panel("\"הזמן הבא\"") {
             Hint(
                 if (prefs.nextZmanFilter.isEmpty()) "כל הזמנים נחשבים — לפי הסדר"
                 else "${prefs.nextZmanFilter.size} זמנים נבחרו",
@@ -339,8 +354,7 @@ private fun FiltersHalf(service: DesktopZmanimService, modifier: Modifier) {
         }
 
         // ---- 4. תזכורות ----
-        SectionTitle("תזכורות")
-        Panel {
+        Panel("תזכורות") {
             Hint(
                 if (prefs.reminderZmanim.isEmpty()) "אין תזכורות — ברירת המחדל"
                 else "${prefs.reminderZmanim.size} תזכורות פעילות",
@@ -407,7 +421,7 @@ private fun ZmanChipGrid(
 @Composable
 private fun AutostartPanel(service: DesktopZmanimService) {
     val prefs = service.prefs
-    Panel {
+    Panel("הפעלה עם Windows") {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
                 checked = prefs.startWithWindows,
@@ -430,31 +444,46 @@ private fun AutostartPanel(service: DesktopZmanimService) {
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-    )
-}
-
-@Composable
 private fun Hint(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = color)
 }
 
-/** A surface block. Not material3.Card — Card's default padding is phone-sized. */
+/**
+ * One settings section as a single card.
+ *
+ * The heading used to float as bare coloured text ABOVE a separate grey block,
+ * so every section read as two disconnected things and the pane came out as a
+ * ladder of loose parts. Title and body now live in one rounded card with a
+ * hairline border — the same 16dp card the zmanim list and the day hero use,
+ * so all three tabs are visibly the same product.
+ */
 @Composable
-private fun Panel(content: @Composable ColumnScope.() -> Unit) {
+private fun Panel(
+    title: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(14.dp)
     Column(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-        content = content,
-    )
+        modifier.fillMaxWidth()
+            .clip(shape)
+            .background(cs.surface)
+            .border(1.dp, cs.outlineVariant.copy(alpha = 0.6f), shape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (title != null) {
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = cs.primary,
+                modifier = Modifier.padding(bottom = 2.dp),
+            )
+        }
+        content()
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -477,7 +506,7 @@ private fun ChipFlow(content: @Composable () -> Unit) {
 @Composable
 private fun SmallChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(5.dp)
+    val shape = RoundedCornerShape(50)
     Box(
         Modifier.clip(shape)
             .background(if (selected) cs.primaryContainer else cs.background)
