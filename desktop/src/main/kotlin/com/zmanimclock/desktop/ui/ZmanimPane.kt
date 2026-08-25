@@ -85,7 +85,7 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
                     view.hebrewDate,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = cs.onPrimary,
+                    color = ext.heroText,
                 )
                 Text(
                     "${view.gregorianDate} · ${view.weekdayName} · ${view.cityName}",
@@ -97,25 +97,33 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
         }
 
         if (view.headlineLabel != null && view.headlineTime != null) {
+            // Sized to its contents, NOT to the window.
+            //
+            // This card used to take weight(1f) and stretch the whole width, so
+            // a label and a time — five words between them — sat inside a box
+            // most of which was empty, and on any day that is not today, where
+            // there is no countdown, the entire left half was blank. A card
+            // that hugs what it holds says the same thing without the hole.
             Row(
                 Modifier.padding(top = 8.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(ext.heroInner)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Column(Modifier.weight(1f)) {
+                Column {
                     Text(
                         view.headlineLabel,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = ext.heroLabel,
                     )
                     Text(
                         view.headlineTime,
                         fontFamily = ZmanNumberFamily,
-                        fontSize = 26.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        color = cs.onPrimary,
+                        color = ext.heroText,
                     )
                 }
                 if (view.isToday) {

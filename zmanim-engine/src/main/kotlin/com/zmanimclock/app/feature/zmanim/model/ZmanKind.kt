@@ -56,18 +56,26 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     CHATZOT("חצות היום"),
     MINCHA_GEDOLA("מנחה גדולה"),
     MINCHA_KETANA("מנחה קטנה"),
-    // Both plag rows say which end of the day they measure back from. The
-    // app shows two tzeit values and only one of them defines the halachic
-    // day for the seasonal-hour divisions, so an unqualified "פלג המנחה" left
-    // the reader no way to tell which — see PlagHaminchaTest.
-    PLAG_HAMINCHA("פלג המנחה (מצאת הכוכבים)", "פלג המנחה"),
-    // A second shita, shown alongside — not instead of — the luach's own.
-    // The luach measures plag back from TZEIT; the GRA reckoning measures it
-    // back from SHKIA, which is what most Religious-Zionist calendars publish.
-    // Both are verified against their own authorities; the ~11-16 minute gap
-    // between them is the 13.5 zmaniyot minutes of tzeit and is a machloket,
-    // not a defect.
-    PLAG_HAMINCHA_GRA("פלג המנחה (גר\"א — מהשקיעה)", "פלג גר\"א"),
+    // BOTH plag rows are named for WHAT THEY MEASURE BACK FROM, and for
+    // nothing else. Wording set by the app's owner.
+    //
+    // The two rows differ by exactly the 13.5 zmaniyot minutes between shkia
+    // and tzeit — a machloket, not a defect, each verified against its own
+    // authority (see PlagHaminchaTest). An unqualified "פלג המנחה" would leave
+    // a reader no way to tell which of the two he is looking at.
+    //
+    // The earlier label credited the second row to the גר"א. Dropped: the
+    // printed לוח אור החיים carries no such row and so gives it no name, and
+    // for a Sephardi reader an Ashkenazi attribution invites him to discount a
+    // time that R' David Yosef in fact holds. The measurement is the honest
+    // description and needs no posek's name attached.
+    //
+    // NOTE the constant names stay as they are. They are persisted verbatim in
+    // the widget's saved selection (WidgetPrefs / DesktopPrefs.widgetZmanim
+    // store ZmanKind.name), so renaming one silently drops that row from every
+    // widget already configured.
+    PLAG_HAMINCHA("פלג המנחה (מצאה\"כ)", "פלג מצאה\"כ"),
+    PLAG_HAMINCHA_GRA("פלג המנחה (מהשקיעה)", "פלג מהשקיעה"),
     SHKIA("שקיעה"),
     // Naming per the user's ruling: the DEFAULT tzeit shown is the 6.2° one
     // (three medium stars); the 13.5-zmaniyot Geonim time is the kulah.

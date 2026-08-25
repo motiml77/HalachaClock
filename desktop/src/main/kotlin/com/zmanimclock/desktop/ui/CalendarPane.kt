@@ -126,7 +126,8 @@ fun CalendarPane(service: DesktopZmanimService) {
                 selected = today
                 monthIndex = HebrewMonthSequence.clamp(todayMonthIndex)
             },
-            modifier = Modifier.weight(0.45f).fillMaxHeight(),
+            // The month takes whatever the window has SPARE.
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         VerticalDivider()
         DaySide(
@@ -134,10 +135,26 @@ fun CalendarPane(service: DesktopZmanimService) {
             service = service,
             now = now,
             onShiftDay = { selected = selected.plusDays(it.toLong()) },
-            modifier = Modifier.weight(0.55f).fillMaxHeight(),
+            // FIXED, and equal to the whole window on the zmanim tab.
+            //
+            // These were 0.45/0.55 of the window, which meant opening the
+            // calendar RESIZED the zmanim column — the same list, the same
+            // rows, at a different width, so switching tabs made the times
+            // jump about. The day column is now the same width wherever it
+            // appears and the month grid is a genuine ADDITION beside it, not
+            // a renegotiation of the space.
+            modifier = Modifier.width(DAY_SIDE_WIDTH).fillMaxHeight(),
         )
     }
 }
+
+/**
+ * The zmanim column's width, on the calendar tab and on the zmanim tab alike.
+ *
+ * Equal to MainTab.ZMANIM's window width, so the list looks identical in both
+ * places. If one moves, move the other.
+ */
+private val DAY_SIDE_WIDTH = 400.dp
 
 // ---------------------------------------------------------------------------
 // Month side

@@ -76,6 +76,17 @@ private val DarkColors = darkColorScheme(
 /** Extended roles the M3 scheme has no slot for — mirrors the Android app. */
 data class DesktopExtras(
     val accentGold: Color,
+    /**
+     * Text ON the hero band. NOT colorScheme.onPrimary.
+     *
+     * onPrimary is defined to sit on `primary`, and in a dark scheme that
+     * makes it DARK — #0B2352 here. The hero is not painted with `primary`,
+     * it is painted with heroTop/heroBottom, so using onPrimary there put a
+     * dark navy Hebrew date and a dark navy headline time on a navy band.
+     * The date was the app's largest text and it was the hardest to read.
+     * The hero owns its own foreground, in both themes.
+     */
+    val heroText: Color,
     val onAccentGold: Color,
     val deadline: Color,
     val deadlineContainer: Color,
@@ -88,6 +99,7 @@ data class DesktopExtras(
 
 private val ExtrasLight = DesktopExtras(
     accentGold = Gold,
+    heroText = Color.White,
     onAccentGold = Color(0xFF12203A),
     deadline = Color(0xFFC24A00),
     deadlineContainer = Color(0xFFFFE1CC),
@@ -100,6 +112,7 @@ private val ExtrasLight = DesktopExtras(
 
 private val ExtrasDark = DesktopExtras(
     accentGold = Gold,
+    heroText = Color(0xFFF2F6FF),
     onAccentGold = Color(0xFF12203A),
     deadline = Color(0xFFFFAE7E),
     deadlineContainer = Color(0xFF5E2C00),

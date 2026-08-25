@@ -41,11 +41,11 @@ class RenderShotTest {
      * clipping bugs this project shipped would have been visible here, and
      * neither was, because the shots were being taken at the wrong width.
      */
-    private val windowW = 620
-    private val windowH = 540
+    private val windowW = 400
+    private val windowH = 560
 
-    private fun shot(name: String, dark: Boolean, content: @Composable () -> Unit) {
-        ImageComposeScene(width = windowW, height = windowH, density = Density(1f)).use { scene ->
+    private fun shot(name: String, dark: Boolean, w: Int, content: @Composable () -> Unit) {
+        ImageComposeScene(width = w, height = windowH, density = Density(1f)).use { scene ->
             scene.setContent {
                 ZmanimDesktopTheme(dark = dark) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -68,12 +68,16 @@ class RenderShotTest {
      * their window is legible — which is how the dark surfaces stayed at
      * near-black long enough to ship.
      */
-    private fun both(name: String, content: @Composable () -> Unit) {
-        shot(name, dark = false, content = content)
-        shot(name, dark = true, content = content)
+    private fun both(name: String, w: Int = windowW, content: @Composable () -> Unit) {
+        shot(name, dark = false, w = w, content = content)
+        shot(name, dark = true, w = w, content = content)
     }
 
-    @Test fun zmanim() = both("desk_zmanim") { ZmanimPane(service()) }
-    @Test fun calendar() = both("desk_calendar") { CalendarPane(service()) }
-    @Test fun settings() = both("desk_settings") { SettingsPane(service()) }
+    // Each pane is shot at the width its own tab opens the window to — see
+    // MainTab. Shooting them all at one width is what let the near-black
+    // palette and the clipped labels through: a pane looks fine at a size
+    // nobody ever sees it at.
+    @Test fun zmanim() = both("desk_zmanim", 400) { ZmanimPane(service()) }
+    @Test fun calendar() = both("desk_calendar", 780) { CalendarPane(service()) }
+    @Test fun settings() = both("desk_settings", 620) { SettingsPane(service()) }
 }
