@@ -1,5 +1,6 @@
 package com.zmanimclock.desktop.data
 
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import java.io.File
 import java.util.Properties
 
@@ -64,8 +65,13 @@ data class DesktopPrefs(
             if (!f.exists()) return DesktopPrefs()
             val p = Properties()
             runCatching { f.inputStream().use { p.load(it) } }.getOrElse { return DesktopPrefs() }
-            fun set(key: String): Set<String> =
-                p.getProperty(key).orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            // Every one of these sets holds ZmanKind.name strings, saved
+            // under whatever names the constants carried at the time — read
+            // them back through canonicalNames so a rename does not silently
+            // empty a filter. See ZmanKind.legacyName.
+            fun set(key: String): Set<String> = ZmanKind.canonicalNames(
+                p.getProperty(key).orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() },
+            ).toSet()
             val defaults = DesktopPrefs()
             return DesktopPrefs(
                 cityId = p.getProperty("cityId") ?: defaults.cityId,

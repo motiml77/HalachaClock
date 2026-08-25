@@ -51,7 +51,11 @@ object WidgetPrefs {
         // user had just removed, with the config screen (if #13's
         // reconfigure route is even reachable) still showing them unchecked.
         val raw = p.getString(zmanimKey(widgetId), null)
-        val zmanim = if (raw == null) DEFAULT_SELECTION else raw.split(",").filter { it.isNotBlank() }
+        // canonicalNames both drops names that no longer exist and updates
+        // the ones a constant has since been renamed away from, so a widget
+        // configured by an earlier version keeps the rows it was given.
+        val zmanim = if (raw == null) DEFAULT_SELECTION
+        else ZmanKind.canonicalNames(raw.split(",").filter { it.isNotBlank() })
         val config = Config(
             showHebrewDate = p.getBoolean(key(widgetId, "date"), true),
             showNextZman = p.getBoolean(key(widgetId, "next"), true),

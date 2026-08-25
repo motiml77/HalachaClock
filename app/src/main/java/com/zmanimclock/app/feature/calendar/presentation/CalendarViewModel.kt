@@ -91,7 +91,11 @@ class CalendarViewModel @Inject constructor(
     /** Zman kinds with at least one active alarm — drives the bell markers. */
     val alertedKinds: StateFlow<Set<String>> =
         alarmDao.getActiveAlarms()
-            .map { list -> list.filter { it.type == AlarmType.ZMAN }.map { it.zmanId }.toSet() }
+            .map { list ->
+                ZmanKind.canonicalNames(
+                    list.filter { it.type == AlarmType.ZMAN }.map { it.zmanId },
+                ).toSet()
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     private val selected = MutableStateFlow(

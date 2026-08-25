@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.location.model.AppGeoLocation
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -96,8 +97,12 @@ class UserPreferencesRepository @Inject constructor(
             useElevation = prefs[Keys.USE_ELEVATION] ?: true,
             candleLightingMinutes = prefs[Keys.CANDLE_LIGHTING_MIN] ?: 20,
             tzeitShabbatMinutes = prefs[Keys.TZEIT_SHABBAT_MIN] ?: 40,
-            nextZmanFilter = prefs[Keys.NEXT_ZMAN_FILTER]
-                ?.split(",")?.filter { it.isNotBlank() }?.toSet().orEmpty(),
+            // Through canonicalNames, because this set was written with
+            // whatever names the constants carried on the day the user saved
+            // it — see ZmanKind.legacyName.
+            nextZmanFilter = ZmanKind.canonicalNames(
+                prefs[Keys.NEXT_ZMAN_FILTER]?.split(",")?.filter { it.isNotBlank() }.orEmpty(),
+            ).toSet(),
             nusach = prefs[Keys.NUSACH] ?: "sephardi",
             primaryShita = prefs[Keys.PRIMARY_SHITA] ?: "both",
             darkMode = prefs[Keys.DARK_MODE] ?: "system",
@@ -144,8 +149,9 @@ class UserPreferencesRepository @Inject constructor(
         useGps = dpsPrefs.getBoolean("useGps", false),
         candleLightingMinutes = dpsPrefs.getInt("candle", 20),
         tzeitShabbatMinutes = dpsPrefs.getInt("tzeitShabbat", 40),
-        nextZmanFilter = dpsPrefs.getString("nextZmanFilter", "")
-            .orEmpty().split(",").filter { it.isNotBlank() }.toSet(),
+        nextZmanFilter = ZmanKind.canonicalNames(
+            dpsPrefs.getString("nextZmanFilter", "").orEmpty().split(",").filter { it.isNotBlank() },
+        ).toSet(),
         persistentNotification = dpsPrefs.getBoolean("persistent", true),
     )
 

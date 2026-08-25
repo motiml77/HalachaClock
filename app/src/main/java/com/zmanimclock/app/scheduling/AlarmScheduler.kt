@@ -243,8 +243,8 @@ class AlarmScheduler @Inject constructor(
 
     private fun mgaFallback(day: com.zmanimclock.app.feature.zmanim.engine.DayZmanim, kind: ZmanKind): Instant? =
         when (kind) {
-            ZmanKind.SOF_ZMAN_SHMA_MGA_72 -> day.sofZmanShmaMga
-            ZmanKind.SOF_ZMAN_TFILA_MGA_72 -> day.sofZmanTfilaMga
+            ZmanKind.SOF_ZMAN_SHMA_MGA_16_1_DEG -> day.sofZmanShmaMga
+            ZmanKind.SOF_ZMAN_TFILA_MGA_16_1_DEG -> day.sofZmanTfilaMga
             else -> null
         }
 

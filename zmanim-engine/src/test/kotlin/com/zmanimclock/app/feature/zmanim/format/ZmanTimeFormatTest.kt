@@ -116,7 +116,7 @@ class ZmanTimeFormatTest {
         assertEquals("00:45", t(ZmanKind.CHATZOT_LAYLA))
         assertEquals("04:35", t(ZmanKind.ALOT_HASHACHAR))       // :47 — rounds to 04:36
         assertEquals("05:57", t(ZmanKind.HANETZ))
-        assertEquals("08:40", t(ZmanKind.SOF_ZMAN_SHMA_MGA))
+        assertEquals("08:40", t(ZmanKind.SOF_ZMAN_SHMA_MGA_72_ZMANIYOT))
         assertEquals("09:21", t(ZmanKind.SOF_ZMAN_SHMA_GRA))
         assertEquals("12:45", t(ZmanKind.CHATZOT))
         assertEquals("19:32", t(ZmanKind.SHKIA))

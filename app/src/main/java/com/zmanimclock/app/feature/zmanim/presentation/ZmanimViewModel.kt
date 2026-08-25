@@ -44,7 +44,9 @@ class ZmanimViewModel @Inject constructor(
     val alertedKinds: StateFlow<Set<String>> =
         alarmDao.getActiveAlarms()
             .map { alarms ->
-                alarms.filter { it.type == AlarmType.ZMAN }.map { it.zmanId }.toSet()
+                ZmanKind.canonicalNames(
+                    alarms.filter { it.type == AlarmType.ZMAN }.map { it.zmanId },
+                ).toSet()
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 

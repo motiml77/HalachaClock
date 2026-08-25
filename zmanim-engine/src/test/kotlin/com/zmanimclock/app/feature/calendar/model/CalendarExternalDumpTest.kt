@@ -129,7 +129,7 @@ class CalendarExternalDumpTest {
         )
         val kinds = listOf(
             ZmanKind.ALOT_HASHACHAR, ZmanKind.MISHEYAKIR, ZmanKind.HANETZ,
-            ZmanKind.SOF_ZMAN_SHMA_MGA, ZmanKind.SOF_ZMAN_SHMA_GRA,
+            ZmanKind.SOF_ZMAN_SHMA_MGA_72_ZMANIYOT, ZmanKind.SOF_ZMAN_SHMA_GRA,
             ZmanKind.SOF_ZMAN_TFILA_GRA, ZmanKind.CHATZOT,
             ZmanKind.MINCHA_GEDOLA, ZmanKind.MINCHA_KETANA, ZmanKind.PLAG_HAMINCHA,
             ZmanKind.SHKIA, ZmanKind.TZEIT_HAKOCHAVIM, ZmanKind.TZEIT_LECHUMRA,

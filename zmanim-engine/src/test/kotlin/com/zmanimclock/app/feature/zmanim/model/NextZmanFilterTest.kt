@@ -38,7 +38,7 @@ class NextZmanFilterTest {
         // NOT שקיעה, because nothing has been narrowed.
         val next = nextRelevantZman(day, date, at(6, 30), null, emptySet())
         assertNotNull(next)
-        assertEquals(ZmanKind.SOF_ZMAN_SHMA_MGA, next!!.first)
+        assertEquals(ZmanKind.SOF_ZMAN_SHMA_MGA_72_ZMANIYOT, next!!.first)
     }
 
     @Test

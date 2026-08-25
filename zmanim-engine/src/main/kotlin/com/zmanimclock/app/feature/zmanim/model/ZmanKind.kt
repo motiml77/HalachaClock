@@ -10,13 +10,17 @@ import java.time.temporal.ChronoUnit
 import java.util.GregorianCalendar
 
 /**
- * Stable identifiers for alert-able zmanim. Alert rows store [name], so these
- * names must never be renamed once released.
+ * Identifiers for alert-able zmanim.
  *
- * [hebrewName] is used in notifications; screens localize via resources.
- */
-/**
- * [hebrewName] is the full list label (with the shita qualifier);
+ * [name] is persisted VERBATIM in three places — an alarm stores it as
+ * `alarm.zmanId` in Room, the next-zman filter as a DataStore string, each
+ * widget's selection in SharedPreferences — so a constant may only be
+ * renamed together with an entry in legacyName, which keeps a string the
+ * user already saved resolving to the same zman. Every read of a stored
+ * selection goes through [canonicalNames] for the same reason.
+ *
+ * [hebrewName] is the full list label, carrying the shita qualifier, and is
+ * what notifications fall back to; screens localize via resources.
  * [shortName] is the compact display used in notifications — no degree or
  * minute suffixes, per the user's preference.
  */
@@ -32,17 +36,22 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     // regardless (see MaranZmanimEngine), so adding this row changes no
     // computed value anywhere.
     HANETZ_MISHOR("הנץ מישור (אסטרונומי)", "הנץ מישור"),
-    // The CONSTANT NAMES are frozen: they are persisted as `alarm.zmanId` and
-    // resolved back through fromNameOrNull, so renaming one would orphan every
-    // alarm a user has already saved. Only the labels and the values behind
-    // them moved when the MGA shita was corrected to the luach's own (72
-    // zmaniyot minutes); _MGA is now that, and _MGA_72 carries the 16.1°
-    // reading that used to sit on _MGA.
-    SOF_ZMAN_SHMA_MGA("ק\"ש מג\"א 72 ד\"ז", "ק\"ש מג\"א"),
-    SOF_ZMAN_SHMA_MGA_72("ק\"ש מג\"א 16.1°", "ק\"ש מג\"א"),
+    // TWO MGA readings of each morning deadline, and the suffix says which:
+    // _72_ZMANIYOT is the luach's own shita — the day stretched by 72
+    // ZMANIYOT minutes at each end — while _16_1_DEG is the fixed 16.1° solar
+    // depression. They are ~9 minutes apart in Jerusalem, so a name that does
+    // not say which one it is, is a trap: this pair used to be called _MGA and
+    // _MGA_72, where the constant whose name ended in 72 was in fact the 16.1°
+    // one. That already produced a wrong row in docs/VERIFICATION_TABLES.md.
+    //
+    // The retired names are still resolvable — see legacyName() below. They
+    // were written verbatim into saved alarms, widget selections and the
+    // next-zman filter, so they have to keep meaning what they meant.
+    SOF_ZMAN_SHMA_MGA_72_ZMANIYOT("ק\"ש מג\"א 72 ד\"ז", "ק\"ש מג\"א"),
+    SOF_ZMAN_SHMA_MGA_16_1_DEG("ק\"ש מג\"א 16.1°", "ק\"ש מג\"א"),
     SOF_ZMAN_SHMA_GRA("סוף זמן ק\"ש גר\"א", "ק\"ש גר\"א"),
-    SOF_ZMAN_TFILA_MGA("תפילה מג\"א 72 ד\"ז", "תפילה מג\"א"),
-    SOF_ZMAN_TFILA_MGA_72("תפילה מג\"א 16.1°", "תפילה מג\"א"),
+    SOF_ZMAN_TFILA_MGA_72_ZMANIYOT("תפילה מג\"א 72 ד\"ז", "תפילה מג\"א"),
+    SOF_ZMAN_TFILA_MGA_16_1_DEG("תפילה מג\"א 16.1°", "תפילה מג\"א"),
     SOF_ZMAN_TFILA_GRA("סוף זמן תפילה גר\"א", "תפילה גר\"א"),
     CHATZOT("חצות היום"),
     MINCHA_GEDOLA("מנחה גדולה"),
@@ -70,7 +79,38 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     CANDLE_LIGHTING("הדלקת נרות");
 
     companion object {
-        fun fromNameOrNull(name: String): ZmanKind? = entries.firstOrNull { it.name == name }
+        fun fromNameOrNull(name: String): ZmanKind? =
+            entries.firstOrNull { it.name == name } ?: legacyName(name)
+
+        /**
+         * Persisted [name] strings mapped onto the names those zmanim carry
+         * TODAY, dropping any string that no longer names a zman at all.
+         *
+         * Call this wherever a stored selection is READ — the next-zman
+         * filter, a widget's zman list, the set of kinds that have an alarm —
+         * so that everything downstream compares current names only.
+         */
+        fun canonicalNames(names: Collection<String>): List<String> =
+            names.mapNotNull { fromNameOrNull(it)?.name }
+
+        /**
+         * Names a constant used to carry, and the constant carrying that
+         * meaning now.
+         *
+         * [name] is written verbatim into `alarm.zmanId` (Room), the
+         * next-zman filter (DataStore) and each widget's selection
+         * (SharedPreferences), so an entry here is the ONLY surviving record
+         * of what an already-saved string meant. Never delete one, and never
+         * hand a retired name to a different zman — an alarm set for one zman
+         * would start ringing for another.
+         */
+        private fun legacyName(name: String): ZmanKind? = when (name) {
+            "SOF_ZMAN_SHMA_MGA" -> SOF_ZMAN_SHMA_MGA_72_ZMANIYOT
+            "SOF_ZMAN_SHMA_MGA_72" -> SOF_ZMAN_SHMA_MGA_16_1_DEG
+            "SOF_ZMAN_TFILA_MGA" -> SOF_ZMAN_TFILA_MGA_72_ZMANIYOT
+            "SOF_ZMAN_TFILA_MGA_72" -> SOF_ZMAN_TFILA_MGA_16_1_DEG
+            else -> null
+        }
     }
 }
 
@@ -158,7 +198,11 @@ fun nextRelevantZman(
      */
     eligible: Set<String> = emptySet(),
 ): Pair<ZmanKind, Instant>? {
-    fun allowed(kind: ZmanKind) = eligible.isEmpty() || kind.name in eligible
+    // Resolved through fromNameOrNull rather than compared as raw strings, so
+    // a filter saved under a name its constant no longer carries still picks
+    // out the zman the user actually chose.
+    val eligibleKinds = eligible.mapNotNullTo(mutableSetOf()) { ZmanKind.fromNameOrNull(it) }
+    fun allowed(kind: ZmanKind) = eligible.isEmpty() || kind in eligibleKinds
 
     val candidates = today.relevantTimedZmanim(date)
         .filter { (kind, instant) -> instant.isAfter(now) && allowed(kind) }
@@ -190,11 +234,11 @@ fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.MISHEYAKIR -> misheyakir60 // luach standard: one shaah zmanit before the netz
     ZmanKind.HANETZ -> hanetzVisible ?: hanetzMishor
     ZmanKind.HANETZ_MISHOR -> hanetzMishor
-    ZmanKind.SOF_ZMAN_SHMA_MGA -> sofZmanShmaMga
-    ZmanKind.SOF_ZMAN_SHMA_MGA_72 -> sofZmanShmaMga16
+    ZmanKind.SOF_ZMAN_SHMA_MGA_72_ZMANIYOT -> sofZmanShmaMga
+    ZmanKind.SOF_ZMAN_SHMA_MGA_16_1_DEG -> sofZmanShmaMga16
     ZmanKind.SOF_ZMAN_SHMA_GRA -> sofZmanShmaGra
-    ZmanKind.SOF_ZMAN_TFILA_MGA -> sofZmanTfilaMga
-    ZmanKind.SOF_ZMAN_TFILA_MGA_72 -> sofZmanTfilaMga16
+    ZmanKind.SOF_ZMAN_TFILA_MGA_72_ZMANIYOT -> sofZmanTfilaMga
+    ZmanKind.SOF_ZMAN_TFILA_MGA_16_1_DEG -> sofZmanTfilaMga16
     ZmanKind.SOF_ZMAN_TFILA_GRA -> sofZmanTfilaGra
     ZmanKind.CHATZOT -> chatzot
     ZmanKind.MINCHA_GEDOLA -> minchaGedola
