@@ -48,6 +48,13 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     MINCHA_GEDOLA("מנחה גדולה"),
     MINCHA_KETANA("מנחה קטנה"),
     PLAG_HAMINCHA("פלג המנחה"),
+    // A second shita, shown alongside — not instead of — the luach's own.
+    // The luach measures plag back from TZEIT; the GRA reckoning measures it
+    // back from SHKIA, which is what most Religious-Zionist calendars publish.
+    // Both are verified against their own authorities; the ~11-16 minute gap
+    // between them is the 13.5 zmaniyot minutes of tzeit and is a machloket,
+    // not a defect.
+    PLAG_HAMINCHA_GRA("פלג המנחה (גר\"א)", "פלג גר\"א"),
     SHKIA("שקיעה"),
     // Naming per the user's ruling: the DEFAULT tzeit shown is the 6.2° one
     // (three medium stars); the 13.5-zmaniyot Geonim time is the kulah.
@@ -189,6 +196,7 @@ fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.MINCHA_GEDOLA -> minchaGedola
     ZmanKind.MINCHA_KETANA -> minchaKetana
     ZmanKind.PLAG_HAMINCHA -> plagHaminchaYalkutYosef
+    ZmanKind.PLAG_HAMINCHA_GRA -> plagHaminchaGra
     ZmanKind.SHKIA -> shkia
     ZmanKind.TZEIT_HAKOCHAVIM -> tzeitHakochavim
     ZmanKind.TZEIT_LECHUMRA -> tzeitLechumra

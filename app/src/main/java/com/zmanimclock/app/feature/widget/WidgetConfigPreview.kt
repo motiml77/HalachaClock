@@ -54,6 +54,7 @@ internal val ZMAN_GROUPS: List<Pair<String, List<ZmanKind>>> = listOf(
         ZmanKind.MINCHA_GEDOLA,
         ZmanKind.MINCHA_KETANA,
         ZmanKind.PLAG_HAMINCHA,
+        ZmanKind.PLAG_HAMINCHA_GRA,
     ),
     "שקיעה וצאת הכוכבים" to listOf(
         ZmanKind.SHKIA,

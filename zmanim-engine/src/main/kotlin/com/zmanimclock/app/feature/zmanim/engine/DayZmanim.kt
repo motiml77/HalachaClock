@@ -63,6 +63,18 @@ data class DayZmanim(
     val minchaGedola: Instant?,
     val minchaKetana: Instant?,
     val plagHaminchaYalkutYosef: Instant?,
+    /**
+     * Plag by the GRA reckoning — shkia minus 1¼ seasonal hours.
+     *
+     * A SECOND, displayed shita, not a replacement. The luach's own plag
+     * (above) measures back from tzeit and is verified against it to the
+     * second; this one measures back from shkia, which is what the widely-used
+     * Religious-Zionist calendars (yeshiva.org.il among them) publish. The two
+     * differ by exactly the 13.5 zmaniyot minutes of tzeit — about 15 minutes
+     * in midsummer, 11 in midwinter — so the gap is a shita, not an error, and
+     * showing both lets a user follow either.
+     */
+    val plagHaminchaGra: Instant?,
 
     // Sunset / night
     val shkia: Instant?,

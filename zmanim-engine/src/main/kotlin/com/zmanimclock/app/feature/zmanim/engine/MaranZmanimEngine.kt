@@ -163,6 +163,10 @@ class MaranZmanimEngine @Inject constructor() {
 
         // Plag hamincha (Yalkut Yosef): one hour and 15 zmaniyot minutes before tzeit
         val plag = tzeit.minusMillis((shaahGra * PLAG_YY_SHAOS_BEFORE_TZEIT).toLong())
+        // Plag by the GRA reckoning: the same 1¼ seasonal hours, but measured
+        // back from SHKIA rather than from tzeit. Displayed alongside the
+        // luach's own, never instead of it.
+        val plagGra = sunset.minusMillis((shaahGra * PLAG_YY_SHAOS_BEFORE_TZEIT).toLong())
 
         // Solar midnight: 12 mean hours after chatzot (luach convention)
         val chatzotLayla = chatzot.plusMillis(Duration.ofHours(12).toMillis())
@@ -189,6 +193,7 @@ class MaranZmanimEngine @Inject constructor() {
             minchaGedola = minchaGedola,
             minchaKetana = minchaKetana,
             plagHaminchaYalkutYosef = plag,
+            plagHaminchaGra = plagGra,
             shkia = sunset,
             tzeitHakochavim = tzeit,
             tzeitLechumra = tzeitLechumra,
@@ -240,6 +245,7 @@ class MaranZmanimEngine @Inject constructor() {
         minchaGedola = null,
         minchaKetana = null,
         plagHaminchaYalkutYosef = null,
+        plagHaminchaGra = null,
         shkia = sunset,
         tzeitHakochavim = null,
         tzeitLechumra = null,
