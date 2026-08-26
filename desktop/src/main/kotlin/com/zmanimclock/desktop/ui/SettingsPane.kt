@@ -408,6 +408,37 @@ private fun AutostartPanel(service: DesktopZmanimService) {
                 }
             }
         }
+
+        // Not autostart, but the same kind of setting: how the app behaves on
+        // the machine rather than what it computes. Both live on one card so
+        // the "system behaviour" questions are answered in one place.
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = prefs.dockTabAlwaysOnTop,
+                onCheckedChange = { on ->
+                    service.update { it.copy(dockTabAlwaysOnTop = on) }
+                },
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "הסימניה במצב מזעור תופיע מעל כל החלונות",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                // Stated rather than discovered: a topmost window is still
+                // covered by anything running truly fullscreen, because
+                // Windows gives exclusive-fullscreen apps priority over the
+                // topmost band. Better said here than found in a cinema.
+                Hint(
+                    if (prefs.dockTabAlwaysOnTop) {
+                        "סרט או משחק במסך מלא עדיין יכסו אותה — כך Windows מתנהגת."
+                    } else {
+                        "כבוי — הסימניה מתנהגת כמו כל חלון ולא מכסה תוכנות אחרות."
+                    },
+                )
+            }
+        }
     }
 }
 

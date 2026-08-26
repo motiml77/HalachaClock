@@ -172,6 +172,7 @@ private fun runApp(args: Array<String>) = application {
     // appearing somewhere unrelated.
     DockTabWindow(
         visible = docked,
+        alwaysOnTop = service.prefs.dockTabAlwaysOnTop,
         onOpen = {
             // Just the flags: the snap-to-edge effect above fires on the
             // visibility transition and does the positioning.

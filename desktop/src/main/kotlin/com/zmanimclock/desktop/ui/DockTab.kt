@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
@@ -62,7 +63,11 @@ import java.awt.Toolkit
  *    never lives and where the eye finds it without hunting the corners.
  */
 @Composable
-fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
+fun ApplicationScope.DockTabWindow(
+    visible: Boolean,
+    alwaysOnTop: Boolean,
+    onOpen: () -> Unit,
+) {
     // AWT reports the LOGICAL screen size (it applies the display scale
     // itself), which is the same unit Compose's dp positions use here.
     val screen = remember { Toolkit.getDefaultToolkit().screenSize }
@@ -85,7 +90,13 @@ fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
         transparent = true,
         resizable = false,
         focusable = false,
-        alwaysOnTop = true,
+        // The user's choice, defaulting to FALSE — see DesktopPrefs. When on,
+        // Windows keeps it above ordinary windows; a program running truly
+        // FULLSCREEN (a film, a game) still covers it, because the shell gives
+        // exclusive-fullscreen apps priority over the topmost band. That is
+        // the behaviour the owner asked for, and it comes for free rather than
+        // needing any detection of what is playing.
+        alwaysOnTop = alwaysOnTop,
     ) {
         ZmanimDesktopTheme {
             val ext = Ext.colors
@@ -96,6 +107,10 @@ fun ApplicationScope.DockTabWindow(visible: Boolean, onOpen: () -> Unit) {
 
             Box(
                 Modifier.fillMaxSize()
+                    // 90% opaque. Enough to read as a solid tab, enough to let
+                    // whatever is behind it show through — so it reads as part
+                    // of the desktop rather than a window parked on top of it.
+                    .alpha(0.9f)
                     .background(Brush.verticalGradient(listOf(ext.heroTop, ext.heroBottom)), shape)
                     // Hover brightens the whole tab, not just the arrow: the
                     // affordance is "this entire thing is a button".
