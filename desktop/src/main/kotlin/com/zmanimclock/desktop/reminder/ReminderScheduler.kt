@@ -117,6 +117,23 @@ class ReminderScheduler(
     }
 
     /** One pass: what is due right now, what is merely stale, what is neither. */
+    /**
+     * Diagnostic, wired to the app's --demo-reminder launch flag: puts a
+     * real-looking reminder on screen immediately, so the banner can be seen
+     * and dismissed without waiting for an actual zman to arrive. It uses
+     * today's own zmanim — the next one still ahead, or the day's last once
+     * the day is done — so what appears is exactly what a real reminder
+     * would show, formatting included.
+     */
+    fun showSample() {
+        val zone = service.zone
+        val today = LocalDate.now(zone)
+        val (kind, at) = service.nextZman()
+            ?: service.day(today).relevantTimedZmanim(today).lastOrNull()
+            ?: return
+        _pending.value = PendingReminder(kind, kind.shortName, at.asZmanTime(zone), at)
+    }
+
     internal fun sweepOnce() {
         // One banner at a time, and the banner now waits for אישור rather
         // than dismissing itself — so an unacknowledged reminder holds later

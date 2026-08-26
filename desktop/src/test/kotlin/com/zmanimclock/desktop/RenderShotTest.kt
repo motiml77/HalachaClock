@@ -85,7 +85,7 @@ class RenderShotTest {
     // nobody ever sees it at.
     @Test fun zmanim() = both("desk_zmanim", 320) { ZmanimPane(service()) }
 
-    @Test fun calendar() = both("desk_calendar", 620) { CalendarPane(service()) }
+    @Test fun calendar() = both("desk_calendar", 660) { CalendarPane(service()) }
     @Test fun settings() = both("desk_settings", 560) { SettingsPane(service()) }
 
     // The reminder banner, at its real 378x189 size, with a realistic

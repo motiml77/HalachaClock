@@ -44,6 +44,7 @@ import com.zmanimclock.desktop.ui.AppTitleBar
 import com.zmanimclock.desktop.ui.CalendarPane
 import com.zmanimclock.desktop.ui.DockTabWindow
 import com.zmanimclock.desktop.ui.SettingsPane
+import com.zmanimclock.desktop.ui.ZMANIM_COLUMN_WIDTH
 import com.zmanimclock.desktop.ui.ZmanimPane
 import androidx.compose.runtime.DisposableEffect
 import com.zmanimclock.desktop.system.SingleInstance
@@ -101,6 +102,13 @@ private fun runApp(args: Array<String>) = application {
     }
 
     LaunchedEffect(scheduler) { scheduler.run() }
+
+    // --demo-reminder: put a sample banner on screen at startup. This is how
+    // the reminder surface gets seen — and verified on a real screen — without
+    // waiting for an actual zman.
+    LaunchedEffect(Unit) {
+        if (args.any { it.equals("--demo-reminder", ignoreCase = true) }) scheduler.showSample()
+    }
     val pending by scheduler.pending.collectAsState()
 
     // Re-assert the Run key on every start while the setting is on. This is
@@ -301,11 +309,17 @@ private enum class MainTab(val label: String, val width: Dp) {
     // rendered offscreen at a sweep of widths and read for clipping.
     //   320 — the zman list. At 300 the long labels ("פלג המנחה (מהשקיעה)",
     //         "הנץ החמה (מישורי)") touch the row edge with no margin left.
-    //   620 — the calendar. At 560 the month header wraps onto two lines and
-    //         the day cells crush their parsha labels.
+    //   660 — the calendar: the fixed zmanim column PLUS room for the month.
+    //         The two sides used to split the window 45/55, which meant
+    //         opening the calendar re-proportioned the zmanim list instead of
+    //         adding to it — the same rows, 80dp wider, jumping on every tab
+    //         switch. The column is now fixed and the month grid takes the
+    //         remainder, so the calendar is a genuine addition beside it.
+    //         Swept 620/660/700: below 660 the month is cramped, above it the
+    //         window grows without the grid reading any better.
     //   560 — settings. Verified clean; the two card columns still breathe.
-    ZMANIM("זמני היום", 320.dp),
-    CALENDAR("לוח שנה", 620.dp),
+    ZMANIM("זמני היום", ZMANIM_COLUMN_WIDTH),
+    CALENDAR("לוח שנה", 660.dp),
     SETTINGS("הגדרות", 560.dp),
 }
 

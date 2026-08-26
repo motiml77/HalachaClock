@@ -143,18 +143,10 @@ fun CalendarPane(service: DesktopZmanimService) {
             // jump about. The day column is now the same width wherever it
             // appears and the month grid is a genuine ADDITION beside it, not
             // a renegotiation of the space.
-            modifier = Modifier.width(DAY_SIDE_WIDTH).fillMaxHeight(),
+            modifier = Modifier.width(ZMANIM_COLUMN_WIDTH).fillMaxHeight(),
         )
     }
 }
-
-/**
- * The zmanim column's width, on the calendar tab and on the zmanim tab alike.
- *
- * Equal to MainTab.ZMANIM's window width, so the list looks identical in both
- * places. If one moves, move the other.
- */
-private val DAY_SIDE_WIDTH = 400.dp
 
 // ---------------------------------------------------------------------------
 // Month side

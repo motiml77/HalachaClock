@@ -186,6 +186,16 @@ internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant)
  * Capping the pair rather than the row keeps the highlight and the divider
  * spanning the full width, which is what makes the list read as a list.
  */
+/**
+ * THE ZMANIM COLUMN'S WIDTH — the whole window on the zmanim tab, and the day
+ * side of the calendar tab. One constant, deliberately, because the two were
+ * separate values coupled only by a comment saying "if one moves, move the
+ * other" and it drifted the first time one did: the zmanim tab went 400 -> 320
+ * while the calendar's day column stayed at 400, so opening the calendar
+ * silently widened the same list by 80dp.
+ */
+val ZMANIM_COLUMN_WIDTH = 320.dp
+
 private val ROW_CONTENT_MAX = 260.dp
 
 @Composable
