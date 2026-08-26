@@ -9,6 +9,9 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.use
+import com.zmanimclock.desktop.reminder.PendingReminder
+import com.zmanimclock.desktop.reminder.ReminderBanner
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.ui.CalendarPane
@@ -84,6 +87,25 @@ class RenderShotTest {
 
     @Test fun calendar() = both("desk_calendar", 620) { CalendarPane(service()) }
     @Test fun settings() = both("desk_settings", 560) { SettingsPane(service()) }
+
+    // The reminder banner, at its real 378x189 size, with a realistic
+    // reminder. It hangs from the top of the screen over other people's
+    // windows, which makes it the single most visible surface the app owns —
+    // and the one whose clipping bug would be seen by the most eyes.
+    @Test
+    fun reminderBanner() {
+        val reminder = PendingReminder(
+            kind = ZmanKind.SHKIA,
+            name = ZmanKind.SHKIA.hebrewName,
+            time = "19:11",
+            at = java.time.Instant.now(),
+        )
+        for (dark in listOf(false, true)) {
+            shot("desk_reminder", dark = dark, w = 378, h = 189) {
+                ReminderBanner(reminder) {}
+            }
+        }
+    }
 
     // At the menu's own real size, not the window's — a small popup shot at
     // 400x560 is mostly a screenshot of empty space and would not have shown

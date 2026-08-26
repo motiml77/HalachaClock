@@ -118,9 +118,12 @@ class ReminderScheduler(
 
     /** One pass: what is due right now, what is merely stale, what is neither. */
     internal fun sweepOnce() {
-        // One popup at a time. The popup dismisses itself in seconds and the
-        // tick is far longer, so at most one pass is skipped — well inside the
-        // five-minute window.
+        // One banner at a time, and the banner now waits for אישור rather
+        // than dismissing itself — so an unacknowledged reminder holds later
+        // ones back deliberately. Nothing is lost quietly: the held-back
+        // zmanim are swept on the next pass after the click, and whatever has
+        // aged past the five-minute delivery window is dropped as stale
+        // instead of fired in a burst.
         if (_pending.value != null) return
 
         val now = clock()
@@ -223,8 +226,6 @@ class ReminderScheduler(
          */
         val DELIVERY_WINDOW: Duration = Duration.ofMinutes(5)
 
-        /** How long the popup stays on screen before removing itself. */
-        val POPUP_DURATION: Duration = Duration.ofSeconds(8)
     }
 }
 

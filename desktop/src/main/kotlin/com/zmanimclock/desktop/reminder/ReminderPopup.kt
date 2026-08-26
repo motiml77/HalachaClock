@@ -1,29 +1,36 @@
 package com.zmanimclock.desktop.reminder
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.AbsoluteAlignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.ApplicationScope
@@ -33,11 +40,12 @@ import androidx.compose.ui.window.rememberWindowState
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanNumberFamily
 import com.zmanimclock.desktop.ZmanimDesktopTheme
-import kotlinx.coroutines.delay
-import java.time.Duration
+import java.awt.Cursor
+import java.awt.Toolkit
 
 /**
- * The visible half of the silent reminders, plus the tray icon.
+ * The visible half of the silent reminders: a banner hanging from the TOP
+ * edge of the screen, above everything, until the user acknowledges it.
  *
  * WHY THE REMINDER IS A COMPOSE WINDOW AND NOT A NOTIFICATION
  *
@@ -51,137 +59,181 @@ import java.time.Duration
  * that file at all, and `NIIF_NONE` means "no icon", not "no sound". There is
  * no seam to inject it through. A zmanim board that chimes is an alarm clock,
  * and this application is explicitly not one, so that whole path is off the
- * table for the reminder itself. The tray icon itself is still used — for the
- * ICON and the click events, which have no sound to suppress; see
- * ZmanimTray.kt for why its MENU is no longer the `Tray()` composable's
- * built-in one.
+ * table. A toast would also fade on its own, and fading on its own is now the
+ * opposite of the contract:
  *
- * So v1's reminder surface is a small, always-on-top, undecorated Compose
- * window near the bottom-right of the primary screen: the zman's name, its
- * time, and nothing else. It is genuinely silent, needs no AppUserModelID
- * registration, ships no native binary, and cannot be broken by a Windows
- * notification-stack regression. THE DOCUMENTED UPGRADE PATH is a bundled
- * SnoreToast helper (`snoretoast.exe -silent`), which buys a real Windows
- * toast that lands in Action Center — at the cost of an LGPL binary in the
- * installer, an AUMID registered through a shortcut (jpackage cannot do it),
- * and a post-install step. That trade is deliberately deferred, not forgotten;
- * see docs/DESKTOP_PLAN.md §3.
+ * THE BANNER STAYS UNTIL אישור IS CLICKED — the owner's requirement, replacing
+ * the old eight-second self-dismissing card at the bottom corner. A reminder
+ * that removes itself is a reminder the user can miss by being out of the
+ * room; one that waits is the whole point of asking for it. The cost is
+ * inherent and accepted: the scheduler shows one reminder at a time, so an
+ * unacknowledged banner holds later zmanim back until it is clicked (they are
+ * then swept, and anything older than the five-minute delivery window is
+ * dropped as stale rather than fired in a burst).
  *
- * NOT TRANSPARENT, ON PURPOSE. `transparent = true` is the natural way to get
- * rounded corners, but Compose Desktop's transparent windows have a real crash
- * and black-window history on Windows GPUs (skiko#327, CMP#3171, CMP#3757,
- * CMP-7404), and clicks do not pass through transparent regions anyway
- * (CMP-6036, closed as Obsolete). An opaque card with a border is the boring
- * choice and the correct one for something that must never fail loudly.
- */
-private val PopupWidth = 300.dp
-private val PopupHeight = 110.dp
-
-/**
- * Shows [reminder] when there is one, and calls [onDismiss] when the user
- * clicks it or after [showFor] elapses — whichever comes first.
+ * SHAPE AND PLACE: hanging from the top edge, horizontally centred — where
+ * every platform teaches the eye that transient announcements live, and where
+ * it cannot cover the taskbar or the app's own side panel. It follows the
+ * bookmark's design language exactly: flat on the screen edge it grows out
+ * of, rounded on the side facing the desktop, the hero gradient as ground,
+ * and the gold frame drawn on the three VISIBLE sides only — a gold line
+ * along the top would draw the banner's own boundary against the edge and
+ * turn "emerging from the screen edge" into "parked near it".
  *
- * Wire it up as:
- * ```
- * val pending by scheduler.pending.collectAsState()
- * ReminderPopupWindow(pending, scheduler::dismiss)
- * ```
+ * `transparent = true` for the real rounded corners, the same combination the
+ * bookmark, the widget and the main panel have shipped with. (An earlier
+ * revision of this file avoided transparency citing Skiko's black-window
+ * history; the app has since shipped four transparent windows without a
+ * single such report on this machine, and the design language won.)
+ *
+ * ALWAYS ON TOP, and honestly so: over films, music, browsers — that is the
+ * owner's explicit instruction. What it deliberately does NOT do is steal
+ * focus (`focusable = false`): it must never take the caret from a sentence
+ * being typed. Buttons receive mouse clicks regardless of focus, so אישור
+ * works without the window ever being focused.
  */
 @Composable
 fun ApplicationScope.ReminderPopupWindow(
     reminder: PendingReminder?,
     onDismiss: () -> Unit,
-    showFor: Duration = ReminderScheduler.POPUP_DURATION,
 ) {
     if (reminder == null) return
+
+    // Centred on the primary screen. Toolkit reports the LOGICAL size — the
+    // same unit Compose's dp positions use here (see DockTabWindow).
+    val screen = remember { Toolkit.getDefaultToolkit().screenSize }
+    val x = ((screen.width - BANNER_WIDTH_PX) / 2).coerceAtLeast(0)
 
     Window(
         onCloseRequest = onDismiss,
         state = rememberWindowState(
-            width = PopupWidth,
-            height = PopupHeight,
-            // AbsoluteAlignment rather than Alignment.BottomEnd: the whole app
-            // forces LayoutDirection.Rtl, and a direction-aware alignment would
-            // be an invitation for this to end up on the wrong side of the
-            // screen. Compose subtracts the screen insets itself, so this sits
-            // above the taskbar rather than under it.
-            position = WindowPosition.Aligned(AbsoluteAlignment.BottomRight),
+            position = WindowPosition(x.dp, 0.dp),
+            size = DpSize(BANNER_WIDTH, BANNER_HEIGHT),
         ),
         title = "שעון מעורר - זמנים הלכתיים",
         icon = painterResource("branding/logo.png"),
         undecorated = true,
+        transparent = true,
         resizable = false,
         alwaysOnTop = true,
-        // Never steal the caret from whatever the user is typing. A reminder
-        // that interrupts a sentence is worse than no reminder.
         focusable = false,
     ) {
-        // Keyed on the reminder, so a new one restarts the countdown instead of
-        // inheriting the remainder of the previous one's.
-        LaunchedEffect(reminder) {
-            delay(showFor.toMillis().coerceAtLeast(0L))
-            onDismiss()
-        }
-
         ZmanimDesktopTheme {
-            ReminderCard(reminder, onDismiss)
+            ReminderBanner(reminder, onDismiss)
         }
     }
 }
 
+/**
+ * The banner's face, with no [Window] around it — split out so RenderShotTest
+ * can shoot it at its real size. Every clipping bug this project has shipped
+ * was invisible until something was actually rendered.
+ */
 @Composable
-private fun ReminderCard(reminder: PendingReminder, onDismiss: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
+fun ReminderBanner(reminder: PendingReminder, onDismiss: () -> Unit) {
     val ext = Ext.colors
+    // Flat top (the screen edge), rounded toward the desktop. Symmetric, so
+    // RTL corner resolution cannot put a curve on the wrong side.
+    val shape = RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp)
 
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .border(1.dp, cs.outline)
-            .clickable(onClick = onDismiss),
-        color = cs.surface,
-    ) {
-        Row(Modifier.fillMaxSize()) {
-            // Under RTL this stripe lands on the right edge — the reading edge.
-            Spacer(Modifier.width(4.dp).fillMaxHeight().background(ext.accentGold))
-
-            Column(
-                Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    "שעון מעורר - זמנים הלכתיים",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = cs.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        reminder.name,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = cs.onSurface,
-                    )
-                    Text(
-                        reminder.time,
-                        fontFamily = ZmanNumberFamily,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.End,
-                        color = cs.onSurface,
-                    )
+    Column(
+        Modifier.fillMaxSize()
+            .background(Brush.verticalGradient(listOf(ext.heroTop, ext.heroBottom)), shape)
+            // The bookmark's three-sided gold frame, rotated to a top-edge
+            // window: left, bottom and right stroked; the top edge open so the
+            // shape runs off the screen. Hand-drawn because Modifier.border
+            // strokes the whole outline or nothing.
+            .drawBehind {
+                val stroke = 1.5.dp.toPx()
+                val half = stroke / 2f
+                val r = 18.dp.toPx()
+                val left = half
+                val right = size.width - half
+                val bottom = size.height - half
+                val path = Path().apply {
+                    moveTo(left, 0f)
+                    lineTo(left, bottom - r)
+                    // 180° is the left edge of the corner circle; sweeping
+                    // -90° runs clockwise-on-screen to the circle's bottom.
+                    arcTo(Rect(left, bottom - 2 * r, left + 2 * r, bottom), 180f, -90f, false)
+                    lineTo(right - r, bottom)
+                    arcTo(Rect(right - 2 * r, bottom - 2 * r, right, bottom), 90f, -90f, false)
+                    lineTo(right, 0f)
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "לחצו לסגירה",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                )
+                drawPath(path, ext.accentGold.copy(alpha = 0.85f), style = Stroke(width = stroke))
             }
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            "שעון מעורר - זמנים הלכתיים",
+            style = MaterialTheme.typography.labelMedium,
+            color = ext.heroLabel,
+        )
+
+        // The zman and its time are the message; everything else on this
+        // banner is frame. Largest text, dead centre.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                reminder.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = ext.heroText,
+            )
+            Spacer(Modifier.padding(horizontal = 8.dp))
+            Text(
+                reminder.time,
+                fontFamily = ZmanNumberFamily,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                color = ext.accentGold,
+            )
         }
+
+        ConfirmButton(onDismiss)
+        Spacer(Modifier.height(2.dp))
     }
 }
+
+/**
+ * אישור — the one way off the screen, so it earns the one accent. Gold pill,
+ * navy text: the banner's colours inverted, which is what makes a single
+ * button read as THE button. Sized for a mouse ("small but not too small" was
+ * the specification): a 32dp-tall target is comfortably clickable without
+ * competing with the zman line above it.
+ */
+@Composable
+private fun ConfirmButton(onClick: () -> Unit) {
+    val ext = Ext.colors
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+
+    Text(
+        "אישור",
+        modifier = Modifier
+            .background(
+                if (hovered) ext.accentGold else ext.accentGold.copy(alpha = 0.88f),
+                RoundedCornerShape(50),
+            )
+            .hoverable(interaction)
+            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 26.dp, vertical = 6.dp),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = ext.onAccentGold,
+    )
+}
+
+/**
+ * ~10cm x ~5cm at the owner's request. Centimetres only exist on a physical
+ * panel, so the conversion anchors on Windows' nominal 96 dp/inch: 10cm =
+ * 3.94in = 378dp, 5cm = 189dp. On a scaled display Windows multiplies the
+ * same factor into every window, so the banner keeps its proportion to
+ * everything else on screen — which is what a physical-size request is
+ * actually asking for.
+ */
+private val BANNER_WIDTH = 378.dp
+private val BANNER_HEIGHT = 189.dp
+private const val BANNER_WIDTH_PX = 378
