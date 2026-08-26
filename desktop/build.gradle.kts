@@ -44,6 +44,18 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
+// TESTS NEVER TOUCH THE REAL PROFILE. DesktopPrefs.save() writes to
+// %LOCALAPPDATA%\HalachClock by default, and the alert CRUD tests drive the
+// real service — which put two test alerts into the developer's own running
+// app before this existed. One property redirects the whole data directory,
+// including the fired-reminder log.
+tasks.withType<Test>().configureEach {
+    systemProperty(
+        "halachclock.data.dir",
+        layout.buildDirectory.dir("test-data").get().asFile.absolutePath,
+    )
+}
+
 dependencies {
     implementation(project(":zmanim-engine"))
     implementation(compose.desktop.currentOs)
@@ -75,7 +87,7 @@ compose.desktop {
             // 1638 ("another version of this product is already installed"),
             // confirmed in practice — an update MUST raise this or nobody can
             // upgrade in place.
-            packageVersion = "1.3.0"
+            packageVersion = "1.4.0"
             description = "Halacha Clock - Zmanim and Hebrew calendar"
             vendor = "Halacha Clock"
 

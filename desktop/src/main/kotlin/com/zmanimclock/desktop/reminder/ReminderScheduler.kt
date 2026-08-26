@@ -3,7 +3,9 @@ package com.zmanimclock.desktop.reminder
 import com.zmanimclock.app.feature.zmanim.format.asZmanTime
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
+import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
+import com.zmanimclock.desktop.data.ZmanAlert
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -131,7 +133,8 @@ class ReminderScheduler(
         val (kind, at) = service.nextZman()
             ?: service.day(today).relevantTimedZmanim(today).lastOrNull()
             ?: return
-        _pending.value = PendingReminder(kind, kind.shortName, at.asZmanTime(zone), at)
+        val sample = ZmanAlert(id = "demo", name = "התראה לדוגמה", kind = kind)
+        _pending.value = PendingReminder(sample, at.asZmanTime(zone), at)
     }
 
     internal fun sweepOnce() {
@@ -147,20 +150,23 @@ class ReminderScheduler(
         val zone = service.zone
         val today = LocalDate.now(zone)
 
+        // Keyed on the ALERT's id, not on the zman: two alerts may sit on the
+        // same zman ("15 before שקיעה" and "at שקיעה"), and a kind-keyed flag
+        // would let the first one fired suppress the other for the rest of
+        // the day.
         val candidates = scheduleFor(today, zone)
-            .filter { (kind, at) -> !firedLog.hasFired(at.atZone(zone).toLocalDate(), kind.name) }
+            .filter { (alert, at) -> !firedLog.hasFired(at.atZone(zone).toLocalDate(), alert.id) }
 
         val sweep = sweepDue(candidates, now, window)
 
         // Marked first, shown second. The reverse order would re-fire on a
         // crash between the two.
-        sweep.handled.forEach { (kind, at) ->
-            firedLog.markFired(at.atZone(zone).toLocalDate(), kind.name)
+        sweep.handled.forEach { (alert, at) ->
+            firedLog.markFired(at.atZone(zone).toLocalDate(), alert.id)
         }
-        sweep.show?.let { (kind, at) ->
+        sweep.show?.let { (alert, at) ->
             _pending.value = PendingReminder(
-                kind = kind,
-                name = kind.shortName,
+                alert = alert,
                 time = at.asZmanTime(zone),
                 at = at,
             )
@@ -174,52 +180,65 @@ class ReminderScheduler(
         val cityId: String,
         val candleMinutes: Long,
         val tzeitShabbatMinutes: Long,
-        val wanted: Set<String>,
+        val alerts: List<ZmanAlert>,
     )
 
     private var cacheKey: ScheduleKey? = null
-    private var cached: List<Pair<ZmanKind, Instant>> = emptyList()
+    private var cached: List<Pair<ZmanAlert, Instant>> = emptyList()
 
     /**
-     * The zmanim the user opted into, for [today], sorted.
+     * Every enabled alert's firing instant for [today], sorted.
      *
      * Rebuilt whenever the date rolls over or any preference in the key
-     * changes — that is the whole of requirement "recompute on startup, date
-     * rollover, and preference change", expressed as data rather than as three
-     * separate callbacks that can each be forgotten.
+     * changes — that is the whole of "recompute on startup, date rollover and
+     * preference change", expressed as data rather than three callbacks that
+     * can each be forgotten. The alert LIST is part of the key, so editing an
+     * offset or toggling one off takes effect on the next tick.
      *
      * YESTERDAY'S חצות לילה IS INCLUDED ON PURPOSE. Solar midnight for date D
      * is D's chatzot plus twelve hours, which lands on the CALENDAR DAY AFTER
      * D for roughly half the year (whenever chatzot itself falls after 12:00
      * wall clock, i.e. under DST). So the חצות לילה that actually occurs in
-     * tonight's small hours belongs to yesterday's DayZmanim, not today's —
-     * today's own row for that kind is about 24 hours out. This mirrors
-     * `nextRelevantZman`, which had to learn the same thing.
+     * tonight's small hours belongs to yesterday's DayZmanim, not today's.
+     * This mirrors `nextRelevantZman`, which had to learn the same thing.
      */
-    private fun scheduleFor(today: LocalDate, zone: ZoneId): List<Pair<ZmanKind, Instant>> {
+    private fun scheduleFor(today: LocalDate, zone: ZoneId): List<Pair<ZmanAlert, Instant>> {
         val prefs = service.prefs
         val key = ScheduleKey(
             date = today,
             cityId = prefs.cityId,
             candleMinutes = prefs.candleLightingMinutes,
             tzeitShabbatMinutes = prefs.tzeitShabbatMinutes,
-            wanted = prefs.reminderZmanim,
+            alerts = prefs.alerts,
         )
         if (key == cacheKey) return cached
 
-        val wanted = prefs.reminderZmanim
-        val list = if (wanted.isEmpty()) {
-            // Reminders are opt-in and default to none, so the common case
-            // costs nothing at all: no engine call, no day cached.
+        val enabled = prefs.alerts.filter { it.enabled }
+        val list = if (enabled.isEmpty()) {
+            // Alerts are opt-in and default to none, so the common case costs
+            // nothing at all: no engine call, no day cached.
             emptyList()
         } else {
-            buildList {
-                addAll(service.day(today).relevantTimedZmanim(today))
+            val zmanim = buildMap {
+                service.day(today).relevantTimedZmanim(today).forEach { (kind, at) -> put(kind, at) }
                 service.day(today.minusDays(1)).chatzotLayla
-                    ?.let { add(ZmanKind.CHATZOT_LAYLA to it) }
+                    ?.let { put(ZmanKind.CHATZOT_LAYLA, it) }
             }
-                .filter { (kind, _) -> kind.name in wanted }
-                .sortedBy { (_, at) -> at }
+            // The weekday is the ZMAN'S OWN day, taken after the offset is
+            // applied, not "today". An alert 30 minutes after חצות לילה set
+            // for Sunday means the small hours that belong to Sunday night —
+            // and those land on Monday's calendar date. Filtering on today's
+            // date instead would fire it on the wrong night.
+            enabled.mapNotNull { alert ->
+                // A zman the engine did not produce today — הדלקת נרות on a
+                // Tuesday, the visible netz without terrain data — simply has
+                // no firing instant, and the alert sits out the day rather
+                // than firing at some invented time.
+                zmanim[alert.kind]
+                    ?.plus(Duration.ofMinutes(alert.offsetMinutes.toLong()))
+                    ?.takeIf { fireAt -> alert.firesOn(fireAt.atZone(zone).dayOfWeek) }
+                    ?.let { fireAt -> alert to fireAt }
+            }.sortedBy { (_, at) -> at }
         }
 
         cacheKey = key
@@ -246,11 +265,10 @@ class ReminderScheduler(
     }
 }
 
-/** A reminder that is on screen right now. */
+/** An alert that is on screen right now. */
 data class PendingReminder(
-    val kind: ZmanKind,
-    /** Already-localized Hebrew label — the popup does no naming of its own. */
-    val name: String,
+    /** The banner shows the USER'S OWN name for this alert; see [ZmanAlert]. */
+    val alert: ZmanAlert,
     /** Formatted through the shared [asZmanTime], so it matches the phone exactly. */
     val time: String,
     val at: Instant,
@@ -292,8 +310,8 @@ fun reminderStateOf(
  * machine was asleep would be re-evaluated on every single tick forever.
  */
 data class ReminderSweep(
-    val show: Pair<ZmanKind, Instant>?,
-    val handled: List<Pair<ZmanKind, Instant>>,
+    val show: Pair<ZmanAlert, Instant>?,
+    val handled: List<Pair<ZmanAlert, Instant>>,
 )
 
 /**
@@ -306,7 +324,7 @@ data class ReminderSweep(
  * still act on; the older ones are already history by the time they are read.
  */
 fun sweepDue(
-    candidates: List<Pair<ZmanKind, Instant>>,
+    candidates: List<Pair<ZmanAlert, Instant>>,
     now: Instant,
     window: Duration = ReminderScheduler.DELIVERY_WINDOW,
 ): ReminderSweep {
@@ -377,6 +395,9 @@ class FiredLog(
     /** Test/diagnostic view of what is on disk. */
     fun size(): Int = entries.size
 
+    /** The raw `date|alertId` lines, for tests that assert WHICH fired. */
+    fun entriesForTest(): List<String> = entries.toList()
+
     private fun save() {
         runCatching {
             file.parentFile?.mkdirs()
@@ -397,9 +418,6 @@ class FiredLog(
          * [com.zmanimclock.desktop.data.DesktopPrefs]'s own resolution,
          * including its fallback for a machine with no LOCALAPPDATA.
          */
-        fun default(): FiredLog {
-            val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
-            return FiredLog(File(File(base, "HalachClock"), "fired.txt"))
-        }
+        fun default(): FiredLog = FiredLog(File(DesktopPrefs.dir(), "fired.txt"))
     }
 }

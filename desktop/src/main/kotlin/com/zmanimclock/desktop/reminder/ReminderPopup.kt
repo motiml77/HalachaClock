@@ -30,6 +30,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -172,23 +173,35 @@ fun ReminderBanner(reminder: PendingReminder, onDismiss: () -> Unit) {
             color = ext.heroLabel,
         )
 
-        // The zman and its time are the message; everything else on this
-        // banner is frame. Largest text, dead centre.
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // THE USER'S OWN NAME IS THE MESSAGE. They wrote it when they made the
+        // alert, and it says what they actually meant — "לצאת לתפילה" carries
+        // the intent that "מנחה קטנה" only implies. The zman it derives from
+        // is the supporting line beneath it, not the headline.
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                reminder.name,
+                reminder.alert.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = ext.heroText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.padding(horizontal = 8.dp))
-            Text(
-                reminder.time,
-                fontFamily = ZmanNumberFamily,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                color = ext.accentGold,
-            )
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    reminder.alert.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.heroLabel,
+                )
+                Spacer(Modifier.padding(horizontal = 5.dp))
+                Text(
+                    reminder.time,
+                    fontFamily = ZmanNumberFamily,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ext.accentGold,
+                )
+            }
         }
 
         ConfirmButton(onDismiss)

@@ -12,6 +12,8 @@ import androidx.compose.ui.use
 import com.zmanimclock.desktop.reminder.PendingReminder
 import com.zmanimclock.desktop.reminder.ReminderBanner
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.desktop.data.ZmanAlert
+import com.zmanimclock.desktop.ui.AlertsPane
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.ui.CalendarPane
@@ -86,6 +88,38 @@ class RenderShotTest {
     @Test fun zmanim() = both("desk_zmanim", 320) { ZmanimPane(service()) }
 
     @Test fun calendar() = both("desk_calendar", 660) { CalendarPane(service()) }
+
+    @Test
+    fun alerts() {
+        val svc = DesktopZmanimService(
+            DesktopPrefs(
+                alerts = listOf(
+                    ZmanAlert("a1", "לצאת לתפילה", ZmanKind.MINCHA_KETANA, -20),
+                    ZmanAlert(
+                        "a2", "הדלקת נרות", ZmanKind.SHKIA, -18,
+                        days = ZmanAlert.bitFor(java.time.DayOfWeek.FRIDAY),
+                    ),
+                    ZmanAlert("a3", "ערבית", ZmanKind.TZEIT_LECHUMRA, 5, enabled = false),
+                    ZmanAlert("a4", "ותיקין", ZmanKind.HANETZ, 0),
+                ),
+            ),
+        )
+        both("desk_alerts", 320) { AlertsPane(svc, null) {} }
+    }
+
+    /**
+     * The editor sheet, opened the way a bell in the zmanim list opens it —
+     * by handing the pane a prefill kind. Rendered rather than clicked: the
+     * one attempt to drive it with synthetic mouse events landed in another
+     * application's window, which is not a thing to do on someone's live
+     * desktop.
+     */
+    @Test
+    fun alertEditor() {
+        both("desk_alert_editor", 320) {
+            AlertsPane(DesktopZmanimService(DesktopPrefs()), ZmanKind.MINCHA_KETANA) {}
+        }
+    }
     @Test fun settings() = both("desk_settings", 560) { SettingsPane(service()) }
 
     // The reminder banner, at its real 378x189 size, with a realistic
@@ -95,8 +129,7 @@ class RenderShotTest {
     @Test
     fun reminderBanner() {
         val reminder = PendingReminder(
-            kind = ZmanKind.SHKIA,
-            name = ZmanKind.SHKIA.hebrewName,
+            alert = ZmanAlert("a1", "הדלקת נרות", ZmanKind.SHKIA, -18),
             time = "19:11",
             at = java.time.Instant.now(),
         )

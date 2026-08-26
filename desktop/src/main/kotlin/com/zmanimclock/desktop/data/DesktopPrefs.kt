@@ -22,8 +22,17 @@ data class DesktopPrefs(
     var tzeitShabbatMinutes: Long = com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine.TZEIT_SHABBAT_FIXED_MINUTES,
     /** Which zmanim may be announced as "הזמן הבא". Empty = all, as on Android. */
     var nextZmanFilter: Set<String> = emptySet(),
-    /** Zmanim the user asked to be reminded about. Empty by default: opt-in. */
-    var reminderZmanim: Set<String> = emptySet(),
+    /**
+     * The user's alerts — see [ZmanAlert]. Empty by default: an app that
+     * starts by interrupting someone about zmanim they never asked for gets
+     * its notifications switched off wholesale, and the ones they DID want go
+     * with them.
+     *
+     * This replaced a plain `reminderZmanim: Set<String>`, which could say
+     * only "tell me at שקיעה" — no offset, and no name to put on the banner.
+     * Old files are migrated on load rather than dropped.
+     */
+    var alerts: List<ZmanAlert> = emptyList(),
     var startWithWindows: Boolean = false,
     var widgetPinnedToDesktop: Boolean = false,
     var widgetVisible: Boolean = false,
@@ -36,7 +45,10 @@ data class DesktopPrefs(
         p["candleLightingMinutes"] = candleLightingMinutes.toString()
         p["tzeitShabbatMinutes"] = tzeitShabbatMinutes.toString()
         p["nextZmanFilter"] = nextZmanFilter.joinToString(",")
-        p["reminderZmanim"] = reminderZmanim.joinToString(",")
+        // One property per alert rather than one delimited blob: a blob would
+        // have to escape the separator out of user-typed names, and a single
+        // corrupt record would take the whole list with it.
+        alerts.forEach { p["alert.${it.id}"] = it.encode() }
         p["startWithWindows"] = startWithWindows.toString()
         p["widgetPinnedToDesktop"] = widgetPinnedToDesktop.toString()
         p["widgetVisible"] = widgetVisible.toString()
@@ -52,13 +64,52 @@ data class DesktopPrefs(
 
         val DEFAULT_WIDGET_ZMANIM = setOf("HANETZ", "SOF_ZMAN_SHMA_GRA", "SHKIA", "TZEIT_LECHUMRA")
 
-        private fun dir(): File {
+        /**
+         * The system property a test build sets to redirect this whole
+         * directory somewhere disposable.
+         *
+         * It exists because it was needed: `save()` had no seam at all, so
+         * AlertCrudTest — which exercises add/edit/delete through the real
+         * service — wrote its fixtures straight into the developer's own
+         * settings.properties, and two test alerts appeared in the running
+         * app. A file path with no override is a global variable.
+         */
+        const val DATA_DIR_PROPERTY = "halachclock.data.dir"
+
+        fun dir(): File {
+            System.getProperty(DATA_DIR_PROPERTY)?.takeIf { it.isNotBlank() }
+                ?.let { return File(it) }
             val base = System.getenv("LOCALAPPDATA")
                 ?: System.getProperty("user.home")
             return File(base, "HalachClock")
         }
 
         private fun file() = File(dir(), "settings.properties")
+
+        /**
+         * Reads `alert.<id>` records, and MIGRATES the old `reminderZmanim`
+         * set if no alert records exist: each remembered zman becomes an alert
+         * at zero offset, named after the zman itself. Someone who had five
+         * reminders configured must not open the new version to an empty list
+         * and conclude their settings were thrown away.
+         */
+        private fun readAlerts(p: Properties): List<ZmanAlert> {
+            val stored = p.stringPropertyNames()
+                .filter { it.startsWith("alert.") }
+                .sorted()
+                .mapNotNull { key ->
+                    ZmanAlert.decode(key.removePrefix("alert."), p.getProperty(key).orEmpty())
+                }
+            if (stored.isNotEmpty()) return stored
+
+            val legacy = ZmanKind.canonicalNames(
+                p.getProperty("reminderZmanim").orEmpty()
+                    .split(',').map { it.trim() }.filter { it.isNotEmpty() },
+            ).mapNotNull { ZmanKind.fromNameOrNull(it) }
+            return legacy.mapIndexed { i, kind ->
+                ZmanAlert(id = "a${i + 1}", name = kind.shortName, kind = kind)
+            }
+        }
 
         fun load(): DesktopPrefs {
             val f = file()
@@ -80,7 +131,7 @@ data class DesktopPrefs(
                 tzeitShabbatMinutes = p.getProperty("tzeitShabbatMinutes")?.toLongOrNull()
                     ?: defaults.tzeitShabbatMinutes,
                 nextZmanFilter = set("nextZmanFilter"),
-                reminderZmanim = set("reminderZmanim"),
+                alerts = readAlerts(p),
                 startWithWindows = p.getProperty("startWithWindows")?.toBoolean() ?: false,
                 widgetPinnedToDesktop = p.getProperty("widgetPinnedToDesktop")?.toBoolean() ?: false,
                 widgetVisible = p.getProperty("widgetVisible")?.toBoolean() ?: false,

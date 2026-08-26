@@ -19,6 +19,8 @@ import com.zmanimclock.app.feature.zmanim.model.instantOf
 import com.zmanimclock.app.feature.zmanim.model.nextRelevantZman
 import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
+import com.zmanimclock.desktop.ui.AlertRowData
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -122,6 +124,54 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
     }
 
     /** The Hebrew-calendar month at [index] in [HebrewMonthSequence]. */
+    // ---- alerts ----------------------------------------------------------
+
+    /** Adds or replaces by id — one call for both "new" and "edited". */
+    fun putAlert(alert: ZmanAlert) = update { p ->
+        val without = p.alerts.filterNot { it.id == alert.id }
+        p.copy(alerts = without + alert)
+    }
+
+    fun removeAlert(id: String) = update { p ->
+        p.copy(alerts = p.alerts.filterNot { it.id == id })
+    }
+
+    /**
+     * The zmanim offered when choosing what an alert hangs on.
+     *
+     * Exactly what the זמנים tab lists for the day, PLUS the חצות לילה that
+     * actually falls in tonight's small hours — which belongs to yesterday's
+     * DayZmanim, not today's, for roughly half the year. The scheduler already has
+     * to know this; the picker must agree with it or it would offer a zman the
+     * scheduler then cannot resolve.
+     */
+    fun zmanimForPicker(date: LocalDate): List<Pair<ZmanKind, Instant>> = buildList {
+        addAll(day(date).relevantTimedZmanim(date))
+        if (none { it.first == ZmanKind.CHATZOT_LAYLA }) {
+            day(date.minusDays(1)).chatzotLayla?.let { add(ZmanKind.CHATZOT_LAYLA to it) }
+        }
+    }.sortedBy { it.second }
+
+    /**
+     * Every alert with the clock time it resolves to on [date], ordered the
+     * way the day happens. Alerts whose zman does not occur that day keep
+     * their place in the list but carry no time, and sort last.
+     */
+    fun alertsInFiringOrder(date: LocalDate): List<AlertRowData> {
+        val zmanim = zmanimForPicker(date).toMap()
+        return prefs.alerts
+            .map { alert ->
+                val at = zmanim[alert.kind]?.plus(Duration.ofMinutes(alert.offsetMinutes.toLong()))
+                AlertRowData(alert, at?.asZmanTime(zone))
+            }
+            .sortedWith(
+                compareBy(
+                    { it.firesAt == null },
+                    { it.firesAt ?: "" },
+                ),
+            )
+    }
+
     fun monthGrid(index: Int): MonthGrid = synchronized(gridCache) {
         gridCache.getOrPut(index) { MonthGridBuilder.build(HebrewMonthSequence.refAt(index)) }
     }

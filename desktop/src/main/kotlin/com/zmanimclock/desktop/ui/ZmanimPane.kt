@@ -34,6 +34,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NotificationsNone
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanNumberFamily
 import com.zmanimclock.desktop.data.DayView
@@ -46,7 +49,7 @@ import java.time.LocalDate
 
 /** Today's zmanim — the app's front page, and the sibling of the Android home screen. */
 @Composable
-fun ZmanimPane(service: DesktopZmanimService) {
+fun ZmanimPane(service: DesktopZmanimService, onAddAlert: (ZmanKind) -> Unit = {}) {
     var now by remember0 { mutableStateOf(Instant.now()) }
 
     // Ticks on the wall clock rather than on a fixed delay, so the countdown
@@ -75,7 +78,9 @@ fun ZmanimPane(service: DesktopZmanimService) {
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         ) {
             LazyColumn(Modifier.fillMaxSize().padding(vertical = 4.dp)) {
-                items(view.rows, key = { it.kind.name }) { ZmanListRow(it) }
+                items(view.rows, key = { it.kind.name }) {
+                    ZmanListRow(it, onAddAlert = { onAddAlert(it.kind) })
+                }
             }
         }
     }
@@ -199,7 +204,11 @@ val ZMANIM_COLUMN_WIDTH = 320.dp
 private val ROW_CONTENT_MAX = 260.dp
 
 @Composable
-internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
+internal fun ZmanListRow(
+    row: ZmanRow,
+    compact: Boolean = false,
+    onAddAlert: (() -> Unit)? = null,
+) {
     val cs = MaterialTheme.colorScheme
     val ext = Ext.colors
     Column {
@@ -250,6 +259,21 @@ internal fun ZmanListRow(row: ZmanRow, compact: Boolean = false) {
                     color = if (row.isPast) cs.onSurfaceVariant else cs.onSurface,
                     modifier = Modifier.width(if (compact) 42.dp else 50.dp),
                 )
+                // AN EMPTY BELL, one per row: the shortest path from "this is
+                // the zman I care about" to an alert on it. Outlined rather
+                // than filled — nothing is set yet, and a filled bell would
+                // read as an alert that already exists. Not shown in the
+                // widget's compact rows, which have no room and no editor to
+                // open.
+                if (onAddAlert != null && !compact) {
+                    Spacer(Modifier.width(2.dp))
+                    RoundIconButton(
+                        icon = Icons.Outlined.NotificationsNone,
+                        description = "הוסף התראה על ${row.name}",
+                        size = 22.dp,
+                        onClick = onAddAlert,
+                    )
+                }
             }
         }
         HorizontalDivider(

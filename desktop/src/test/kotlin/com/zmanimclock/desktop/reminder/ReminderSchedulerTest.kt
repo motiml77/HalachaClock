@@ -1,6 +1,10 @@
 package com.zmanimclock.desktop.reminder
 
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.desktop.data.DesktopPrefs
+import com.zmanimclock.desktop.data.DesktopZmanimService
+import java.time.DayOfWeek
+import com.zmanimclock.desktop.data.ZmanAlert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -30,6 +34,15 @@ class ReminderSchedulerTest {
     private val now: Instant = Instant.parse("2026-08-07T16:30:00Z")
 
     private fun at(secondsFromNow: Long): Instant = now.plusSeconds(secondsFromNow)
+
+    /**
+     * sweepDue works on ALERTS now, not on bare zmanim — two alerts can hang
+     * off the same zman with different offsets, so the fired-log had to key on
+     * the alert. These cases are all about the DUE/MISSED arithmetic, which
+     * did not change, so each kind is wrapped in a throwaway alert named after
+     * itself and the assertions read the kind back off it.
+     */
+    private fun alertOn(kind: ZmanKind) = ZmanAlert(kind.name, kind.shortName, kind)
 
     // ---- reminderStateOf --------------------------------------------------
 
@@ -73,8 +86,8 @@ class ReminderSchedulerTest {
     fun `nothing due yet handles nothing and shows nothing`() {
         val sweep = sweepDue(
             listOf(
-                ZmanKind.SHKIA to at(60),
-                ZmanKind.TZEIT_LECHUMRA to at(900),
+                alertOn(ZmanKind.SHKIA) to at(60),
+                alertOn(ZmanKind.TZEIT_LECHUMRA) to at(900),
             ),
             now,
             window,
@@ -85,8 +98,8 @@ class ReminderSchedulerTest {
 
     @Test
     fun `a single zman inside the window is shown`() {
-        val sweep = sweepDue(listOf(ZmanKind.SHKIA to at(-120)), now, window)
-        assertEquals(ZmanKind.SHKIA, sweep.show?.first)
+        val sweep = sweepDue(listOf(alertOn(ZmanKind.SHKIA) to at(-120)), now, window)
+        assertEquals(ZmanKind.SHKIA, sweep.show?.first?.kind)
         assertEquals(1, sweep.handled.size)
     }
 
@@ -100,18 +113,18 @@ class ReminderSchedulerTest {
     fun `several due at once show exactly one — the most recent`() {
         val sweep = sweepDue(
             listOf(
-                ZmanKind.MINCHA_KETANA to at(-280),
-                ZmanKind.PLAG_HAMINCHA to at(-200),
-                ZmanKind.SHKIA to at(-30),
-                ZmanKind.TZEIT_LECHUMRA to at(600),
+                alertOn(ZmanKind.MINCHA_KETANA) to at(-280),
+                alertOn(ZmanKind.PLAG_HAMINCHA) to at(-200),
+                alertOn(ZmanKind.SHKIA) to at(-30),
+                alertOn(ZmanKind.TZEIT_LECHUMRA) to at(600),
             ),
             now,
             window,
         )
-        assertEquals(ZmanKind.SHKIA, sweep.show?.first)
+        assertEquals(ZmanKind.SHKIA, sweep.show?.first?.kind)
         assertEquals(
             listOf(ZmanKind.MINCHA_KETANA, ZmanKind.PLAG_HAMINCHA, ZmanKind.SHKIA),
-            sweep.handled.map { it.first },
+            sweep.handled.map { it.first.kind },
         )
     }
 
@@ -123,9 +136,9 @@ class ReminderSchedulerTest {
     fun `stale zmanim are written off silently, not shown`() {
         val sweep = sweepDue(
             listOf(
-                ZmanKind.ALOT_HASHACHAR to at(-11 * 3600),
-                ZmanKind.HANETZ to at(-10 * 3600),
-                ZmanKind.SOF_ZMAN_SHMA_GRA to at(-8 * 3600),
+                alertOn(ZmanKind.ALOT_HASHACHAR) to at(-11 * 3600),
+                alertOn(ZmanKind.HANETZ) to at(-10 * 3600),
+                alertOn(ZmanKind.SOF_ZMAN_SHMA_GRA) to at(-8 * 3600),
             ),
             now,
             window,
@@ -138,13 +151,13 @@ class ReminderSchedulerTest {
     fun `a mix of missed and due shows only the due one`() {
         val sweep = sweepDue(
             listOf(
-                ZmanKind.CHATZOT to at(-4 * 3600),
-                ZmanKind.MINCHA_GEDOLA to at(-60),
+                alertOn(ZmanKind.CHATZOT) to at(-4 * 3600),
+                alertOn(ZmanKind.MINCHA_GEDOLA) to at(-60),
             ),
             now,
             window,
         )
-        assertEquals(ZmanKind.MINCHA_GEDOLA, sweep.show?.first)
+        assertEquals(ZmanKind.MINCHA_GEDOLA, sweep.show?.first?.kind)
         assertEquals(2, sweep.handled.size)
     }
 
@@ -153,6 +166,64 @@ class ReminderSchedulerTest {
         val sweep = sweepDue(emptyList(), now, window)
         assertNull(sweep.show)
         assertTrue(sweep.handled.isEmpty())
+    }
+
+    // ---- weekdays end to end ----------------------------------------------
+
+    /**
+     * The scheduler resolves alerts against the REAL engine, so these exercise
+     * the whole chain: alert -> zman -> offset -> weekday filter -> due.
+     * A day mask that did not reach the scheduler would show up here and
+     * nowhere else, since the model tests only prove the mask itself.
+     */
+    private fun scheduleOn(date: LocalDate, vararg alerts: ZmanAlert): List<String> {
+        val svc = DesktopZmanimService(DesktopPrefs(alerts = alerts.toList()))
+        val fired = FiredLog(File.createTempFile("fired", ".txt").apply { delete() })
+        val scheduler = ReminderScheduler(
+            service = svc,
+            firedLog = fired,
+            clock = { date.atTime(23, 59).atZone(svc.zone).toInstant() },
+        )
+        // Everything on `date` is in the past at 23:59, so a sweep reports the
+        // full day's worth as handled — which is exactly the day's table.
+        scheduler.sweepOnce()
+        return fired.entriesForTest().map { it.substringAfter('|') }
+    }
+
+    @Test
+    fun `an alert restricted to other days does not fire`() {
+        // 2026-08-26 is a Wednesday.
+        val wednesday = LocalDate.of(2026, 8, 26)
+        val onlyFriday = ZmanAlert("a1", "ערב שבת", ZmanKind.SHKIA, -18, ZmanAlert.bitFor(DayOfWeek.FRIDAY))
+        assertTrue(scheduleOn(wednesday, onlyFriday).isEmpty())
+    }
+
+    @Test
+    fun `an alert on today's weekday does fire`() {
+        val wednesday = LocalDate.of(2026, 8, 26)
+        val onlyWednesday =
+            ZmanAlert("a1", "מנחה", ZmanKind.MINCHA_KETANA, 0, ZmanAlert.bitFor(DayOfWeek.WEDNESDAY))
+        assertEquals(listOf("a1"), scheduleOn(wednesday, onlyWednesday))
+    }
+
+    @Test
+    fun `a disabled alert never reaches the schedule`() {
+        val wednesday = LocalDate.of(2026, 8, 26)
+        val off = ZmanAlert("a1", "כבוי", ZmanKind.SHKIA, 0, ZmanAlert.EVERY_DAY, enabled = false)
+        assertTrue(scheduleOn(wednesday, off).isEmpty())
+    }
+
+    /**
+     * Two alerts on the SAME zman must both fire. The fired-log used to key on
+     * the zman, which meant the first one shown suppressed the second for the
+     * rest of the day; it keys on the alert id now.
+     */
+    @Test
+    fun `two alerts on one zman are tracked separately`() {
+        val wednesday = LocalDate.of(2026, 8, 26)
+        val a = ZmanAlert("a1", "להתכונן", ZmanKind.SHKIA, -30)
+        val b = ZmanAlert("a2", "הדלקה", ZmanKind.SHKIA, -18)
+        assertEquals(setOf("a1", "a2"), scheduleOn(wednesday, a, b).toSet())
     }
 
     // ---- FiredLog ---------------------------------------------------------

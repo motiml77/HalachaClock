@@ -41,6 +41,11 @@ import com.zmanimclock.desktop.reminder.ReminderPopupWindow
 import com.zmanimclock.desktop.reminder.ReminderScheduler
 import com.zmanimclock.desktop.reminder.ZmanimTray
 import com.zmanimclock.desktop.ui.AppTitleBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.desktop.ui.AlertsPane
+import com.zmanimclock.desktop.ui.RoundIconButton
 import com.zmanimclock.desktop.ui.CalendarPane
 import com.zmanimclock.desktop.ui.DockTabWindow
 import com.zmanimclock.desktop.ui.SettingsPane
@@ -312,15 +317,30 @@ private enum class MainTab(val label: String, val width: Dp) {
     //   660 — the calendar: the fixed zmanim column PLUS room for the month.
     //         The two sides used to split the window 45/55, which meant
     //         opening the calendar re-proportioned the zmanim list instead of
-    //         adding to it — the same rows, 80dp wider, jumping on every tab
-    //         switch. The column is now fixed and the month grid takes the
-    //         remainder, so the calendar is a genuine addition beside it.
-    //         Swept 620/660/700: below 660 the month is cramped, above it the
-    //         window grows without the grid reading any better.
-    //   560 — settings. Verified clean; the two card columns still breathe.
+    //         adding to it. Swept 620/660/700 and read each.
+    //   560 — settings. Verified clean; both card columns still breathe.
     ZMANIM("זמני היום", ZMANIM_COLUMN_WIDTH),
     CALENDAR("לוח שנה", 660.dp),
+    // The SAME column as the zmanim list, deliberately: the two are read one
+    // after the other ("what is next" then "what did I set for it"), and a
+    // panel that changed width between them would make the whole window jump
+    // on every switch.
+    ALERTS("התראות", ZMANIM_COLUMN_WIDTH),
+
+    /**
+     * Reached by the gear, NOT by the pill. Settings is a place you visit to
+     * change something and then leave; the other three are places you look at.
+     * Giving it a quarter of a permanent segmented control implied it was a
+     * destination of the same rank, and cost the three real ones a quarter of
+     * their width apiece.
+     */
     SETTINGS("הגדרות", 560.dp),
+    ;
+
+    companion object {
+        /** The three that appear in the pill. Settings is deliberately absent. */
+        val PILL: List<MainTab> = listOf(ZMANIM, CALENDAR, ALERTS)
+    }
 }
 
 @Composable
@@ -331,65 +351,82 @@ private fun MainWindowContent(
     onTabChange: (MainTab) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+
+    // Set by a bell in the zmanim list; consumed by the alerts pane, which
+    // opens its editor prefilled with that zman.
+    var pendingAlertKind by remember { mutableStateOf<ZmanKind?>(null) }
+
+    fun goTo(t: MainTab) {
+        // Leaving settings may have changed the city, the halachic offsets or
+        // the alert set; tell the scheduler now rather than making the user
+        // wait for the next tick to notice.
+        if (tab == MainTab.SETTINGS && t != MainTab.SETTINGS) scheduler.invalidate()
+        onTabChange(t)
+    }
+
     Column(Modifier.fillMaxSize()) {
-        // A segmented pill rather than Material's TabRow. The stock TabRow is
-        // a full-width strip with an underline — the visual language of a
-        // browser, not of a small always-there panel. A pill track with a
-        // filled thumb reads instantly as "one of three", costs less height,
-        // and gives the top of the window a shape that matches the rounded
-        // shell it now lives in.
         Row(
-            Modifier.fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(50))
-                .background(cs.surfaceVariant.copy(alpha = 0.55f))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            MainTab.entries.forEach { t ->
-                val selected = tab == t
-                Box(
-                    Modifier.weight(1f)
-                        .clip(RoundedCornerShape(50))
-                        .background(if (selected) cs.primaryContainer else Color.Transparent)
-                        // The gold ring marks the ACTIVE tab the way the gold
-                        // arrow marks the bookmark — one accent, used for "this
-                        // is where you are", nowhere else on the strip.
-                        .then(
-                            if (selected) {
-                                Modifier.border(
-                                    1.dp,
-                                    Ext.colors.accentGold.copy(alpha = 0.8f),
-                                    RoundedCornerShape(50),
-                                )
-                            } else {
-                                Modifier
-                            },
+            // A segmented pill rather than Material's TabRow. The stock TabRow
+            // is a full-width strip with an underline — the visual language of
+            // a browser, not of a small always-there panel. A pill track with
+            // a filled thumb reads instantly as "one of three", costs less
+            // height, and matches the rounded shell it lives in.
+            Row(
+                Modifier.weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(cs.surfaceVariant.copy(alpha = 0.55f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                MainTab.PILL.forEach { t ->
+                    val selected = tab == t
+                    Box(
+                        Modifier.weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (selected) cs.primaryContainer else Color.Transparent)
+                            .clickable { goTo(t) }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            t.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selected) cs.onPrimaryContainer else cs.onSurfaceVariant,
+                            maxLines = 1,
                         )
-                        .clickable {
-                            // Leaving settings may have changed the city, the
-                            // halachic offsets or the reminder set; tell the
-                            // scheduler now rather than making the user wait
-                            // for the next tick to notice.
-                            if (tab == MainTab.SETTINGS && t != MainTab.SETTINGS) scheduler.invalidate()
-                            onTabChange(t)
-                        }
-                        .padding(vertical = 7.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        t.label,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (selected) cs.onPrimaryContainer else cs.onSurfaceVariant,
-                    )
+                    }
                 }
             }
+
+            // LAST child, so under the app's forced RTL it lands on the LEFT —
+            // the far side from where reading starts, which is where a utility
+            // control belongs.
+            RoundIconButton(
+                icon = Icons.Outlined.Settings,
+                description = "הגדרות",
+                size = 30.dp,
+                tint = if (tab == MainTab.SETTINGS) cs.onPrimaryContainer else cs.onSurfaceVariant,
+                onClick = { goTo(if (tab == MainTab.SETTINGS) MainTab.ZMANIM else MainTab.SETTINGS) },
+            )
         }
+
         Box(Modifier.fillMaxSize()) {
             when (tab) {
-                MainTab.ZMANIM -> ZmanimPane(service)
+                MainTab.ZMANIM -> ZmanimPane(service) { kind ->
+                    pendingAlertKind = kind
+                    goTo(MainTab.ALERTS)
+                }
                 MainTab.CALENDAR -> CalendarPane(service)
+                MainTab.ALERTS -> AlertsPane(
+                    service = service,
+                    prefillKind = pendingAlertKind,
+                    onPrefillConsumed = { pendingAlertKind = null },
+                )
                 MainTab.SETTINGS -> SettingsPane(service)
             }
         }

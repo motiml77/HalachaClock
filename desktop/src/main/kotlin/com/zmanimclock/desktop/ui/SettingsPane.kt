@@ -358,37 +358,10 @@ private fun FiltersHalf(service: DesktopZmanimService, modifier: Modifier) {
             Hint("בלי בחירה — כל הזמנים נחשבים.")
         }
 
-        // ---- 4. תזכורות ----
-        Panel("תזכורות") {
-            Hint(
-                if (prefs.reminderZmanim.isEmpty()) "אין תזכורות — ברירת המחדל"
-                else "${prefs.reminderZmanim.size} תזכורות פעילות",
-            )
-            // Empty by default ON PURPOSE. An app that starts by interrupting
-            // the user about seventeen zmanim they never asked about gets its
-            // notifications switched off wholesale, and then the ones they DID
-            // want are gone too. Opt-in, one at a time.
-            Hint("תזכורות הן בבחירה בלבד — כברירת מחדל שום זמן לא מתריע.")
-            if (prefs.reminderZmanim.isNotEmpty()) {
-                ActionLink("נקה הכל") {
-                    service.update { it.copy(reminderZmanim = emptySet()) }
-                }
-            }
-            ZmanChecklist(
-                selected = prefs.reminderZmanim,
-                onChange = { service.update { p -> p.copy(reminderZmanim = it) } },
-            )
-            Spacer(Modifier.height(2.dp))
-            // Stated plainly rather than discovered later: a desktop app cannot
-            // promise delivery the way a phone alarm can, and this build is a
-            // zmanim board, not an alarm clock — no sound, no snooze.
-            Text(
-                "תזכורת תופיע רק אם המחשב פעיל ומצב \"נא לא להפריע\" כבוי.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Ext.colors.deadline,
-            )
-            Hint("התזכורת שקטה — הודעה על המסך בלבד, בלי צליל.")
-        }
+        // תזכורות moved OUT of settings and became the התראות tab: they
+        // stopped being a set of checkboxes and turned into named alerts with
+        // their own offsets, which is a list to manage rather than a filter to
+        // tick. See ui/AlertsPane.kt.
     }
 }
 
