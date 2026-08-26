@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -329,13 +331,21 @@ private fun AlertEditor(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp)
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)
                 // Clicks inside must not reach the scrim's cancel.
                 .clickable(enabled = false) {},
             shape = RoundedCornerShape(16.dp),
             color = cs.surface,
             border = BorderStroke(1.dp, cs.outlineVariant),
         ) {
+            // TITLE, SCROLLING BODY, PINNED ACTIONS.
+            //
+            // A plain Column here overflowed: name + picker + offset + days +
+            // preview + buttons is taller than the sheet on a short panel, and
+            // Compose does not clip gracefully — the שמירה row simply ran off
+            // the bottom edge with no way to reach it. The body scrolls and
+            // the buttons sit outside that scroll, so they are reachable at
+            // any height the window can be dragged to.
             Column(Modifier.padding(14.dp)) {
                 Text(
                     if (isNew) "התראה חדשה" else "עריכת התראה",
@@ -344,6 +354,9 @@ private fun AlertEditor(
                     color = cs.primary,
                 )
 
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                ) {
                 Spacer(Modifier.height(10.dp))
                 FieldLabel("שם ההתראה")
                 NameField(name) { name = it }
@@ -379,6 +392,8 @@ private fun AlertEditor(
                     color = Ext.colors.accentGold,
                     fontWeight = FontWeight.Bold,
                 )
+
+                }
 
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -504,7 +519,7 @@ private fun ZmanPicker(
  * choice rather than a degenerate case of "0 minutes before".
  */
 @Composable
-private fun OffsetPicker(offset: Int, onChange: (Int) -> Unit) {
+internal fun OffsetPicker(offset: Int, onChange: (Int) -> Unit) {
     val magnitude = kotlin.math.abs(offset)
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -515,9 +530,27 @@ private fun OffsetPicker(offset: Int, onChange: (Int) -> Unit) {
         }
         if (offset != 0) {
             val sign = if (offset < 0) -1 else 1
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(5, 10, 15, 20, 30, 45, 60).forEach { m ->
-                    ChoiceChip("$m", magnitude == m) { onChange(sign * m) }
+            // A STEPPER, not a row of preset minutes. The presets were seven
+            // chips that could not all fit the 320dp column — "60" wrapped to
+            // two lines inside its own pill — and they still could not express
+            // 7 or 23 minutes. One pair of buttons covers every value and
+            // costs one line instead of two.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StepButton("−", magnitude > 1) { onChange(sign * (magnitude - 1)) }
+                Box(Modifier.width(74.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        "$magnitude דקות",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+                StepButton("+", magnitude < ZmanAlert.MAX_OFFSET_MINUTES) {
+                    onChange(sign * (magnitude + 1))
                 }
             }
         }
@@ -534,6 +567,30 @@ private fun OffsetPicker(offset: Int, onChange: (Int) -> Unit) {
  * unticking the last remaining day does nothing. An alert that fires on no
  * days is not a state anyone means to be in; "off" is what the bell is for.
  */
+/** Round, and disabled at the ends rather than silently doing nothing. */
+@Composable
+private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Box(
+        Modifier.size(30.dp)
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (enabled) cs.primaryContainer
+                else cs.surfaceVariant.copy(alpha = 0.4f),
+            )
+            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (enabled) cs.onPrimaryContainer else cs.onSurfaceVariant.copy(alpha = 0.5f),
+        )
+    }
+}
+
 @Composable
 private fun DayPicker(days: Int, onChange: (Int) -> Unit) {
     val labels = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")

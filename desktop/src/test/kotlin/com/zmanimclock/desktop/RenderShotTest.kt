@@ -2,18 +2,21 @@ package com.zmanimclock.desktop
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.use
 import com.zmanimclock.desktop.reminder.PendingReminder
 import com.zmanimclock.desktop.reminder.ReminderBanner
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.desktop.data.ZmanAlert
 import com.zmanimclock.desktop.ui.AlertsPane
+import com.zmanimclock.desktop.ui.OffsetPicker
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.ui.CalendarPane
@@ -118,6 +121,23 @@ class RenderShotTest {
     fun alertEditor() {
         both("desk_alert_editor", 320) {
             AlertsPane(DesktopZmanimService(DesktopPrefs()), ZmanKind.MINCHA_KETANA) {}
+        }
+        // The stepper only exists when the offset is non-zero, which the
+        // prefill path never is — so it is shot directly. It replaced seven
+        // preset-minute chips that could not fit 320dp: "60" was wrapping to
+        // two lines inside its own pill.
+        for (value in listOf(-10, 60)) {
+            shot("desk_offset_$value", dark = true, w = 320, h = 90) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.padding(14.dp),
+                ) { OffsetPicker(value) {} }
+            }
+        }
+        // AND AT A SHORT PANEL. The editor overflowed its sheet once — the
+        // שמירה row ran off the bottom with no way to reach it — and a shot at
+        // a comfortable height is exactly what failed to show it.
+        shot("desk_alert_editor_short", dark = true, w = 320, h = 420) {
+            AlertsPane(DesktopZmanimService(DesktopPrefs()), ZmanKind.SHKIA) {}
         }
     }
     @Test fun settings() = both("desk_settings", 560) { SettingsPane(service()) }
