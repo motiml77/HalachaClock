@@ -16,6 +16,7 @@ import com.zmanimclock.desktop.reminder.ReminderBanner
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.desktop.data.ZmanAlert
 import com.zmanimclock.desktop.ui.AlertsPane
+import com.zmanimclock.desktop.ui.StartupPromptCard
 import com.zmanimclock.desktop.ui.OffsetPicker
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
@@ -156,6 +157,16 @@ class RenderShotTest {
         for (dark in listOf(false, true)) {
             shot("desk_reminder", dark = dark, w = 378, h = 189) {
                 ReminderBanner(reminder) {}
+            }
+        }
+    }
+
+    /** The first-run question, at its real 360x240. */
+    @Test
+    fun startupPrompt() {
+        for (dark in listOf(false, true)) {
+            shot("desk_startup_prompt", dark = dark, w = 360, h = 240) {
+                StartupPromptCard {}
             }
         }
     }

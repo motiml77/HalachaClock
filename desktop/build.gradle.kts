@@ -72,7 +72,21 @@ compose.desktop {
         mainClass = "com.zmanimclock.desktop.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Msi)
+            // EXE, not MSI. jpackage's exe bundle is a WIZARD — welcome page,
+            // licence page, install-location page, progress, finish — which is
+            // what a person expects when they double-click something a friend
+            // sent them. The MSI runs silently or throws a bare Windows
+            // installer dialog, has no place to show terms, and reinstalling
+            // the same version fails with error 1638 instead of just running.
+            // Both are produced: the EXE is the one to hand out, the MSI stays
+            // for anyone deploying by policy.
+            targetFormats(TargetFormat.Exe, TargetFormat.Msi)
+
+            // Shown as its own page in the EXE wizard, which the user must
+            // accept before Next becomes available. Plain text, CRLF, ASCII —
+            // the installer renders it in a fixed-width control with no
+            // wrapping of its own, so the file is hard-wrapped to fit.
+            licenseFile.set(project.file("LICENSE.txt"))
             // ASCII: the installer identity. The product's real name inside
             // the app is Hebrew, but packageName/menuGroup/description feed
             // file paths and WiX. ASCII ONLY, all three of these — verified by
@@ -87,7 +101,7 @@ compose.desktop {
             // 1638 ("another version of this product is already installed"),
             // confirmed in practice — an update MUST raise this or nobody can
             // upgrade in place.
-            packageVersion = "1.7.0"
+            packageVersion = "1.8.0"
             description = "Halacha Clock - Zmanim and Hebrew calendar"
             vendor = "Halacha Clock"
 
@@ -100,9 +114,20 @@ compose.desktop {
 
             windows {
                 menuGroup = "Halacha Clock"
-                perUserInstall = true   // no admin rights needed
+                // The wizard's own pages. Without these the EXE installs
+                // silently on a double-click, which is the opposite of what an
+                // installer sent to a stranger should do: they get no licence
+                // page, no choice of location, and no sign anything happened.
+                //   dirChooser    — the "where to install" page
+                //   perUserInstall— no admin prompt; a UAC dialog on a
+                //                   personal utility from an unsigned author
+                //                   is what makes people cancel
+                //   shortcut      — desktop icon
+                //   menu          — Start-menu entry under menuGroup
+                perUserInstall = true
                 dirChooser = true
                 shortcut = true
+                menu = true
                 iconFile.set(project.file("src/main/resources/branding/app.ico"))
                 // FROZEN. Change this and every upgrade installs alongside the
                 // old version instead of replacing it.

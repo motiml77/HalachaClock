@@ -53,6 +53,8 @@ import com.zmanimclock.desktop.ui.ZMANIM_COLUMN_WIDTH
 import com.zmanimclock.desktop.ui.ZmanimPane
 import androidx.compose.runtime.DisposableEffect
 import com.zmanimclock.desktop.system.SingleInstance
+import com.zmanimclock.desktop.ui.FirstRunStartupPrompt
+import com.zmanimclock.desktop.system.StartupManager
 import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.widget.ZmanimWidgetWindow
 
@@ -137,6 +139,28 @@ private fun runApp(args: Array<String>) = application {
             mainState.isMinimized = false
         }
         onDispose { SingleInstance.release() }
+    }
+
+    // Asked once, right after installation — see FirstRunStartupPrompt for why
+    // this is here and not a page in the installer's wizard. Never asked when
+    // there is no launcher to register (a Gradle run), and never asked twice.
+    var askStartup by remember {
+        mutableStateOf(
+            !prefs.startupPrompted &&
+                !startHidden &&
+                StartupManager.isSupported() &&
+                !StartupManager.isEnabled(),
+        )
+    }
+    if (askStartup) {
+        FirstRunStartupPrompt { enable ->
+            // REGISTRY FIRST, pref second — the settings pane learned this the
+            // hard way: a flag that says "on" while the machine does nothing
+            // is worse than not offering it.
+            val ok = if (enable) StartupManager.setEnabled(true) else true
+            service.update { it.copy(startupPrompted = true, startWithWindows = enable && ok) }
+            askStartup = false
+        }
     }
 
     ZmanimTray(

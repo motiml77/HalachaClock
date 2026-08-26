@@ -35,6 +35,13 @@ data class DesktopPrefs(
     var alerts: List<ZmanAlert> = emptyList(),
     var startWithWindows: Boolean = false,
     /**
+     * Whether the first-run "start with Windows?" question has been PUT — not
+     * what was answered. Recording the answer would mean re-asking everyone
+     * who declined, every launch; recording the asking means it happens once
+     * and settings holds the switch thereafter.
+     */
+    var startupPrompted: Boolean = false,
+    /**
      * Whether the folded bookmark floats above other windows.
      *
      * OFF BY DEFAULT, deliberately. A 36dp sliver that sits over everything is
@@ -61,6 +68,7 @@ data class DesktopPrefs(
         // corrupt record would take the whole list with it.
         alerts.forEach { p["alert.${it.id}"] = it.encode() }
         p["startWithWindows"] = startWithWindows.toString()
+        p["startupPrompted"] = startupPrompted.toString()
         p["dockTabAlwaysOnTop"] = dockTabAlwaysOnTop.toString()
         p["widgetPinnedToDesktop"] = widgetPinnedToDesktop.toString()
         p["widgetVisible"] = widgetVisible.toString()
@@ -145,6 +153,7 @@ data class DesktopPrefs(
                 nextZmanFilter = set("nextZmanFilter"),
                 alerts = readAlerts(p),
                 startWithWindows = p.getProperty("startWithWindows")?.toBoolean() ?: false,
+                startupPrompted = p.getProperty("startupPrompted")?.toBoolean() ?: false,
                 dockTabAlwaysOnTop = p.getProperty("dockTabAlwaysOnTop")?.toBoolean() ?: false,
                 widgetPinnedToDesktop = p.getProperty("widgetPinnedToDesktop")?.toBoolean() ?: false,
                 widgetVisible = p.getProperty("widgetVisible")?.toBoolean() ?: false,
