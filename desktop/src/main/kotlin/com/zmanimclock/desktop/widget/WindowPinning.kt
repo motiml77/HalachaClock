@@ -80,8 +80,18 @@ internal object WindowPinning {
     /** (HWND)-2 — above nothing in particular; clears the topmost band. */
     private val HWND_NOTOPMOST: HWND = HWND(Pointer.createConstant(-2L))
 
+    /** (HWND)-1 — the TOP of the topmost band. */
+    private val HWND_TOPMOST: HWND = HWND(Pointer.createConstant(-1L))
+
     /** Slow enough to be free, fast enough that a stray raise is not noticed. */
     private const val POLL_MILLIS = 1_500
+
+    /**
+     * Faster than the widget's poll: this one is fighting to stay VISIBLE, and
+     * a second of being buried under a newly-created topmost window is a
+     * second the user cannot see their alert.
+     */
+    private const val TOP_POLL_MILLIS = 700
 
     /**
      * Why the last call failed, for an honest message in the settings pane.
@@ -92,6 +102,18 @@ internal object WindowPinning {
         private set
 
     private var timer: Timer? = null
+
+    /**
+     * ONE TIMER PER WINDOW, not one for the object.
+     *
+     * Separate from [timer] because the widget pins DOWN while these pin UP —
+     * but also keyed by window, because TWO of these can be live at once: the
+     * folded bookmark sits on the edge while an alert banner is on screen. A
+     * single shared field meant the second caller stopped the first one's
+     * timer, silently un-pinning the bookmark for as long as the banner
+     * showed.
+     */
+    private val topTimers = java.util.WeakHashMap<Window, Timer>()
 
     // ── Public surface ──────────────────────────────────────────────────────
 
@@ -181,6 +203,66 @@ internal object WindowPinning {
                 SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_NOOWNERZORDER,
             )
         }
+    }
+
+    /**
+     * Holds [window] at the TOP of the topmost band, re-asserting on a poll.
+     *
+     * ── Why a poll and not just alwaysOnTop ─────────────────────────────────
+     * `alwaysOnTop` puts the window IN the topmost band; it does not keep it at
+     * the top OF that band. Any other topmost window created afterwards — a
+     * media player's controls, another always-on-top utility, a notification —
+     * lands above it and stays there. Re-asserting HWND_TOPMOST on a slow poll
+     * puts it back, which is exactly what every "always on top" utility does.
+     *
+     * ── What this DOES buy, and it is most of what was asked ────────────────
+     * Modern fullscreen video is not what people assume. Browsers, media
+     * players and the Netflix/YouTube path all present through the DXGI FLIP
+     * model in a borderless window, and Microsoft's own guidance says that
+     * when other desktop content comes on top of such an app, "the DWM can
+     * seamlessly transition back to composed mode" and compose it over the
+     * top. So a topmost window IS drawn over fullscreen video.
+     *
+     * ── What it CANNOT buy ──────────────────────────────────────────────────
+     * True exclusive fullscreen — the legacy DXGI path a game enters with
+     * SetFullscreenState — bypasses the compositor entirely, and nothing in
+     * user space draws over it. The only supported escape is UIAccess, which
+     * requires an Authenticode-signed binary installed to a UAC-protected
+     * location such as Program Files; this app is unsigned and installs
+     * per-user. Microsoft also states plainly that UIAccess must not be used
+     * "by applications that just want to appear above other applications", so
+     * that door is closed by policy as well as by packaging.
+     */
+    fun keepOnTop(window: Window, on: Boolean): Boolean {
+        stopTopTimer(window)
+        if (!on) return true
+        if (!raiseToTop(window)) return false
+
+        return guard("start the always-on-top timer") {
+            val t = Timer(TOP_POLL_MILLIS) {
+                if (!window.isDisplayable) stopTopTimer(window) else raiseToTop(window)
+            }
+            t.isRepeats = true
+            t.start()
+            topTimers[window] = t
+            true
+        }
+    }
+
+    /** One re-assert. Never moves, resizes or activates the window. */
+    fun raiseToTop(window: Window): Boolean {
+        val hwnd = hwndOf(window) ?: return false
+        return guard("raise window to the top") {
+            User32.INSTANCE.SetWindowPos(
+                hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_NOOWNERZORDER,
+            )
+        }
+    }
+
+    /** Stops one window's poll. Safe when nothing is running for it. */
+    fun stopTopTimer(window: Window) {
+        runCatching { topTimers.remove(window)?.stop() }
     }
 
     /**

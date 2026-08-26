@@ -38,6 +38,8 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.runtime.DisposableEffect
+import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanNumberFamily
 import com.zmanimclock.desktop.ZmanimDesktopTheme
@@ -119,6 +121,16 @@ fun ApplicationScope.ReminderPopupWindow(
         alwaysOnTop = true,
         focusable = false,
     ) {
+        // ALWAYS, and re-asserted. This is the one surface whose whole purpose
+        // is to be seen: an alert buried under a media player's own topmost
+        // controls is an alert that did not happen. Unlike the bookmark this
+        // is not a setting — an alert the user asked for must not be
+        // conditional on a preference they set months earlier.
+        DisposableEffect(window) {
+            WindowPinning.keepOnTop(window, true)
+            onDispose { WindowPinning.stopTopTimer(window) }
+        }
+
         ZmanimDesktopTheme {
             ReminderBanner(reminder, onDismiss)
         }

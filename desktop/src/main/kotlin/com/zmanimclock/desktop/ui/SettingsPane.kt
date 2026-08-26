@@ -426,13 +426,16 @@ private fun AutostartPanel(service: DesktopZmanimService) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                // Stated rather than discovered: a topmost window is still
-                // covered by anything running truly fullscreen, because
-                // Windows gives exclusive-fullscreen apps priority over the
-                // topmost band. Better said here than found in a cinema.
+                // Precise about what "above everything" reaches, because the
+                // obvious guess is wrong in both directions. Fullscreen VIDEO
+                // — browsers, players, streaming — presents through the DXGI
+                // flip model in a borderless window, and the compositor draws
+                // topmost windows over it, so it IS covered. Only a game in
+                // true exclusive fullscreen bypasses the compositor entirely.
                 Hint(
                     if (prefs.dockTabAlwaysOnTop) {
-                        "סרט או משחק במסך מלא עדיין יכסו אותה — כך Windows מתנהגת."
+                        "תופיע גם מעל סרטים ומסך מלא. משחק במצב מסך-מלא בלעדי " +
+                            "הוא היחיד שיכסה אותה — הוא עוקף את מנהל החלונות של Windows."
                     } else {
                         "כבוי — הסימניה מתנהגת כמו כל חלון ולא מכסה תוכנות אחרות."
                     },

@@ -33,6 +33,8 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.runtime.DisposableEffect
+import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanimDesktopTheme
 import java.awt.Cursor
@@ -98,6 +100,15 @@ fun ApplicationScope.DockTabWindow(
         // needing any detection of what is playing.
         alwaysOnTop = alwaysOnTop,
     ) {
+        // alwaysOnTop puts the window IN the topmost band; it does not keep it
+        // at the top OF it. Any topmost window created afterwards lands above.
+        // The poll re-asserts, which is what makes "above fullscreen video"
+        // actually hold rather than hold until something else floats.
+        DisposableEffect(window, alwaysOnTop) {
+            WindowPinning.keepOnTop(window, alwaysOnTop)
+            onDispose { WindowPinning.stopTopTimer(window) }
+        }
+
         ZmanimDesktopTheme {
             val ext = Ext.colors
             val cs = MaterialTheme.colorScheme
