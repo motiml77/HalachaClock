@@ -1,0 +1,110 @@
+HALACHA CLOCK  ("Sheon Meorer - Zmanim Hilchatiyim")
+END USER LICENCE AGREEMENT AND TERMS OF USE
+
+Copyright (c) 2026 Moti Levi. All rights reserved.
+
+Please read this agreement before installing. By installing or using this
+software you accept the terms below. If you do not accept them, do not
+install the software.
+
+
+1. HALACHIC DISCLAIMER  -  PLEASE READ THIS FIRST
+
+This program calculates zmanim (halachic times) by astronomical computation.
+The times it displays follow the shitot of Luach Ohr HaChaim / Chazon Yosef
+(Rav Yitzchak Yosef), and have been checked against that luach's own
+published values. They are provided for INFORMATIONAL PURPOSES ONLY.
+
+A calculated time is not a psak halacha. Zmanim depend on your exact
+location, your elevation, local custom, and questions of shita on which
+poskim differ. Where a matter of halacha turns on a zman - and especially
+for Shabbat, Yom Tov, fast days, candle lighting and the end of Shabbat -
+you must rely on a printed luach for your locality and on your own Rav,
+not on this program.
+
+The author accepts no responsibility for any halachic, financial or other
+consequence of relying on the times this program displays.
+
+
+2. LICENCE GRANTED TO YOU
+
+You are granted a personal, non-exclusive, royalty-free licence to install
+and use this software on any number of computers you own or control, and to
+copy it and pass it to others, PROVIDED that you pass it on complete and
+unmodified, with this notice included, and that you do not charge for it.
+
+You may not sell this software, bundle it with anything sold, or present it
+as your own work.
+
+You may not modify, reverse engineer, decompile or disassemble the program,
+except to the extent that such restriction is prohibited by applicable law,
+or as required by the third-party licences in section 5.
+
+
+3. NO WARRANTY
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+In particular, and without limiting the above: this program is NOT an alarm
+clock and gives no guarantee of delivery. Its alerts are silent on-screen
+banners that appear only while the computer is awake, running, and not in a
+mode that suppresses notifications. Do not rely on it to wake you, and do
+not rely on it where missing an alert would matter.
+
+
+4. YOUR PRIVACY
+
+This program collects nothing, transmits nothing, and contains no
+advertising, no analytics and no tracking of any kind.
+
+All calculation is performed on your own computer. Your chosen city, your
+alerts and your settings are stored only in a plain text file on your own
+machine, under your user profile, and are never sent anywhere. The program
+does not require an internet connection to work.
+
+
+5. THIRD-PARTY COMPONENTS
+
+This software includes the following components, each under its own licence.
+Those licences continue to apply to those components and nothing in this
+agreement restricts the rights they grant you.
+
+  KosherJava Zmanim API - Copyright (c) Eliyahu Hershfeld
+      GNU Lesser General Public License, version 2.1 (LGPL-2.1)
+      https://kosherjava.com  |  https://github.com/KosherJava/zmanim
+      The astronomical substrate for the zmanim calculations. As LGPL
+      requires, you are entitled to obtain, modify and relink this
+      component; contact the author for the corresponding source.
+
+  Compose Multiplatform, Kotlin and the AndroidX Compose libraries
+      Copyright (c) JetBrains s.r.o. and The Android Open Source Project
+      Apache License, Version 2.0
+
+  Java Native Access (JNA) - Copyright (c) Timothy Wall and contributors
+      Apache License, Version 2.0, or LGPL 2.1 at your option
+
+  Heebo and Rubik typefaces
+      SIL Open Font License, Version 1.1
+      Heebo (c) Oded Ezer; Rubik (c) Hubert & Fischer and contributors
+
+  OpenJDK runtime - Copyright (c) Oracle and/or its affiliates
+      GNU General Public License, version 2, with the Classpath Exception
+
+Halachic parameters and reference values are derived from Luach Ohr HaChaim
+/ Chazon Yosef. This program is not published by, endorsed by or affiliated
+with that luach or with its publishers.
+
+
+6. GENERAL
+
+This agreement is governed by the laws of the State of Israel.
+
+If any provision of this agreement is held unenforceable, the remaining
+provisions continue in full force.
+
+Contact: motiml77@gmail.com
