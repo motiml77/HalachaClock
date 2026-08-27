@@ -95,6 +95,19 @@ data class AlarmEntity(
      */
     val skipUntilEpochMs: Long = 0,
 
+    /**
+     * DELETE this alarm once it has been dealt with, rather than deactivating
+     * it.
+     *
+     * An ordinary one-time alarm stays in the list switched off, which is
+     * right: the user built it and may want it again. A שומר לערבית is the
+     * opposite — a single tap on the zmanim screen for tonight only, and the
+     * owner's requirement was that it "vanish without a trace". Leaving a
+     * disabled row behind would silt up the alarms list with something the
+     * user never meant to create.
+     */
+    val deleteAfterFiring: Boolean = false,
+
     val label: String = "",
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),

@@ -295,8 +295,21 @@ class AlarmSoundService : Service() {
             // Everything past this point is bookkeeping — it must never be
             // able to take the ringing alarm down with it.
             runCatching {
-                if (loaded.isOneTime) alarmDao.setActive(loaded.id, false)
-            }.onFailure { Log.e(TAG, "Failed to deactivate one-time alarm", it) }
+                when {
+                    // שומר לערבית: created by one tap on the zmanim screen for
+                    // tonight only, and required to leave nothing behind. A
+                    // deactivated row would silt up the alarms list with
+                    // something the user never meant to create.
+                    //
+                    // Safe to delete WHILE IT RINGS: this service already holds
+                    // the loaded row in memory, AlarmActivity is handed
+                    // everything it shows through Intent extras and never reads
+                    // the database, and these alarms carry maxSnoozes = 0, so
+                    // nothing downstream needs the row to still exist.
+                    loaded.deleteAfterFiring -> alarmDao.deleteById(loaded.id)
+                    loaded.isOneTime -> alarmDao.setActive(loaded.id, false)
+                }
+            }.onFailure { Log.e(TAG, "Failed to retire one-time alarm", it) }
             runCatching {
                 // WorkManager lives in credential-encrypted storage, so this
                 // is unavailable before the first unlock after a reboot.

@@ -39,7 +39,7 @@ object AppModule {
         return Room.databaseBuilder(dpsContext, ZmanimDatabase::class.java, "zmanim.db")
             // v4→v5: ring duration moved from whole minutes to seconds — keep
             // the user's existing alarms by converting minutes×60 in place.
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
             // silently wipe every alarm the user created.
@@ -67,6 +67,19 @@ object AppModule {
      * behaviour rather than silently keep a fade the user never chose.
      * Anyone who actually wants it can switch it back on per alarm.
      */
+    /**
+     * v8→v9: the שומר לערבית flag. DEFAULT 0, so every alarm that already
+     * exists keeps the old behaviour of being switched off rather than
+     * removed — only the one-tap evening reminder opts into vanishing.
+     */
+    private val MIGRATION_8_9 = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE alarms ADD COLUMN deleteAfterFiring INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
+
     private val MIGRATION_7_8 = object : Migration(7, 8) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(

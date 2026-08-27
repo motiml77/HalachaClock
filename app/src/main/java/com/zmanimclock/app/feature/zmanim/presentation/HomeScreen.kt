@@ -28,6 +28,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -52,6 +55,8 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val alertedKinds by viewModel.alertedKinds.collectAsStateWithLifecycle()
+    val tzeitGuard by viewModel.tzeitGuard.collectAsStateWithLifecycle()
+    var guardDialogFor by remember { mutableStateOf<ZmanimViewModel.ZmanRow?>(null) }
 
     // Recompute the moment the screen comes back into view. The ViewModel
     // survives backgrounding and its minute ticker cannot run while the
@@ -66,15 +71,29 @@ fun HomeScreen(
     ZmanimContent(
         state = state,
         alertedKinds = alertedKinds,
+        guardArmed = tzeitGuard != null,
         onBellClick = { kind -> onCreateZmanAlarm(kind.name) },
+        onGuardClick = { row -> guardDialogFor = row },
     )
+
+    guardDialogFor?.let { row ->
+        TzeitGuardDialog(
+            zmanTime = row.time,
+            armedAt = tzeitGuard?.let { "%02d:%02d".format(it.hour, it.minute) },
+            onArm = { h, m -> viewModel.armTzeitGuard(h, m); guardDialogFor = null },
+            onCancelGuard = { viewModel.cancelTzeitGuard(); guardDialogFor = null },
+            onDismiss = { guardDialogFor = null },
+        )
+    }
 }
 
 @Composable
 fun ZmanimContent(
     state: ZmanimViewModel.UiState,
     alertedKinds: Set<String>,
+    guardArmed: Boolean = false,
     onBellClick: (ZmanKind) -> Unit,
+    onGuardClick: (ZmanimViewModel.ZmanRow) -> Unit = {},
 ) {
     if (state.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -90,7 +109,12 @@ fun ZmanimContent(
                 ZmanRow(
                     row = row,
                     hasAlert = row.kind.name in alertedKinds,
+                    // The badge belongs to ONE row: the stricter tzeit, which
+                    // is the one a maariv safeguard hangs off.
+                    showGuardBadge = row.kind == ZmanKind.TZEIT_LECHUMRA,
+                    guardArmed = guardArmed,
                     onBellClick = { onBellClick(row.kind) },
+                    onGuardClick = { onGuardClick(row) },
                 )
             }
         }
@@ -206,7 +230,10 @@ private fun NextHero(state: ZmanimViewModel.UiState) {
 private fun ZmanRow(
     row: ZmanimViewModel.ZmanRow,
     hasAlert: Boolean,
+    showGuardBadge: Boolean = false,
+    guardArmed: Boolean = false,
     onBellClick: () -> Unit,
+    onGuardClick: () -> Unit = {},
 ) {
     val ext = Ext.colors
     val cs = MaterialTheme.colorScheme
@@ -260,6 +287,10 @@ private fun ZmanRow(
                     .weight(1f)
                     .padding(start = 4.dp),
             )
+            if (showGuardBadge) {
+                TzeitGuardBadge(armed = guardArmed, onClick = onGuardClick)
+                Spacer(Modifier.size(8.dp))
+            }
             Text(
                 text = row.time,
                 style = ZmanListTimeStyle,

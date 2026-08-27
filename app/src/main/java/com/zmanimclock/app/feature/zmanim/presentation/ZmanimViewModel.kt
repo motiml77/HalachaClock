@@ -6,6 +6,8 @@ import com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter
 import com.kosherjava.zmanim.hebrewcalendar.JewishDate
 import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.alarms.data.AlarmType
+import com.zmanimclock.app.scheduling.RescheduleWorker
+import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.FastDays
@@ -38,8 +40,23 @@ import javax.inject.Inject
 class ZmanimViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val zmanimRepository: ZmanimRepository,
-    alarmDao: AlarmDao,
+    private val alarmDao: AlarmDao,
+    @dagger.hilt.android.qualifiers.ApplicationContext
+    private val context: android.content.Context,
 ) : ViewModel() {
+
+    /**
+     * The one-tap שומר לערבית for tonight, if it is armed.
+     *
+     * Kept as its own flow rather than folded into [alertedKinds] because it
+     * is a different thing entirely: alertedKinds says "this zman has some
+     * alarm on it", whereas the guard is a single, disposable, one-time alert
+     * that the badge must be able to show and cancel by identity.
+     */
+    val tzeitGuard: StateFlow<AlarmEntity?> =
+        alarmDao.getAllAlarms()
+            .map { alarms -> alarms.firstOrNull { it.deleteAfterFiring && it.isActive } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Zman kinds that currently have at least one ACTIVE alarm (for the bell markers). */
     val alertedKinds: StateFlow<Set<String>> =
@@ -222,9 +239,66 @@ class ZmanimViewModel @Inject constructor(
         return null
     }
 
+    /**
+     * Arms tonight's שומר לערבית at [hour]:[minute] — the day's tzeit, or a
+     * time the user picked instead.
+     *
+     * A FIXED alarm, deliberately, even when the chosen moment IS the zman.
+     * A ZMAN-anchored alarm re-derives its time every day and would roll to
+     * tomorrow's tzeit the instant tonight's passed; this alert exists only
+     * for tonight, so it is pinned to tonight's wall clock and nothing about
+     * it moves afterwards.
+     *
+     * Replaces rather than stacks: arming it twice is the user changing their
+     * mind, not asking for two alarms.
+     */
+    fun armTzeitGuard(hour: Int, minute: Int) {
+        viewModelScope.launch {
+            tzeitGuard.value?.let { runCatching { alarmDao.deleteById(it.id) } }
+            alarmDao.insertAlarm(
+                AlarmEntity(
+                    type = AlarmType.FIXED,
+                    hour = hour,
+                    minute = minute,
+                    // 0 = one-time. Bit-for-bit the same "fires once" the
+                    // alarms screen uses, so the scheduler needs no new case.
+                    daysOfWeek = 0,
+                    soundEnabled = true,
+                    vibrate = true,
+                    ringDurationSeconds = TZEIT_GUARD_RING_SECONDS,
+                    // No snooze: this is a nudge for one moment, and a snooze
+                    // would also keep the row alive past the ring it is
+                    // supposed to disappear with.
+                    maxSnoozes = 0,
+                    label = TZEIT_GUARD_LABEL,
+                    deleteAfterFiring = true,
+                ),
+            )
+            RescheduleWorker.enqueueUnique(context)
+        }
+    }
+
+    /** Disarms it and removes every trace, the same as firing would. */
+    fun cancelTzeitGuard() {
+        viewModelScope.launch {
+            tzeitGuard.value?.let {
+                runCatching { alarmDao.deleteById(it.id) }
+                RescheduleWorker.enqueueUnique(context)
+            }
+        }
+    }
+
     private fun hebrewDate(date: LocalDate, zone: ZoneId): String {
         val cal = GregorianCalendar.from(date.atStartOfDay(zone))
         return hebrewFormatter.format(JewishDate(cal))
+    }
+
+    companion object {
+        /** The owner's wording, and the marker the badge matches on. */
+        const val TZEIT_GUARD_LABEL = "שומר לערבית"
+
+        /** Ten seconds of ring and vibration, then the screen waits for אישור. */
+        const val TZEIT_GUARD_RING_SECONDS = 10
     }
 
     /** Short "1:06" / "0:42" countdown (README §7.1). */
