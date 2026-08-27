@@ -278,18 +278,34 @@ private fun ZmanRow(
                     modifier = Modifier.size(24.dp),
                 )
             }
-            Text(
-                text = row.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = if (row.isNext) FontWeight.Bold else FontWeight.SemiBold,
-                color = nameColor,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 4.dp),
-            )
             if (showGuardBadge) {
+                // The name text hugs its own box's start edge (right, in RTL),
+                // so a single weight(1f) box — as every other row uses — piles
+                // all the slack on the far side of the text, right next to the
+                // badge, and leaves the badge glued to the time instead. Here
+                // the name is measured at its own width and the slack is
+                // pulled out into two equal spacers, so the badge sits in the
+                // middle of the gap rather than at whichever end absorbed it.
+                Text(
+                    text = row.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = if (row.isNext) FontWeight.Bold else FontWeight.SemiBold,
+                    color = nameColor,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                Spacer(Modifier.weight(1f))
                 TzeitGuardBadge(armed = guardArmed, onClick = onGuardClick)
-                Spacer(Modifier.size(8.dp))
+                Spacer(Modifier.weight(1f))
+            } else {
+                Text(
+                    text = row.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = if (row.isNext) FontWeight.Bold else FontWeight.SemiBold,
+                    color = nameColor,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 4.dp),
+                )
             }
             Text(
                 text = row.time,

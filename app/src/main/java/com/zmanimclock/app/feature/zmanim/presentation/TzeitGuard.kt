@@ -3,6 +3,7 @@ package com.zmanimclock.app.feature.zmanim.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zmanimclock.app.ui.theme.Ext
 
 /**
  * שומר לערבית — one tap on the zmanim screen arms tonight's maariv nudge.
@@ -55,18 +57,20 @@ private val GuardRed = Color(0xFFD32F2F)
  *
  * Red, and the only red on the screen: it is the one control in the list that
  * arms something which will make a noise. Armed, the disc goes fully opaque
- * and gains a white ring, so "this is set" reads from the corner of the eye
- * without re-reading the words.
+ * and gains a gold ring — the app's existing "this is active" accent (the
+ * countdown figure, the ringing bell) — so "this is set" reads from the
+ * corner of the eye without re-reading the words.
  */
 @Composable
 internal fun TzeitGuardBadge(armed: Boolean, onClick: () -> Unit) {
+    val gold = Ext.colors.accentGold
     Box(
         modifier = Modifier
             .size(44.dp)
             .clip(CircleShape)
             .background(if (armed) GuardRed else GuardRed.copy(alpha = 0.85f))
             .then(
-                if (armed) Modifier.border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                if (armed) Modifier.border(2.5.dp, gold, CircleShape)
                 else Modifier,
             )
             .clickable(onClick = onClick),
@@ -131,14 +135,32 @@ internal fun TzeitGuardDialog(
                 GuardOption("בשעה אחרת", selected = custom) { custom = true }
 
                 if (custom) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Two steppers rather than a TimePicker: a picker
-                        // dialog on top of this one would be a dialog over a
-                        // dialog for two numbers.
-                        TimeStepper("שעה", hour, 0..23) { hour = it }
-                        Spacer(Modifier.size(12.dp))
+                    Spacer(Modifier.height(10.dp))
+                    // One dark panel — not two separate boxes — reading
+                    // "hour : minute" like an actual digital clock face:
+                    // coded minute-then-hour so that in this RTL row the
+                    // hour lands on the visual left and the minute on the
+                    // right, which is the order asked for. Each side steps
+                    // with +/- directly above/below its own digits, not
+                    // beside them, so the two digit groups can sit close
+                    // together instead of being pushed apart by side buttons.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Ext.colors.heroInner, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         TimeStepper("דקה", minute, 0..59) { minute = it }
+                        Text(
+                            ":",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                        )
+                        TimeStepper("שעה", hour, 0..23) { hour = it }
                     }
                 }
 
@@ -186,23 +208,39 @@ private fun GuardOption(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Minus / number / plus, wrapping within [range] so it can never get stuck. */
+/**
+ * One digit group of the digital-clock panel: a "+" above, the value, a "−"
+ * below — stepping the number in place rather than from beside it, which is
+ * what let the hour and minute digits sit close together like a real clock
+ * instead of being held apart by side buttons.
+ */
 @Composable
 private fun TimeStepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
+    val ext = Ext.colors
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { onChange(if (value <= range.first) range.last else value - 1) }) {
-                Text("−", fontWeight = FontWeight.Bold)
-            }
-            Text(
-                "%02d".format(value),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            TextButton(onClick = { onChange(if (value >= range.last) range.first else value + 1) }) {
-                Text("+", fontWeight = FontWeight.Bold)
-            }
-        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = ext.heroLabel)
+        StepGlyph("+", ext.accentGold) { onChange(if (value >= range.last) range.first else value + 1) }
+        Text(
+            "%02d".format(value),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        StepGlyph("−", ext.accentGold) { onChange(if (value <= range.first) range.last else value - 1) }
     }
+}
+
+/** A compact tap target for one step — a bare glyph, not a full-size button. */
+@Composable
+private fun StepGlyph(symbol: String, tint: Color, onClick: () -> Unit) {
+    Text(
+        symbol,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = tint,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 2.dp),
+    )
 }
