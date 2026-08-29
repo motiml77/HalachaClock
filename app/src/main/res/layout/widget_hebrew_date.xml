@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Home-screen widget: the Hebrew date alone, four centered lines —
+    weekday (small) / day (largest, bold) / month (smaller, bold) /
+    year (small, matching the weekday) — over a user-chosen, user-tinted
+    background. See HebrewDateWidgetProvider and WidgetRenderer.
+
+    Two-layer FrameLayout rather than a single background drawable: the
+    background is an ImageView so its COLOR and TRANSPARENCY can both be set
+    per-widget at render time (ImageView.setColorFilter / setAlpha via
+    RemoteViews' reflection setters — see widget_rounded_mask.xml). A plain
+    `android:background` on the root can't be retinted or faded per instance
+    the way an ImageView's src can. The text sits in its own full-opacity
+    layer on top so it never dims with the background.
+
+    IMPORTANT: RemoteViews inflates only a fixed whitelist of view classes —
+    FrameLayout is on it, a plain <View> is not.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_hdw_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_rounded_mask"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layoutDirection="rtl"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/widget_hdw_weekday"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="יום חמישי" />
+
+        <TextView
+            android:id="@+id/widget_hdw_day"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="48sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            tools:text="י״ד" />
+
+        <TextView
+            android:id="@+id/widget_hdw_month"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="אלול" />
+
+        <TextView
+            android:id="@+id/widget_hdw_year"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:maxLines="1"
+            tools:text="תשפ״ו" />
+    </LinearLayout>
+</FrameLayout>

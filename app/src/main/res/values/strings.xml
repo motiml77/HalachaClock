@@ -20,6 +20,7 @@
     <string name="minutes_after">%d דקות אחרי</string>
     <string name="info">מידע</string>
     <string name="widget_description">מציג את הזמנים ההלכתיים שבחרת ואת הזמן הבא</string>
+    <string name="hebrew_date_widget_description">מציג רק את התאריך העברי, בצבע וברמת שקיפות שתבחר</string>
 
     <!-- Categories -->
     <string name="category_night">לילה</string>

@@ -84,18 +84,25 @@ class WidgetRenderer @Inject constructor(
         R.id.widget_alarm_time_2, R.id.widget_alarm_time_3,
     )
 
-    /** Re-render every widget instance. Cache-only (may run from a receiver). */
+    /** Re-render every widget instance — both kinds. Cache-only (may run from a receiver). */
     suspend fun renderAll() {
         val manager = AppWidgetManager.getInstance(context)
         val ids = manager.getAppWidgetIds(ComponentName(context, ZmanWidgetProvider::class.java))
-        if (ids.isEmpty()) return
+        val hebrewDateIds = manager.getAppWidgetIds(ComponentName(context, HebrewDateWidgetProvider::class.java))
+        if (ids.isEmpty() && hebrewDateIds.isEmpty()) return
 
         val prefs = prefsRepository.schedulingPreferences()
+        val zone = ZoneId.of(prefs.timeZoneId)
+        val today = LocalDate.now(zone)
+
+        // The date-only widget needs nothing but today's date and its own
+        // per-widget color/opacity — no city, no zmanim lookup, no alarms.
+        if (hebrewDateIds.isNotEmpty()) renderHebrewDateWidgets(manager, hebrewDateIds, today, zone)
+        if (ids.isEmpty()) return
+
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
-        val zone = ZoneId.of(prefs.timeZoneId)
         val now = Instant.now()
-        val today = LocalDate.now(zone)
 
         val candle = prefs.candleLightingMinutes.toLong()
         val tzeitShabbat = prefs.tzeitShabbatMinutes.toLong()
@@ -299,6 +306,38 @@ class WidgetRenderer @Inject constructor(
         runCatching {
             hebrewFormatter.format(JewishDate(GregorianCalendar.from(date.atStartOfDay(zone))))
         }.getOrDefault("")
+
+    /**
+     * Render every instance of the Hebrew-date-only widget.
+     *
+     * If [hebrewDateParts] throws (a malformed date is the only realistic
+     * cause — see its own doc), every one of these widgets simply keeps
+     * whatever it last rendered rather than the whole [renderAll] pass
+     * failing and taking the zmanim widgets down with it.
+     */
+    private fun renderHebrewDateWidgets(
+        manager: AppWidgetManager,
+        ids: IntArray,
+        today: LocalDate,
+        zone: ZoneId,
+    ) {
+        val parts = runCatching { hebrewDateParts(today, zone, hebrewFormatter) }.getOrNull() ?: return
+        for (id in ids) {
+            val config = HebrewDateWidgetPrefs.getConfig(context, id)
+            val views = RemoteViews(context.packageName, R.layout.widget_hebrew_date)
+            views.setTextViewText(R.id.widget_hdw_weekday, parts.weekday)
+            views.setTextViewText(R.id.widget_hdw_day, parts.day)
+            views.setTextViewText(R.id.widget_hdw_month, parts.month)
+            views.setTextViewText(R.id.widget_hdw_year, parts.year)
+            // Color and transparency are two independent knobs on the same
+            // background layer — see widget_rounded_mask.xml for why one
+            // drawable serves every preset and every opacity.
+            views.setInt(R.id.widget_hdw_bg, "setColorFilter", config.preset.color)
+            views.setFloat(R.id.widget_hdw_bg, "setAlpha", config.opacityPercent / 100f)
+            views.setOnClickPendingIntent(R.id.widget_root, openAppIntent())
+            manager.updateAppWidget(id, views)
+        }
+    }
 
     private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
         context,
