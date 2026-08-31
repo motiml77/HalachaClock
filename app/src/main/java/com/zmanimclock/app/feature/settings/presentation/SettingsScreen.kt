@@ -164,8 +164,16 @@ fun SettingsScreen(
             }
         },
         onOpenAutostart = { com.zmanimclock.app.util.OemHelper.openAutostartSettings(context) },
+        onOpenPrivacyPolicy = {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(PRIVACY_POLICY_URL))
+            )
+        },
     )
 }
+
+/** Also the URL declared to Google Play under App content → Privacy policy. */
+const val PRIVACY_POLICY_URL = "https://github.com/motiml77/HalachaClock/blob/main/PRIVACY.md"
 
 @Composable
 fun SettingsContent(
@@ -184,6 +192,7 @@ fun SettingsContent(
     onRequestExactAlarms: () -> Unit,
     onRequestFullScreen: () -> Unit = {},
     onOpenAutostart: () -> Unit = {},
+    onOpenPrivacyPolicy: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -459,6 +468,26 @@ fun SettingsContent(
                         "ומשמש לשעונים המכוונים להנץ.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+        }
+
+        // Privacy policy — required to be reachable from inside the app for
+        // the Play Store listing, not only linked from the store page itself.
+        Card(modifier = Modifier.clickable(onClick = onOpenPrivacyPolicy)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("מדיניות פרטיות", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
