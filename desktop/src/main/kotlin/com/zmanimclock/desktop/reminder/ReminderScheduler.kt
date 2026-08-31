@@ -148,7 +148,14 @@ class ReminderScheduler(
 
         val now = clock()
         val zone = service.zone
-        val today = LocalDate.now(zone)
+        // Derived from `now` — the injected clock — not a second, independent
+        // LocalDate.now(zone) read. That second read used to silently win:
+        // it ignored the clock a test (or a future caller) supplied, so
+        // "today" was always the real wall-clock date regardless of what
+        // `clock` said. Invisible in production, where the default clock IS
+        // the wall clock — but it meant a weekday-restricted alert could only
+        // ever be tested against whatever the real day happened to be.
+        val today = now.atZone(zone).toLocalDate()
 
         // Keyed on the ALERT's id, not on the zman: two alerts may sit on the
         // same zman ("15 before שקיעה" and "at שקיעה"), and a kind-keyed flag
