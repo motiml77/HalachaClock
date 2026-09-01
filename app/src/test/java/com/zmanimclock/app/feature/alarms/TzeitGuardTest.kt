@@ -2,7 +2,9 @@ package com.zmanimclock.app.feature.alarms
 
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
+import com.zmanimclock.app.feature.zmanim.presentation.GUARD_OFFSET_MINUTES
 import com.zmanimclock.app.feature.zmanim.presentation.ZmanimViewModel
+import com.zmanimclock.app.feature.zmanim.presentation.shiftClock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -152,5 +154,38 @@ class TzeitGuardTest {
             com.zmanimclock.app.feature.alarms.data.DismissChallenge.NONE,
             guard().dismissChallenge,
         )
+    }
+
+    // ---- the default offset past tzeit ---------------------------------------
+
+    /**
+     * The badge does not fire AT צאת הכוכבים but a couple of minutes past it,
+     * by the owner's ruling — the alert is for someone who has not yet davened,
+     * so landing exactly on the zman leaves no margin.
+     */
+    @Test
+    fun `the default sits two minutes after the zman`() {
+        assertEquals(2, GUARD_OFFSET_MINUTES)
+        assertEquals(19 to 32, shiftClock(19, 30, GUARD_OFFSET_MINUTES))
+    }
+
+    @Test
+    fun `the offset rolls over the hour`() {
+        assertEquals(20 to 1, shiftClock(19, 59, 2))
+        assertEquals(20 to 0, shiftClock(19, 58, 2))
+    }
+
+    /**
+     * Never hour 24. Israel's tzeit is nowhere near midnight, but the modulo
+     * is what keeps a legal wall clock if the app is ever used far enough north
+     * that it is — and an hour of 24 would be rejected by the alarm entity.
+     */
+    @Test
+    fun `the offset wraps past midnight rather than producing hour 24`() {
+        assertEquals(0 to 1, shiftClock(23, 59, 2))
+        assertEquals(0 to 0, shiftClock(23, 58, 2))
+        val (h, m) = shiftClock(23, 59, 2)
+        assertTrue("hour must stay a legal wall clock", h in 0..23)
+        assertTrue("minute must stay a legal wall clock", m in 0..59)
     }
 }

@@ -47,6 +47,28 @@ import com.zmanimclock.app.ui.theme.Ext
 private val GuardRed = Color(0xFFD32F2F)
 
 /**
+ * How long after צאת הכוכבים (המחמירה) the guard fires by default.
+ *
+ * Set by the owner. The badge hangs off the stricter tzeit, and the alert is
+ * a nudge for someone who still has not davened maariv — so it sits just past
+ * the zman rather than on it. The custom-time picker overrides it.
+ */
+internal const val GUARD_OFFSET_MINUTES = 2
+
+/**
+ * [hour]:[minute] moved [byMinutes] forward, as a wall clock.
+ *
+ * Extracted from the dialog so the wrap can be tested: a tzeit late enough to
+ * push the offset past midnight never happens in Israel, but the arithmetic
+ * that would produce hour 24 is exactly the kind that survives review and then
+ * throws on someone's phone abroad.
+ */
+internal fun shiftClock(hour: Int, minute: Int, byMinutes: Int): Pair<Int, Int> {
+    val total = (hour * 60 + minute + byMinutes).mod(24 * 60)
+    return total / 60 to total % 60
+}
+
+/**
  * A small red disc, sized to the ROW rather than to the words.
  *
  * The text is two lines of one word each — שומר over לערבית — which is what
@@ -92,8 +114,8 @@ internal fun TzeitGuardBadge(armed: Boolean, onClick: () -> Unit) {
  *
  * Two taps at most for the common case. The point of the badge is that arming
  * tonight's reminder should not mean a trip to the alarms screen and a form —
- * "בדיוק בצאת הכוכבים" is one press and done. The custom time is there for
- * someone whose minyan is at a quarter past.
+ * the default, [GUARD_OFFSET_MINUTES] minutes past the zman, is one press and
+ * done. The custom time is there for someone whose minyan is at a quarter past.
  */
 @Composable
 internal fun TzeitGuardDialog(
@@ -108,9 +130,12 @@ internal fun TzeitGuardDialog(
     val zmanHour = zmanTime.substringBefore(':').toIntOrNull() ?: 19
     val zmanMinute = zmanTime.substringAfter(':').toIntOrNull() ?: 0
 
+    val (defaultHour, defaultMinute) = shiftClock(zmanHour, zmanMinute, GUARD_OFFSET_MINUTES)
+    val defaultLabel = "%02d:%02d".format(defaultHour, defaultMinute)
+
     var custom by remember { mutableStateOf(false) }
-    var hour by remember { mutableIntStateOf(zmanHour) }
-    var minute by remember { mutableIntStateOf(zmanMinute) }
+    var hour by remember { mutableIntStateOf(defaultHour) }
+    var minute by remember { mutableIntStateOf(defaultMinute) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -127,10 +152,13 @@ internal fun TzeitGuardDialog(
                 )
                 Spacer(Modifier.height(12.dp))
 
-                GuardOption("בדיוק בצאת הכוכבים · $zmanTime", selected = !custom) {
+                GuardOption(
+                    "$GUARD_OFFSET_MINUTES דקות אחרי צאת הכוכבים · $defaultLabel",
+                    selected = !custom,
+                ) {
                     custom = false
-                    hour = zmanHour
-                    minute = zmanMinute
+                    hour = defaultHour
+                    minute = defaultMinute
                 }
                 GuardOption("בשעה אחרת", selected = custom) { custom = true }
 

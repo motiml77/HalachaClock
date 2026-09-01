@@ -58,12 +58,15 @@ class AlarmEditViewModel @Inject constructor(
                 }
             }
         } else if (shabbatPreset) {
-            // Shabbat entry: every Friday, 4 minutes before the location's
-            // shkia, with its own special sound and the candles screen
+            // Shabbat entry: every Friday, 5 minutes before the location's
+            // shkia, with its own special sound and the candles screen.
+            // Five rather than four by the owner's ruling — this alarm is the
+            // last warning before shkia itself, so the extra minute is the
+            // side to err on.
             _alarm.value = AlarmEntity(
                 type = AlarmType.ZMAN,
                 zmanId = "SHKIA",
-                offsetMinutes = 4,
+                offsetMinutes = 5,
                 offsetBefore = true,
                 daysOfWeek = AlarmEntity.FRIDAY_ONLY,
                 shabbatMode = true,
