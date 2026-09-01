@@ -48,24 +48,60 @@ class MaranZmanimEngine @Inject constructor() {
     ): DayZmanim {
         val czc = complexCalendarFor(location, date)
 
+        // The MISHOR pair — sea-level horizon. Kept because הנץ is displayed
+        // from it (see below) and because שקיעה מישורית is shown as its own
+        // row, so a user can see both conventions rather than being handed
+        // one silently.
         val mishorSunrise: Instant? = czc.seaLevelSunrise?.toInstant()
-        val sunset: Instant? = czc.seaLevelSunset?.toInstant()
+        val mishorSunset: Instant? = czc.seaLevelSunset?.toInstant()
 
-        // === THE ROOT PRINCIPLE: the seasonal-hour grid runs on the SEA-LEVEL
-        // (mishor) day — sunrise to sunset — NEVER on the visible netz.
+        // === THE HALACHIC DAY RUNS ON THE ELEVATION HORIZON ===
         //
-        // Chazon Yosef / Zemaneh Yosef (royzmanim.com shows "Sunrise (Sea
-        // Level)"; its GRA shaah = mishor day / 12): terrain delays what the
-        // eye sees, not the halachic day. The VISIBLE netz (ChaiTables) is the
-        // vatikin davening time — displayed as הנץ הנראה and used for
-        // netz-anchored alarms via instantOf(HANETZ) — but it must not stretch
-        // or shift the shaah zmanit. Using it as the grid base skewed every
-        // sunrise-anchored zman in hill towns (Karnei Shomron: netz +12 min →
-        // shma GRA +9, chatzot +5), while sunset-anchored zmanim stayed right.
-        val baseSunrise: Instant? = mishorSunrise ?: visibleSunrise
+        // Both endpoints, sunrise AND sunset, taken at the city's own height.
+        // This is the Or HaChaim / Chazon Yosef convention, and it was
+        // established here by measurement, not by assertion — the previous
+        // sea-level rule had been asserted once and then "verified" by a test
+        // that queried royzmanim.com with `&elevation=0` in the URL, i.e. it
+        // asked the reference to assume our answer and then agreed with it.
+        //
+        // Measured for קרני שומרון, 2026-09-01, against royzmanim.com — the
+        // posek's own reference implementation — driven live at two
+        // elevations, everything else identical:
+        //
+        //                        elevation=0     elevation=320
+        //   הנץ                     6:15            6:15      <- does NOT move
+        //   סוף זמן ק"ש גר"א        9:27            9:26
+        //   סוף זמן תפילה גר"א     10:31           10:30
+        //   מנחה קטנה              16:24           16:26
+        //   שקיעה                  19:04           19:07
+        //
+        // Three candidate grids were computed against those numbers. Only
+        // elevation-sunrise → elevation-sunset reproduces them (it gives
+        // 9:25:43 / 10:30:18 / 16:25:29); a mishor-sunrise → elevation-sunset
+        // hybrid gives 10:32 for tefila and is ruled out outright. Matching
+        // חזון שמים's statement of the Sephardi shita: "זמן קריאת שמע תפילה
+        // וחמץ גר\"א – מחושב מזריחה בגובה ועד שקיעה בגובה".
+        //
+        // הנץ IS DELIBERATELY NOT THIS. royzmanim hardcodes sea-level sunrise
+        // for the displayed netz (its own getNetz() calls getSeaLevelSunrise),
+        // which the table above confirms — 6:15 at both elevations. So the
+        // grid moves with height while the netz row does not, and that
+        // asymmetry is the shita rather than an oversight.
+        //
+        // The VISIBLE netz (ChaiTables) remains vatikin-only: displayed as
+        // הנץ הנראה and used for netz-anchored alarms, never as a grid
+        // endpoint. Using it as the base skewed every sunrise-anchored zman in
+        // hill towns (Karnei Shomron: netz +12 min → shma GRA +9, chatzot +5).
+        val elevationSunrise: Instant? = czc.sunrise?.toInstant()
+        val sunset: Instant? = czc.sunset?.toInstant()
+
+        val baseSunrise: Instant? = elevationSunrise ?: mishorSunrise ?: visibleSunrise
 
         if (baseSunrise == null || sunset == null) {
-            return emptyDay(location, date, visibleSunrise != null, mishorSunrise, visibleSunrise, sunset)
+            return emptyDay(
+                location, date, visibleSunrise != null,
+                mishorSunrise, visibleSunrise, sunset, mishorSunset,
+            )
         }
 
         // Shaah zmanit (GRA): the mishor day divided by 12
@@ -195,6 +231,7 @@ class MaranZmanimEngine @Inject constructor() {
             plagHaminchaYalkutYosef = plag,
             plagHaminchaGra = plagGra,
             shkia = sunset,
+            shkiaMishor = mishorSunset,
             tzeitHakochavim = tzeit,
             tzeitLechumra = tzeitLechumra,
             tzeitShabbat = tzeitShabbat,
@@ -212,9 +249,16 @@ class MaranZmanimEngine @Inject constructor() {
         }
         return ComplexZmanimCalendar(location.toKosherJavaGeoLocation()).apply {
             calendar = cal
-            // Ohr HaChaim convention: mishor (sea-level) horizon; visible
-            // terrain is handled by ChaiTables, never by elevation math.
-            isUseElevation = false
+            // Elevation ON, so czc.sunrise / czc.sunset apply the horizon dip
+            // for the city's own height. The mishor pair is still reachable
+            // through seaLevelSunrise / seaLevelSunset, which is what the
+            // displayed הנץ and the שקיעה מישורית row read.
+            //
+            // KosherJava throws on a negative elevation, and 27 of our
+            // localities sit below sea level (Tiberias, Bet She'an, the Jordan
+            // valley), so cities.json clamps those to 0 rather than letting a
+            // Dead Sea town crash the engine.
+            isUseElevation = true
         }
     }
 
@@ -225,6 +269,7 @@ class MaranZmanimEngine @Inject constructor() {
         mishorSunrise: Instant?,
         visibleSunrise: Instant?,
         sunset: Instant?,
+        mishorSunset: Instant? = sunset,
     ): DayZmanim = DayZmanim(
         date = date,
         location = location,
@@ -247,6 +292,7 @@ class MaranZmanimEngine @Inject constructor() {
         plagHaminchaYalkutYosef = null,
         plagHaminchaGra = null,
         shkia = sunset,
+        shkiaMishor = mishorSunset,
         tzeitHakochavim = null,
         tzeitLechumra = null,
         tzeitShabbat = null,

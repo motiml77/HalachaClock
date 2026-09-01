@@ -77,7 +77,24 @@ data class DayZmanim(
     val plagHaminchaGra: Instant?,
 
     // Sunset / night
+    /**
+     * The halachic שקיעה: sunset at the city's OWN height, which is what the
+     * luach prints and what everything below is measured from.
+     */
     val shkia: Instant?,
+    /**
+     * The same moment reckoned at the sea-level horizon — earlier than [shkia]
+     * by ~45 s at 100 m and ~4½ min in Jerusalem.
+     *
+     * Carried alongside rather than discarded because the two are a live
+     * machloket, not a right and a wrong answer: the Or HaChaim luach and
+     * royzmanim print the elevation one, while Rav David Yosef, the Gra"z
+     * Meltzer and Rav Sternbuch hold mishor — the last two explicitly as a
+     * chumra for a de'oraita boundary. A user who follows that view, or who
+     * simply wants to see what his own luach shows, can have the number
+     * instead of being told a single answer is the answer.
+     */
+    val shkiaMishor: Instant?,
     val tzeitHakochavim: Instant?,
     /** 5.075° equinox-calibrated, seasonally scaled (≈20 min at the equinox). */
     val tzeitLechumra: Instant?,

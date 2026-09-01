@@ -3,4 +3,5 @@
 <full-backup-content>
     <exclude domain="file" path="datastore/" />
     <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    <exclude domain="sharedpref" path="entitlement_shadow.xml" />
 </full-backup-content>

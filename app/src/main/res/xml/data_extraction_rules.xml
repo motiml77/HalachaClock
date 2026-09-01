@@ -10,10 +10,12 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/" />
-        <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    <exclude domain="sharedpref" path="entitlement_shadow.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/" />
-        <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+    <exclude domain="sharedpref" path="entitlement_shadow.xml" />
     </device-transfer>
 </data-extraction-rules>

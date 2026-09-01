@@ -1,5 +1,6 @@
 [versions]
 agp = "8.11.0"
+billing = "9.1.0"
 kotlin = "2.1.0"
 ksp = "2.1.0-1.0.29"
 coreKtx = "1.15.0"
@@ -42,6 +43,12 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 
 # Navigation
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+
+# Google Play Billing (the monthly subscription)
+# The plain Java artifact, NOT billing-ktx: the ktx variant ships Kotlin
+# 2.3.0 metadata and will not link against this project's Kotlin 2.1.0.
+# All it adds is two suspend wrappers, which are a few lines to write.
+billing = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
 
 # Hilt
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }

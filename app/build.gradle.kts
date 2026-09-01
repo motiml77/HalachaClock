@@ -124,6 +124,9 @@ dependencies {
     implementation(project(":zmanim-engine"))
 
 
+    // Google Play Billing — the monthly subscription.
+    implementation(libs.billing)
+
     // JSON (cities.json)
     implementation(libs.moshi.kotlin)
 

@@ -3,6 +3,7 @@ package com.zmanimclock.app.feature.zmanim.model
 import com.zmanimclock.app.feature.zmanim.engine.EngineLocation
 import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -101,15 +102,67 @@ class HanetzMishorTest {
         assertEquals(plain.hanetzMishor, withTerrain.hanetzMishor)
     }
 
+    /**
+     * The inverse of what this test used to assert.
+     *
+     * It previously pinned "elevation does not reach the sunrise calculation
+     * at all", which was the mishor doctrine stated as a fact. That doctrine
+     * turned out to be wrong for this luach — see MaranZmanimEngine's own
+     * measured table against royzmanim — so the test now pins the behaviour
+     * that replaced it. Kept rather than deleted precisely because it is the
+     * hinge: if anyone ever flips the convention back, this fails loudly.
+     */
     @Test
-    fun `elevation does not reach the sunrise calculation at all`() {
-        // The mishor doctrine, asserted rather than assumed: Jerusalem sits at
-        // ~800m, and feeding that in would move sunrise by minutes. It must
-        // not. Terrain is ChaiTables' job, never elevation math.
+    fun `elevation moves the halachic day but never the displayed mishor netz`() {
         val atSeaLevel = engine.calculate(jerusalem, date)
         val at800m = engine.calculate(jerusalem.copy(elevationMeters = 800.0), date)
-        assertEquals(atSeaLevel.hanetzMishor, at800m.hanetzMishor)
-        assertEquals(atSeaLevel.shkia, at800m.shkia)
-        assertEquals(atSeaLevel.shaahZmanisGra, at800m.shaahZmanisGra)
+
+        // הנץ מישורי is sea-level BY DEFINITION and must be immune.
+        assertEquals(
+            "the mishor netz row must not move with elevation",
+            atSeaLevel.hanetzMishor,
+            at800m.hanetzMishor,
+        )
+        // שקיעה מישורית likewise — it is the other half of the same pair.
+        assertEquals(
+            "the mishor shkia row must not move with elevation",
+            atSeaLevel.shkiaMishor,
+            at800m.shkiaMishor,
+        )
+
+        // The halachic שקיעה, and with it the whole seasonal grid, DOES move.
+        assertNotEquals(
+            "shkia must follow the city's height",
+            atSeaLevel.shkia,
+            at800m.shkia,
+        )
+        assertTrue(
+            "at 800m the sun sets later, not earlier",
+            at800m.shkia!!.isAfter(atSeaLevel.shkia!!),
+        )
+        assertNotEquals(
+            "the seasonal hour is built on the elevation day",
+            atSeaLevel.shaahZmanisGra,
+            at800m.shaahZmanisGra,
+        )
+    }
+
+    /**
+     * The size of the shift, not merely its direction — a sanity rail against
+     * a units or refraction slip that would still move things the right way.
+     * Jerusalem at 800 m: the standard horizon dip puts sunset about 4½
+     * minutes late, and פניני הלכה (זמני השבת א,ט) independently gives
+     * "קרוב לחמש דקות" at that height.
+     */
+    @Test
+    fun `the Jerusalem shift is about four and a half minutes`() {
+        val atSeaLevel = engine.calculate(jerusalem, date)
+        val at800m = engine.calculate(jerusalem.copy(elevationMeters = 800.0), date)
+        val shiftSeconds = java.time.Duration
+            .between(atSeaLevel.shkia, at800m.shkia).seconds
+        assertTrue(
+            "expected roughly 4-5 minutes at 800m, got ${shiftSeconds}s",
+            shiftSeconds in 240..330,
+        )
     }
 }
