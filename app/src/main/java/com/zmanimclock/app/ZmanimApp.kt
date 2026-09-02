@@ -32,6 +32,8 @@ class ZmanimApp : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var notificationHelper: NotificationHelper
     @Inject lateinit var chaiTablesPreloader: ChaiTablesPreloader
+    @Inject lateinit var billingRepository:
+        com.zmanimclock.app.feature.subscription.BillingRepository
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -53,6 +55,28 @@ class ZmanimApp : Application(), Configuration.Provider {
         schedulePeriodicWork()
         // Keep the "next zman / next alarm" status line alive
         com.zmanimclock.app.scheduling.StatusNotificationReceiver.ping(this)
+        refreshEntitlement()
+    }
+
+    /**
+     * Ask Play what this account owns, once per process start.
+     *
+     * Deliberately fire-and-forget on the IO scope: nothing on screen blocks on
+     * it, because [BillingRepository] seeds its StateFlow from the
+     * device-protected cache and only moves it when Play actually answers. A
+     * device with no Play Store, or no network, simply leaves the cached value
+     * in place — see Entitlement.allowsAccess for how that resolves.
+     */
+    private fun refreshEntitlement() {
+        appScope.launch {
+            runCatching { billingRepository.refresh() }
+                .onFailure { android.util.Log.w("ZmanimApp", "billing refresh failed", it) }
+            android.util.Log.i(
+                "ZmanimApp",
+                "entitlement=" + billingRepository.entitlement.value +
+                    " offers=" + billingRepository.offers.value,
+            )
+        }
     }
 
     /** Bundle-shipped ChaiTables data → Room, so netz works offline on day one. */
