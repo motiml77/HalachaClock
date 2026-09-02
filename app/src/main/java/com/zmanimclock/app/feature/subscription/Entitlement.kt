@@ -79,7 +79,16 @@ data class Entitlement(
         get() = when (state) {
             EntitlementState.ENTITLED -> true
             EntitlementState.NOT_ENTITLED -> false
-            EntitlementState.UNKNOWN -> lastKnownEntitled && !offlineGraceExpired
+            EntitlementState.UNKNOWN -> when {
+                // NEVER ASKED. Rule 2 above. `lastKnownEntitled` defaults to
+                // false, so folding this case into the expression below would
+                // paywall every first launch that happens to be offline — the
+                // app accusing someone of not paying before it had ever
+                // checked. It is called out as its own branch because the
+                // short version reads as if it handles it, and does not.
+                lastCheckMillis == 0L -> true
+                else -> lastKnownEntitled && !offlineGraceExpired
+            }
         }
 
     /** True once the offline grace window has run out on a stale YES. */
