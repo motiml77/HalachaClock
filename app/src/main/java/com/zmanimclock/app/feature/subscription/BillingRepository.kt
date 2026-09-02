@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -52,6 +54,8 @@ class BillingRepository @Inject constructor(
     private val store: EntitlementStore,
 ) {
 
+    private val connectMutex = Mutex()
+
     private val _entitlement = MutableStateFlow(store.cached())
 
     /** The current entitlement, seeded from cache so the UI never flashes. */
@@ -68,14 +72,45 @@ class BillingRepository @Inject constructor(
         // another device — so they are delivered here rather than as a return
         // value from launchPurchaseFlow.
         .setListener { result, purchases ->
-            if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-                applyPurchases(purchases, authoritative = true)
+            when (result.responseCode) {
+                BillingClient.BillingResponseCode.OK ->
+                    // NOT authoritative. A listener callback carries only the
+                    // purchases THAT UPDATE touched, never the account's full
+                    // set, so an empty list here does not mean "owns nothing".
+                    // Passing it as authoritative would let a pending payment
+                    // clearing, or any future second product, write NOT_ENTITLED
+                    // into device-protected storage — which BootReceiver reads
+                    // in Direct Boot, and which no later cache may override.
+                    // A paying subscriber's alarms would stop re-arming after
+                    // the next reboot, silently. Only readEntitlement()'s full
+                    // query is allowed to say NO.
+                    applyPurchases(purchases, authoritative = false)
+
+                // The user backed out of the sheet. Says nothing about
+                // entitlement, so deliberately not treated as a NO.
+                BillingClient.BillingResponseCode.USER_CANCELED -> Unit
+
+                // Everything else is a real checkout failure — a stale offer
+                // token, a declined card, a dropped service. This listener is
+                // the ONLY channel that carries the outcome, and there is no
+                // server to inspect instead, so it gets logged with the debug
+                // message or the first live failure is uninvestigable.
+                else -> Log.w(
+                    TAG,
+                    "purchasesUpdated: " + result.responseCode + " " + result.debugMessage,
+                )
             }
-            // A cancelled checkout says nothing about entitlement, so it is
-            // deliberately not treated as a NO — the user backed out, that is all.
         }
-        // Required by the library even for an app that sells no one-time products.
-        .enablePendingPurchases(PendingPurchasesParams.newBuilder().build())
+        // enableOneTimeProducts() is NOT optional, despite this app selling no
+        // one-time product. PendingPurchasesParams.Builder.build() opens with
+        // `if (!enableOneTimeProducts) throw IllegalArgumentException(...)` —
+        // confirmed in the 9.1.0 bytecode — and BillingClient.Builder.build()
+        // independently rejects null params once a PurchasesUpdatedListener is
+        // set, so the call cannot simply be dropped either. Without this the
+        // constructor throws on every device and nothing here ever runs.
+        // enablePrepaidPlans() is deliberately absent: BASE_PLAN_ID is
+        // auto-renewing, so it would be inert.
+        .enablePendingPurchases(pendingPurchasesParams())
         // Play's own reconnection with backoff. Without it a dropped service
         // (a Play Store self-update is the common cause) stays dropped, every
         // later query fails, and every user looks unentitled at once.
@@ -98,16 +133,43 @@ class BillingRepository @Inject constructor(
         readOffers()
     }
 
-    /** Connects if needed. False means Play is unreachable right now. */
+    /**
+     * Connects if needed. False means Play is unreachable right now.
+     *
+     * Serialised, because refresh() is explicitly invited from both app start
+     * and onResume. Two startConnection calls racing make BillingClientImpl
+     * answer the second one synchronously with DEVELOPER_ERROR ("Client is
+     * already in the process of connecting"), which would read here as
+     * "Play unreachable". The mutex makes that branch unreachable from our own
+     * code — which is the fix. Matching on response code 5 instead would not
+     * be: the library shares that constant across many unrelated results,
+     * separable only by an internal debug string free to change in any release.
+     */
     private suspend fun connect(): Boolean {
         if (client.isReady) return true
-        return suspendCancellableCoroutine { cont ->
+        return connectMutex.withLock {
+            // Re-check inside the lock: the connection we queued behind may
+            // have landed, including one whose own caller was cancelled after
+            // it had already succeeded.
+            if (client.isReady) return@withLock true
+            awaitConnection()
+        }
+    }
+
+    private suspend fun awaitConnection(): Boolean =
+        suspendCancellableCoroutine { cont ->
             client.startConnection(object : BillingClientStateListener {
                 private var resumed = false
                 override fun onBillingSetupFinished(result: BillingResult) {
                     if (resumed) return
                     resumed = true
-                    cont.resume(result.responseCode == BillingClient.BillingResponseCode.OK)
+                    val ok = result.responseCode == BillingClient.BillingResponseCode.OK
+                    if (!ok) {
+                        // Previously discarded, which was the only reason a
+                        // failed connect was hard to diagnose in the field.
+                        Log.w(TAG, "connect: " + result.responseCode + " " + result.debugMessage)
+                    }
+                    cont.resume(ok)
                 }
                 override fun onBillingServiceDisconnected() {
                     // Auto-reconnection handles the retry; this only matters if
@@ -118,7 +180,6 @@ class BillingRepository @Inject constructor(
                 }
             })
         }
-    }
 
     /**
      * The entitlement query, and the branch that keeps an unreachable Play
@@ -177,8 +238,9 @@ class BillingRepository @Inject constructor(
 
         active.filterNot { it.isAcknowledged }.forEach(::acknowledge)
 
-        if (!authoritative) return
         val entitled = active.isNotEmpty()
+        // A partial list may GRANT but must never REVOKE.
+        if (!authoritative && !entitled) return
         store.record(entitled)
         _entitlement.value = Entitlement(
             state = if (entitled) EntitlementState.ENTITLED else EntitlementState.NOT_ENTITLED,
@@ -227,7 +289,11 @@ class BillingRepository @Inject constructor(
                 )
             }
         }
-        _offers.value = details?.let { SubscriptionOffers.from(it) }
+        // Only replace on success. Assigning null on a failed query would
+        // regress a StateFlow that already held a good price back to "nothing
+        // for sale", blanking the paywall's buy button because the network
+        // blinked.
+        details?.let { _offers.value = SubscriptionOffers.from(it) }
     }
 
     /**
@@ -255,6 +321,21 @@ class BillingRepository @Inject constructor(
         const val TAG = "BillingRepository"
     }
 }
+
+/**
+ * The pending-purchases configuration this app's [BillingClient] is built with.
+ *
+ * Extracted to file scope for one reason: it is the only part of the client
+ * construction that needs no [android.content.Context], so it is the only part
+ * a plain JVM unit test can exercise — and it is exactly the part that was
+ * wrong. A test that rebuilt these params itself would pin nothing, since it
+ * would be checking its own copy; BillingParamsTest calls THIS function.
+ */
+internal fun pendingPurchasesParams(): PendingPurchasesParams =
+    PendingPurchasesParams.newBuilder()
+        // NOT optional, despite this app selling no one-time product.
+        .enableOneTimeProducts()
+        .build()
 
 /**
  * What Play is currently willing to sell THIS account.
