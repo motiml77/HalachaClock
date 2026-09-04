@@ -181,6 +181,32 @@ class RenderShotTest {
         }
     }
 
+    /**
+     * The folded bookmark at all four edges it can now be dragged to.
+     *
+     * This is the entire reason the border-drawing was split out to
+     * [com.zmanimclock.desktop.ui.DockTabPreview]: every arc in
+     * drawDockBorder was hand-derived per edge, and the LEFT case is the only
+     * one that shipped before and was known correct. Rendering and looking at
+     * all four is what actually confirms the other three — corners rounded on
+     * the desktop-facing side, flat on the screen-edge side, arrow pointing
+     * the direction that edge opens.
+     */
+    @Test
+    fun dockTabEdges() {
+        for (edge in com.zmanimclock.desktop.ui.DockEdge.entries) {
+            val vertical = edge.isVertical
+            both(
+                "desk_dock_${edge.name.lowercase()}",
+                w = if (vertical) 60 else 120,
+            ) {
+                Box(Modifier.padding(12.dp)) {
+                    com.zmanimclock.desktop.ui.DockTabPreview(edge)
+                }
+            }
+        }
+    }
+
     /** The first-run question, at its real 360x240. */
     @Test
     fun startupPrompt() {
