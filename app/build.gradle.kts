@@ -20,7 +20,17 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.zmanimclock.app"
+        // Play Store identity only — deliberately decoupled from `namespace`
+        // above (which stays com.zmanimclock.app, matching every Kotlin
+        // source file's actual package declaration; changing THAT would mean
+        // renaming ~140 files for zero benefit). applicationId is the one
+        // Google checks for global uniqueness, and com.zmanimclock.app is
+        // already registered to some other, unrelated Play Console account —
+        // confirmed via two failed "Create app" attempts on an account that
+        // itself has zero apps. Picked to match the owner's own GitHub
+        // identity (github.com/motiml77/HalachaClock) rather than reusing
+        // the "zmanimclock" domain that already collided once.
+        applicationId = "com.motiml77.halachaclock"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
