@@ -11,11 +11,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.window.WindowDraggableArea
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -253,6 +259,15 @@ private fun WindowScope.WidgetCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    PinToggle(
+                        pinned = service.prefs.widgetPinnedToDesktop,
+                        onToggle = {
+                            service.update {
+                                it.copy(widgetPinnedToDesktop = !it.widgetPinnedToDesktop)
+                            }
+                        },
+                    )
+                    Spacer(Modifier.size(4.dp))
                     Text(
                         "פתיחה",
                         Modifier
@@ -332,6 +347,40 @@ private fun WindowScope.WidgetCard(
             }
         }
     }
+}
+
+/**
+ * The control for the one setting this widget never had a UI for.
+ *
+ * [DesktopPrefs.widgetPinnedToDesktop] and the whole HWND_BOTTOM mechanism in
+ * [WindowPinning] already existed — the widget could always BE pinned, there
+ * was simply nothing on screen that could ask for it. This is that control,
+ * placed on the widget itself rather than in the settings pane, because
+ * pinning is a property of THIS window and changing it should not mean
+ * leaving the window to go find a checkbox elsewhere.
+ *
+ * Filled and gold when pinned — the app's existing colour for "this is
+ * active" (the countdown figure, a firing alert) — outlined and muted
+ * otherwise, so the state reads at a glance without needing the tooltip.
+ *
+ * Internal, not private: [WidgetCard] needs a real WindowScope to render (for
+ * WindowDraggableArea) and so cannot go through RenderShotTest's offscreen
+ * rig, but this one control can and does — shot at both states directly.
+ */
+@Composable
+internal fun PinToggle(pinned: Boolean, onToggle: () -> Unit) {
+    val ext = Ext.colors
+    val cs = MaterialTheme.colorScheme
+    Icon(
+        if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+        contentDescription = if (pinned) "נעוץ לשולחן העבודה — לחץ לביטול" else "נעוץ לחלונות אחרים — לחץ כדי לנעוץ לשולחן העבודה",
+        tint = if (pinned) ext.accentGold else cs.onSurfaceVariant,
+        modifier = Modifier
+            .size(16.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onToggle)
+            .padding(1.dp),
+    )
 }
 
 /**

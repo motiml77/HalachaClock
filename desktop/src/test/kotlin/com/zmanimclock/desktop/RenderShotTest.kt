@@ -161,6 +161,26 @@ class RenderShotTest {
         }
     }
 
+    /**
+     * The widget's new pin control, at both states.
+     *
+     * The widget card itself needs a real WindowScope for WindowDraggableArea
+     * and cannot render in this offscreen rig, but the icon is the whole of
+     * what changed, so it is shot on its own — both the pinned (filled, gold)
+     * and floating (outlined, muted) states, in both themes, so a colour that
+     * only works in one theme cannot slip through unseen.
+     */
+    @Test
+    fun widgetPinToggle() {
+        for (pinned in listOf(false, true)) {
+            for (dark in listOf(false, true)) {
+                shot("desk_widget_pin_${if (pinned) "pinned" else "floating"}", dark = dark, w = 60, h = 40) {
+                    com.zmanimclock.desktop.widget.PinToggle(pinned = pinned) {}
+                }
+            }
+        }
+    }
+
     /** The first-run question, at its real 360x240. */
     @Test
     fun startupPrompt() {
