@@ -703,41 +703,58 @@ private fun PermissionsCard(onOpen: () -> Unit) {
     }
     val cs = MaterialTheme.colorScheme
 
+    // RED ONLY FOR A MISSING *REQUIRED* PERMISSION. The recommended one
+    // (battery) is a reliability improvement the alarm does not need in order
+    // to ring, and painting the whole card as a fault over it told the owner
+    // the clock was broken when it was not.
+    val alarming = summary.missingRequired.isNotEmpty()
     Card(
-        // A missing permission is a real reliability problem, so it is
-        // coloured like one instead of sitting quietly in a list.
+        // A missing required permission is a real reliability problem, so it
+        // is coloured like one instead of sitting quietly in a list.
         colors = CardDefaults.cardColors(
-            containerColor = if (summary.allGranted) cs.surface else cs.errorContainer,
+            containerColor = if (alarming) cs.errorContainer else cs.surface,
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    if (summary.allGranted) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                    if (alarming) Icons.Filled.Warning else Icons.Filled.CheckCircle,
                     contentDescription = null,
-                    tint = if (summary.allGranted) cs.primary else cs.onErrorContainer,
+                    tint = if (alarming) cs.onErrorContainer else cs.primary,
                 )
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "הרשאות",
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (summary.allGranted) cs.onSurface else cs.onErrorContainer,
+                        color = if (alarming) cs.onErrorContainer else cs.onSurface,
                     )
                     Text(
-                        if (summary.allGranted) {
-                            "כל ${summary.total} ההרשאות מאושרות"
-                        } else {
-                            "חסרות ${summary.missing} מתוך ${summary.total} — " +
-                                "השעון עלול לא לצלצל בזמן"
+                        // NAMES THE MISSING ONES, always. A bare count ("one
+                        // of five missing") is what the owner actually met:
+                        // nothing on screen said which, and the permissions
+                        // screen shows a tick beside four of five with no
+                        // summary of its own, so the odd one out is easy to
+                        // scroll straight past. The names here are the card
+                        // titles on that screen, verbatim, so they can be
+                        // found by eye.
+                        when {
+                            summary.allGranted -> "כל ${summary.total} ההרשאות מאושרות"
+                            alarming ->
+                                "חסר: ${summary.missingRequired.joinToString(", ")} — " +
+                                    "השעון עלול לא לצלצל בזמן"
+                            else ->
+                                "מומלץ להוסיף: ${summary.missingRecommended.joinToString(", ")} — " +
+                                    "השעון יצלצל גם בלי זה"
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (summary.allGranted) cs.secondary else cs.onErrorContainer,
+                        color = if (alarming) cs.onErrorContainer else cs.secondary,
                     )
                 }
             }
             OutlinedButton(onClick = onOpen, modifier = Modifier.padding(top = 10.dp)) {
                 Text(if (summary.allGranted) "בדוק הרשאות" else "אשר עכשיו")
+                // (label unchanged: the button opens the same screen either way)
             }
         }
     }

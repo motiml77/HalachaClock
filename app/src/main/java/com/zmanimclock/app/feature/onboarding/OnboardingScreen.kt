@@ -174,7 +174,11 @@ fun OnboardingScreen(onDone: () -> Unit, isFirstRun: Boolean = true) {
         PermissionCard(
             icon = Icons.Filled.BatteryChargingFull,
             title = "פעולה ברקע",
-            description = "פטור מחיסכון בסוללה — כדי שהמערכת לא תעצור את השעון",
+            // Says what to DO, because this button cannot grant anything: it
+            // opens the system's list of every installed app. Without naming
+            // the app and the option, the owner opens a long list, finds no
+            // prompt, and backs out believing it was done.
+            description = "מומלץ. פתח את הרשימה, מצא את \"שעון מעורר\" ובחר \"ללא אופטימיזציה\"",
             granted = batteryExempt,
             onGrant = {
                 // The direct-request variant (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
@@ -323,24 +327,69 @@ internal fun hasFullScreenIntent(context: Context): Boolean =
             ?.canUseFullScreenIntent() == true
 
 /**
- * How many of the five grants are in place right now.
+ * One row of the permission checklist.
  *
- * Read by Settings so a missing permission is VISIBLE rather than something
- * the user has to go looking for. Computed from the same functions the wizard
- * itself uses, so the two can never disagree about what "granted" means.
+ * [name] IS THE CARD'S OWN TITLE, character for character. The whole point of
+ * carrying a name is that Settings can tell the owner WHICH permission is
+ * missing and they can then find that exact card on this screen; a summary
+ * that paraphrases sends them hunting for something that is not written
+ * anywhere.
+ *
+ * [required] separates "the alarm cannot work without this" from "this makes
+ * it more reliable" — see [permissionSummary].
  */
-data class PermissionSummary(val granted: Int, val total: Int) {
-    val allGranted: Boolean get() = granted == total
+data class PermissionState(val name: String, val granted: Boolean, val required: Boolean)
+
+/**
+ * What is in place right now, and what is not, BY NAME.
+ *
+ * This used to be a pair of counts, and Settings could therefore only say
+ * "חסרות 1 מתוך 5" — one missing out of five, without saying which. The owner
+ * hit exactly that: every prompt answered, a red card insisting something was
+ * missing, and nothing anywhere naming it. Their own reaction was the right
+ * instinct — "maybe the check itself is wrong". The check was not wrong. The
+ * REPORT was useless, and the classification below was wrong.
+ */
+data class PermissionSummary(val items: List<PermissionState>) {
+    val total: Int get() = items.size
+    val granted: Int get() = items.count { it.granted }
     val missing: Int get() = total - granted
+    val allGranted: Boolean get() = items.all { it.granted }
+
+    /** Missing AND load-bearing: without these the alarm genuinely may not ring. */
+    val missingRequired: List<String> get() =
+        items.filter { it.required && !it.granted }.map { it.name }
+
+    /** Missing but only a reliability improvement — never painted as a fault. */
+    val missingRecommended: List<String> get() =
+        items.filter { !it.required && !it.granted }.map { it.name }
 }
 
-fun permissionSummary(context: Context): PermissionSummary {
-    val checks = listOf(
-        hasNotificationPermission(context),
-        hasExactAlarms(context),
-        isBatteryExempt(context),
-        hasFullScreenIntent(context),
-        Settings.canDrawOverlays(context),
+fun permissionSummary(context: Context): PermissionSummary = PermissionSummary(
+    listOf(
+        PermissionState("התראות", hasNotificationPermission(context), required = true),
+        PermissionState("אזעקות מדויקות", hasExactAlarms(context), required = true),
+        PermissionState("מסך צלצול מלא", hasFullScreenIntent(context), required = true),
+        PermissionState("מסך צלצול מעל הכל", Settings.canDrawOverlays(context), required = true),
+        // RECOMMENDED, NOT REQUIRED — and this file already knew it. The
+        // battery card's own comment says the alarms arm via setAlarmClock()
+        // and setExactAndAllowWhileIdle(), which Android documents as
+        // Doze-exempt WITHOUT this exemption. So counting it as required
+        // painted the settings card red, warned "השעון עלול לא לצלצל בזמן",
+        // and pointed at something the app does not actually need to ring.
+        //
+        // It also cannot be granted in one tap any more. The direct-request
+        // intent needs REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, which Play policy
+        // restricts and which was removed from the manifest for that reason;
+        // what is left opens the FULL LIST of installed apps, where the owner
+        // has to find this one and switch it over. Easy to open, glance at,
+        // and back out of believing it was done — which is precisely the
+        // report that produced this change.
+        //
+        // It still earns its place in the list: aggressive OEM battery
+        // managers (Xiaomi, Huawei, Oppo) kill background apps regardless of
+        // what the AlarmManager contract says. Worth asking for. Not worth
+        // calling the app broken over.
+        PermissionState("פעולה ברקע", isBatteryExempt(context), required = false),
     )
-    return PermissionSummary(granted = checks.count { it }, total = checks.size)
-}
+)

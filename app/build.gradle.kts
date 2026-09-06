@@ -40,8 +40,8 @@ android {
         // (mediaPlayback -> specialUse), a battery-optimization permission
         // Play policy restricts and the alarm engine doesn't need, and the
         // fixed-alarm timezone bug (AlarmScheduler.zoneFor).
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
