@@ -672,7 +672,20 @@ private fun dockShape(edge: DockEdge): RoundedCornerShape {
     }
 }
 
-/** Points the direction this edge actually opens towards. */
+/**
+ * Points away from the edge the tab is stuck to — "pull me out of here".
+ *
+ * It used to mean something narrower: the direction the panel would open. The
+ * panel now always opens as a narrow column flush LEFT whatever edge the
+ * bookmark sits on (see Main.kt's snap-to-edge effect for the screenful of
+ * reasons), so this is the surviving, more general reading, and it is the one
+ * that was always doing the work visually: the arrow leads out of the screen
+ * edge and into the desktop, which is where the app appears.
+ *
+ * Mid-drag it answers the more urgent question instead — which edge the tab is
+ * about to land on. Same glyph, and no contradiction: both readings point out
+ * of whichever edge the tab is against.
+ */
 private fun dockArrow(edge: DockEdge): ImageVector = when (edge) {
     DockEdge.LEFT -> Icons.Filled.KeyboardArrowRight
     DockEdge.RIGHT -> Icons.Filled.KeyboardArrowLeft

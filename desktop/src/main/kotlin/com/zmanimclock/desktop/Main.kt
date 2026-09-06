@@ -59,6 +59,7 @@ import com.zmanimclock.desktop.ui.FirstRunStartupPrompt
 import com.zmanimclock.desktop.system.StartupManager
 import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.widget.ZmanimWidgetWindow
+import kotlin.math.roundToInt
 
 /**
  * "שעון מעורר - זמנים הלכתיים" for Windows.
@@ -116,17 +117,13 @@ private fun runApp(args: Array<String>) = application {
     // Width per tab; the height is the WORK AREA's, set by snapToEdge below.
     val mainState = rememberWindowState(width = MainTab.ZMANIM.width, height = 560.dp)
 
-    // The window follows the tab, in whichever dimension is this dock edge's
-    // FIXED one — width for a side panel, height for a top/bottom one. The
-    // OTHER dimension never moves here: it belongs to the screen edge, via
-    // the snap-to-edge effect below, not to which tab is open.
-    LaunchedEffect(tab, dockEdge) {
+    // The window follows the tab — its WIDTH, always, because the panel is
+    // always a narrow column down the left. See the snap-to-edge effect below
+    // for why the panel no longer rotates with the bookmark's edge. The height
+    // never moves here: it belongs to the screen, not to which tab is open.
+    LaunchedEffect(tab) {
         if (mainState.placement == WindowPlacement.Floating) {
-            mainState.size = if (dockEdge.isVertical) {
-                mainState.size.copy(width = tab.width)
-            } else {
-                mainState.size.copy(height = tab.width)
-            }
+            mainState.size = mainState.size.copy(width = tab.width)
         }
     }
 
@@ -276,21 +273,32 @@ private fun runApp(args: Array<String>) = application {
         // Keyed on visibility, not just the window: the window is now composed
         // before it is ever shown, and an invisible window has no HWND to
         // clear — the pass has to re-run once it actually appears.
-        LaunchedEffect(window, mainVisible, docked, dockEdge) {
+        // No longer keyed on dockEdge: the panel does not move with the
+        // bookmark any more, and a key the body does not read is a standing
+        // invitation to assume it does.
+        LaunchedEffect(window, mainVisible, docked) {
             if (WindowPinning.clearTopmost(window)) {
                 println("main window was always-on-top; cleared")
             }
 
-            // A SIDE PANEL, not a floating window — the owner's ask, and the
-            // bookmark already implied it: the folded state lives flush
-            // against an edge, so the open state grows out of that SAME edge
-            // instead of appearing as an unrelated window in the middle of the
-            // screen. Flush against it, spanning the FULL length of the OTHER
-            // two edges — full height for a side dock, full width for a
-            // top/bottom one — like a system flyout. This is the 90° rotation
-            // [DockEdge] itself documents: one dimension fixed (the tab's own
-            // measured width, applied to whichever axis is this edge's fixed
-            // one), the other full-length.
+            // A SIDE PANEL, not a floating window — the owner's ask: flush
+            // against the screen's LEFT edge, full height, as narrow as the
+            // open tab needs, like a system flyout.
+            //
+            // ALWAYS THE LEFT EDGE, NEVER THE BOOKMARK'S. This used to rotate
+            // with dockEdge, on the reasoning that the open state should grow
+            // out of the same edge the folded state lives on. Tried on a real
+            // screen, that reasoning was wrong: with the bookmark parked on
+            // TOP, opening it produced a panel spanning the FULL WIDTH of the
+            // display and only as tall as one tab — the zmanim list, which is
+            // one narrow column of "name — time", stretched across a 1047-unit
+            // desktop with everything crushed into a strip. The owner's verdict
+            // was immediate and is the rule now: "תמיד נפתח צמוד בצד שמאל, צר
+            // ויפה כמו שהיה עד עכשיו. רק הסימניה זזה" — it always opens flush
+            // on the left, narrow, the way it was; only the BOOKMARK moves.
+            //
+            // So dockEdge is now the bookmark's business alone. The content
+            // decides the panel's shape, and this content is a column.
             //
             // Set from INSIDE the window, keyed on the AWT window itself. The
             // first attempt snapped from the application scope and did
@@ -301,18 +309,8 @@ private fun runApp(args: Array<String>) = application {
             if (mainVisible && !docked) {
                 val wa = java.awt.GraphicsEnvironment
                     .getLocalGraphicsEnvironment().maximumWindowBounds
-                val thicknessPx = tab.width.value.toInt()
-                val panel = when (dockEdge) {
-                    DockEdge.LEFT -> java.awt.Rectangle(wa.x, wa.y, thicknessPx, wa.height)
-                    DockEdge.RIGHT -> java.awt.Rectangle(
-                        wa.x + wa.width - thicknessPx, wa.y, thicknessPx, wa.height,
-                    )
-                    DockEdge.TOP -> java.awt.Rectangle(wa.x, wa.y, wa.width, thicknessPx)
-                    DockEdge.BOTTOM -> java.awt.Rectangle(
-                        wa.x, wa.y + wa.height - thicknessPx, wa.width, thicknessPx,
-                    )
-                }
-                val x = panel.x; val y = panel.y; val w = panel.width; val h = panel.height
+                val widthPx = tab.width.value.roundToInt()
+                val x = wa.x; val y = wa.y; val w = widthPx; val h = wa.height
 
                 mainState.placement = WindowPlacement.Floating
                 mainState.position = WindowPosition(x.dp, y.dp)
@@ -347,15 +345,11 @@ private fun runApp(args: Array<String>) = application {
         ZmanimDesktopTheme {
             // Rounded ONLY on the side that faces the desktop; flat on the
             // side that IS the screen edge, the same rule DockTabWindow's own
-            // shape follows for the folded tab — see [DockEdge]. Under the
-            // app's forced RTL, topStart/bottomStart ARE the right-hand
-            // corners.
-            val shape = when (dockEdge) {
-                DockEdge.LEFT -> RoundedCornerShape(topStart = WINDOW_CORNER, bottomStart = WINDOW_CORNER)
-                DockEdge.RIGHT -> RoundedCornerShape(topEnd = WINDOW_CORNER, bottomEnd = WINDOW_CORNER)
-                DockEdge.TOP -> RoundedCornerShape(bottomStart = WINDOW_CORNER, bottomEnd = WINDOW_CORNER)
-                DockEdge.BOTTOM -> RoundedCornerShape(topStart = WINDOW_CORNER, topEnd = WINDOW_CORNER)
-            }
+            // shape follows for the folded tab. The panel is always flush
+            // LEFT (see the snap-to-edge effect above), so the desktop-facing
+            // side is always the right-hand one — and under the app's forced
+            // RTL, topStart/bottomStart ARE the right-hand corners.
+            val shape = RoundedCornerShape(topStart = WINDOW_CORNER, bottomStart = WINDOW_CORNER)
             Surface(
                 Modifier.fillMaxSize().clip(shape)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
