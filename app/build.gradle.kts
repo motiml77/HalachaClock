@@ -33,8 +33,15 @@ android {
         applicationId = "com.motiml77.halachaclock"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        // Bumped: Play requires a new versionCode per upload, and this build
+        // fixes real defects an adversarial pre-upload audit found in the
+        // first draft (com.motiml77.halachaclock v1 was never sent to
+        // testers) — wrong foreground-service type for the alarm ringer
+        // (mediaPlayback -> specialUse), a battery-optimization permission
+        // Play policy restricts and the alarm engine doesn't need, and the
+        // fixed-alarm timezone bug (AlarmScheduler.zoneFor).
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

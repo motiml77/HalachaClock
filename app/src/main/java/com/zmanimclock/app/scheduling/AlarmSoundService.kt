@@ -323,7 +323,7 @@ class AlarmSoundService : Service() {
             startForeground(
                 NotificationHelper.ALARM_NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
             )
         } else {
             startForeground(NotificationHelper.ALARM_NOTIFICATION_ID, notification)

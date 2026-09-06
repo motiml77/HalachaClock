@@ -19,7 +19,15 @@
          Optional — requested in onboarding; everything else works without. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- The ringing service is neither media playback nor PiP — it is an
+         exact-alarm sound that must keep ringing until dismissed or
+         snoozed. mediaPlayback is the wrong declared use case for Play's
+         FGS-type review (an adversarial audit confirmed: the service's own
+         AudioAttributes are USAGE_ALARM/CONTENT_TYPE_SONIFICATION, not
+         media, at AlarmSoundService.playRingtone). specialUse is the
+         documented fit, with systemExempted as Android's own named
+         fallback for apps holding SCHEDULE_EXACT_ALARM/USE_EXACT_ALARM. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -27,9 +35,6 @@
     <!-- Network (ChaiTables visible sunrise tables) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Alarm reliability under Doze -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Package visibility for the OEM autostart deep-links (OemHelper).
          Without this, Android 11+ filtering makes the vendor components
@@ -122,12 +127,17 @@
             android:exported="false"
             android:directBootAware="true" />
 
-        <!-- Foreground service that owns the ringing alarm -->
+        <!-- Foreground service that owns the ringing alarm. specialUse, not
+             mediaPlayback — see the permission declaration above for why. -->
         <service
             android:name=".scheduling.AlarmSoundService"
             android:exported="false"
             android:directBootAware="true"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Ringing a user-set halachic alarm clock until the user dismisses or snoozes it" />
+        </service>
 
         <!-- Home-screen widget: selected zmanim + next-zman live countdown -->
         <receiver

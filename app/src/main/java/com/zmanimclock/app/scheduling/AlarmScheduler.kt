@@ -133,7 +133,7 @@ class AlarmScheduler @Inject constructor(
         cityId: String?,
         offsets: ZmanOffsets,
     ) {
-        val zone = ZoneId.of(location.timeZone.id)
+        val zone = zoneFor(alarm, location)
         val fireTime = computeNextOccurrence(alarm, location, cityId, offsets = offsets)
         if (fireTime == null) {
             // Disarm rather than leaving a stale alarm armed from a previous
@@ -145,6 +145,31 @@ class AlarmScheduler @Inject constructor(
         arm(alarm, fireTime, zone)
     }
 
+    /**
+     * The zone an alarm's clock fields actually mean.
+     *
+     * A FIXED alarm is a WALL-CLOCK promise: "wake me at 06:00" means 06:00 on
+     * the clock the user is looking at, which is the DEVICE's zone — never the
+     * selected city's. The two coincide for a user in Israel with an Israeli
+     * city, which is why this went unnoticed, but the city default is
+     * Asia/Jerusalem (UserPreferencesRepository:31) and nothing ever seeds it
+     * from the device. So on a phone anywhere else every fixed alarm silently
+     * resolved in Jerusalem time — an alarm set for 06:00 in New York armed for
+     * 23:00 the previous evening — while AlarmsScreen kept rendering the raw
+     * "06:00" digits, so the list looked right and the alarm simply never rang
+     * when expected. That is precisely what an overseas closed-tester, or a
+     * Play reviewer, does first.
+     *
+     * A ZMAN alarm is the opposite and unchanged: it is anchored to the sun
+     * over the selected city, so it must keep resolving in that city's zone
+     * no matter where the device happens to be.
+     */
+    private fun zoneFor(alarm: AlarmEntity, location: AppGeoLocation): ZoneId =
+        when (alarm.type) {
+            AlarmType.FIXED -> ZoneId.systemDefault()
+            AlarmType.ZMAN -> ZoneId.of(location.timeZone.id)
+        }
+
     /** The next fire time of one alarm (no side effects). Honors skip-next. */
     suspend fun computeNextOccurrence(
         alarm: AlarmEntity,
@@ -153,7 +178,7 @@ class AlarmScheduler @Inject constructor(
         cacheOnly: Boolean = false,
         offsets: ZmanOffsets,
     ): Instant? {
-        val zone = ZoneId.of(location.timeZone.id)
+        val zone = zoneFor(alarm, location)
         // Skip-next (B2): treat occurrences up to skipUntil as already past
         val now = maxOf(Instant.now(), Instant.ofEpochMilli(alarm.skipUntilEpochMs))
         return when (alarm.type) {

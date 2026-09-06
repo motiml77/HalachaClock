@@ -177,12 +177,14 @@ fun OnboardingScreen(onDone: () -> Unit, isFirstRun: Boolean = true) {
             description = "פטור מחיסכון בסוללה — כדי שהמערכת לא תעצור את השעון",
             granted = batteryExempt,
             onGrant = {
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                        Uri.parse("package:${context.packageName}"),
-                    )
-                )
+                // The direct-request variant (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                // with a package: URI) needs REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, which
+                // Play policy restricts to a named allow-list an alarm clock isn't on — an
+                // adversarial audit flagged it as a real submission-rejection risk, and the
+                // app's own alarms don't need it anyway: they arm via setAlarmClock()/
+                // setExactAndAllowWhileIdle(), which Android documents as Doze-exempt
+                // without this permission. This settings-list variant needs none.
+                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
             },
         )
 

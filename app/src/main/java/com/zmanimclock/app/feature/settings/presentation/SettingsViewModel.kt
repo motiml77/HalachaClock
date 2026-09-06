@@ -63,13 +63,16 @@ class SettingsViewModel @Inject constructor(
      */
     fun ringInAMinute() {
         viewModelScope.launch {
-            // Wall-clock must be taken in the CITY's zone — the scheduler
-            // resolves hour/minute there. With the device on another zone the
-            // test alarm landed a day away instead of one minute from now.
-            val zone = java.time.ZoneId.of(
-                prefsRepository.preferences.first().timeZoneId
-            )
-            val fire = LocalDateTime.now(zone).plusMinutes(1)
+            // FIXED alarms are a wall-clock promise, so AlarmScheduler now
+            // resolves their hour/minute in the DEVICE's zone (see
+            // AlarmScheduler.zoneFor) — before that fix it used the
+            // selected city's zone, which is what this used to compute
+            // against. Left as city-zone, this self-test itself reproduces
+            // exactly the bug that fix corrected: on a device whose zone
+            // differs from the city's (caught live testing against an
+            // emulator on UTC with Jerusalem selected), the alarm the
+            // scheduler actually arms lands hours away, not one minute.
+            val fire = LocalDateTime.now(java.time.ZoneId.systemDefault()).plusMinutes(1)
             alarmDao.insertAlarm(
                 AlarmEntity(
                     type = AlarmType.FIXED,
