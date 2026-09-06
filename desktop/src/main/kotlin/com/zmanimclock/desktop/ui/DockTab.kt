@@ -124,7 +124,19 @@ internal fun ApplicationScope.DockTabWindow(
         // effect's dependency list honest) needs to be pushed onto the AWT
         // window directly, the same fix Main.kt's panel-opening effect
         // needed for the identical reason.
-        LaunchedEffect(window, edge, along) {
+        //
+        // KEYED ON `visible` TOO. This window is composed while hidden, and a
+        // hidden window has no peer — `isDisplayable` is false and the guard
+        // below returns without applying anything. Keyed only on
+        // window/edge/along, that early return was FINAL for a placement that
+        // never changed again: the effect had already run, so folding the app
+        // later re-showed the window without this ever firing, leaving the
+        // initial rememberWindowState values as the only thing positioning it.
+        // That is exactly the load-a-saved-placement path, and exactly the
+        // path autostart-folded now takes on every boot, so it gets a real
+        // apply the moment the window actually exists rather than a race it
+        // usually wins.
+        LaunchedEffect(window, edge, along, visible) {
             if (!window.isDisplayable) return@LaunchedEffect
             window.setBounds(bounds.x, bounds.y, bounds.width, bounds.height)
         }
@@ -282,19 +294,37 @@ private val TAB_LENGTH = 96.dp
 private const val DRAG_THRESHOLD_PX = 6f
 
 /**
+ * The screen minus the taskbar. The one place the live display is consulted,
+ * so that the geometry below can be exercised against a made-up screen.
+ */
+private fun workArea(): Rectangle =
+    GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+
+/**
  * Where the bookmark sits for a given edge and position-along-that-edge.
  *
  * [along] is a fraction (0f..1f) of the work area's length along that edge;
  * see [DockPlacement] for why a fraction rather than a pixel offset. The
  * result is clamped so the bookmark's full [TAB_LENGTH] always stays on
  * screen, the same way the widget clamps its own saved position.
+ *
+ * [wa] IS A PARAMETER, defaulted to the real screen, purely so this is
+ * testable. It and [nearestEdge] are the two halves of the "remember where I
+ * dropped it" promise — drop point in, fraction out, fraction in, position
+ * back out — and that round trip was previously unprovable: both read the
+ * live [GraphicsEnvironment] internally, so a test could only ever assert
+ * against whatever monitor happened to be attached, which is no assertion at
+ * all. Injected, the pair is checked at 1920x1040, 4K and a taskbar-on-the-
+ * left offset origin, none of which need a display.
  */
-private fun dockBounds(edge: DockEdge, along: Float): Rectangle {
-    val wa = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+internal fun dockBounds(edge: DockEdge, along: Float, wa: Rectangle = workArea()): Rectangle {
     val thicknessPx = TAB_THICKNESS.value.toInt()
     val lengthPx = TAB_LENGTH.value.toInt()
 
-    fun centred(start: Int, span: Int, lengthAvailable: Int): Int {
+    // The tab's CENTRE lands at `along` of the way down (or across) the work
+    // area, then the whole tab is pulled back inside it. The clamp is why
+    // along=0f and along=1f are legal rather than half-off-screen positions.
+    fun centred(start: Int, lengthAvailable: Int): Int {
         val target = start + (along * lengthAvailable).toInt() - lengthPx / 2
         val maxStart = start + (lengthAvailable - lengthPx).coerceAtLeast(0)
         return target.coerceIn(start, maxStart)
@@ -302,16 +332,16 @@ private fun dockBounds(edge: DockEdge, along: Float): Rectangle {
 
     return when (edge) {
         DockEdge.LEFT -> Rectangle(
-            wa.x, centred(wa.y, wa.height, wa.height), thicknessPx, lengthPx,
+            wa.x, centred(wa.y, wa.height), thicknessPx, lengthPx,
         )
         DockEdge.RIGHT -> Rectangle(
-            wa.x + wa.width - thicknessPx, centred(wa.y, wa.height, wa.height), thicknessPx, lengthPx,
+            wa.x + wa.width - thicknessPx, centred(wa.y, wa.height), thicknessPx, lengthPx,
         )
         DockEdge.TOP -> Rectangle(
-            centred(wa.x, wa.width, wa.width), wa.y, lengthPx, thicknessPx,
+            centred(wa.x, wa.width), wa.y, lengthPx, thicknessPx,
         )
         DockEdge.BOTTOM -> Rectangle(
-            centred(wa.x, wa.width, wa.width), wa.y + wa.height - thicknessPx, lengthPx, thicknessPx,
+            centred(wa.x, wa.width), wa.y + wa.height - thicknessPx, lengthPx, thicknessPx,
         )
     }
 }
@@ -326,8 +356,7 @@ private fun dockBounds(edge: DockEdge, along: Float): Rectangle {
  * a definite, unsurprising edge (the nearer pair of edges, tie-broken by
  * whichever axis is closer) instead of a coordinate-order artefact.
  */
-private fun nearestEdge(dropped: Rectangle): Pair<DockEdge, Float> {
-    val wa = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+internal fun nearestEdge(dropped: Rectangle, wa: Rectangle = workArea()): Pair<DockEdge, Float> {
     val centerX = dropped.x + dropped.width / 2.0
     val centerY = dropped.y + dropped.height / 2.0
 

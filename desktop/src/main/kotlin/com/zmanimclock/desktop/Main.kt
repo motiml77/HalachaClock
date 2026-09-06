@@ -85,18 +85,29 @@ fun main(args: Array<String>) {
 }
 
 private fun runApp(args: Array<String>) = application {
-    // --tray: launched by the Windows Run key at logon. Start hidden in the
-    // tray rather than throwing a window in the user's face at every boot.
-    val startHidden = args.any { it.equals("--tray", ignoreCase = true) }
+    // Launched by the Windows Run key at logon rather than by the user — see
+    // StartupManager.launchedAtLogon.
+    val atLogon = StartupManager.launchedAtLogon(args)
 
     val prefs = remember { DesktopPrefs.load() }
     val service = remember { DesktopZmanimService(prefs) }
     val scheduler = remember { ReminderScheduler(service) }
 
-    var mainVisible by remember { mutableStateOf(!startHidden) }
+    var mainVisible by remember { mutableStateOf(!atLogon) }
     // Folded against a screen edge as a bookmark (DockTabWindow) — which
     // edge, and how far along it, is whatever the owner last dragged it to.
-    var docked by remember { mutableStateOf(false) }
+    //
+    // A LOGON STARTS FOLDED. Measured before this change: `--tray` set
+    // mainVisible=false and left docked=false, so booting the PC produced a
+    // tray icon and NOTHING on screen — not the window the owner feared, but
+    // not the bookmark either. The app was simply invisible, and the only way
+    // back to it was to notice a tray icon and click it, which rather defeats
+    // a clock. Folded is the state the owner actually asked for: a discreet
+    // tab on the edge they left it on, one click from the full panel.
+    //
+    // Only the logon path. Double-clicking the app still opens the window —
+    // someone who launches a clock deliberately wants to see it.
+    var docked by remember { mutableStateOf(atLogon) }
     var tab by remember { mutableStateOf(MainTab.ZMANIM) }
     val savedDock = remember { DockPlacement.load() }
     var dockEdge by remember { mutableStateOf(savedDock?.edge ?: DockEdge.LEFT) }
@@ -158,7 +169,7 @@ private fun runApp(args: Array<String>) = application {
     var askStartup by remember {
         mutableStateOf(
             !prefs.startupPrompted &&
-                !startHidden &&
+                !atLogon &&
                 StartupManager.isSupported() &&
                 !StartupManager.isEnabled(),
         )

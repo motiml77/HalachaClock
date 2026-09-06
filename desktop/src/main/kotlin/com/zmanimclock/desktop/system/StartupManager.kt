@@ -11,7 +11,7 @@ import java.io.File
  * The value written is:
  *
  *     HKCU\Software\Microsoft\Windows\CurrentVersion\Run
- *         ZmanimClock = "C:\...\Halacha Clock.exe" --tray
+ *         ZmanimClock = "C:\...\Halacha Clock.exe" --startup
  *
  * HKCU, not HKLM. Per-user means no administrator rights are needed and it
  * lines up with the installer's `perUserInstall = true`; HKLM would demand
@@ -19,8 +19,10 @@ import java.io.File
  * rather than writing some "enabled=false" flag — a leftover key that claims to
  * be disabled is exactly the residue people rightly resent.
  *
- * The `--tray` flag means a boot brings the app up hidden in the tray instead of
- * throwing a window at someone who is trying to log in.
+ * The flag marks the launch as "Windows did this, not the user", which is the
+ * only thing the app needs to know: a logon comes up FOLDED — the bookmark on
+ * its saved screen edge and nothing else — while double-clicking the shortcut
+ * opens the window, as it always has. See [launchedAtLogon].
  *
  * ⚠️ WHY THIS FILE DESERVES A WARNING, NOT JUST A DOC COMMENT
  * Writing a Run key is MITRE ATT&CK T1547.001 — the single most common malware
@@ -44,8 +46,42 @@ object StartupManager {
     /** ASCII and stable. Renaming this orphans every existing installation's value. */
     private const val VALUE_NAME = "ZmanimClock"
 
-    /** Boot straight to the tray — no window in anyone's face at login. */
-    const val TRAY_FLAG = "--tray"
+    /**
+     * Written into the Run value; means "Windows started this at logon".
+     *
+     * Renamed from `--tray`, which had become a lie: it used to mean "come up
+     * hidden in the tray" and now means "come up folded to the edge". The
+     * registry VALUE NAME is still ZmanimClock and still must never change —
+     * that is the thing existing installs have on disk. The flag inside the
+     * value is different: it is re-written from scratch on every launch (see
+     * Main.kt's re-assert effect), so it costs nothing to correct.
+     */
+    const val STARTUP_FLAG = "--startup"
+
+    /**
+     * Recognised forever, never written again.
+     *
+     * Every Run value written by a shipped build so far carries `--tray`, and
+     * those values sit in real users' registries right now. The re-assert on
+     * launch replaces them with [STARTUP_FLAG] — but only once the app has run
+     * once, and the very first thing that happens after an upgrade may well be
+     * a reboot. Accepting both means that boot folds correctly too, instead of
+     * silently falling through to the manual-launch path and opening a window.
+     */
+    const val LEGACY_TRAY_FLAG = "--tray"
+
+    /**
+     * True when these process arguments say Windows launched the app at logon.
+     *
+     * A function, not an `args.contains` at the call site, because the two
+     * accepted spellings and the case-insensitivity are a rule about the Run
+     * value — they belong next to the code that writes it, and they are the
+     * one part of the autostart path that can be tested without a registry, a
+     * reboot, or a window.
+     */
+    fun launchedAtLogon(args: Array<String>): Boolean = args.any {
+        it.equals(STARTUP_FLAG, ignoreCase = true) || it.equals(LEGACY_TRAY_FLAG, ignoreCase = true)
+    }
 
     /**
      * True when the Run value exists and is not blank.
@@ -119,7 +155,7 @@ object StartupManager {
         val exe = executablePath() ?: return false
         // Quoted: Program Files has a space in it, and an unquoted path there is
         // the classic unquoted-service-path bug.
-        val command = "\"$exe\" $TRAY_FLAG"
+        val command = "\"$exe\" $STARTUP_FLAG"
         return runCatching {
             if (!Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, RUN_KEY)) {
                 Advapi32Util.registryCreateKey(WinReg.HKEY_CURRENT_USER, RUN_KEY)

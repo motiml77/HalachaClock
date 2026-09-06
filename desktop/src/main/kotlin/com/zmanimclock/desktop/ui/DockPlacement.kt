@@ -1,5 +1,6 @@
 package com.zmanimclock.desktop.ui
 
+import com.zmanimclock.desktop.data.DesktopPrefs
 import java.io.File
 import java.util.Properties
 
@@ -23,10 +24,19 @@ internal object DockPlacement {
 
     data class Saved(val edge: DockEdge, val along: Float)
 
-    private fun file(): File = File(
-        File(System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home"), "HalachClock"),
-        "dock.properties",
-    )
+    /**
+     * Resolved through [DesktopPrefs.dir], NOT by re-deriving LOCALAPPDATA
+     * here. The two produce the same path in a real install, so this is not a
+     * behaviour change — but only DesktopPrefs.dir honours the
+     * `halachclock.data.dir` override that build.gradle.kts sets for every
+     * test task, and this file was reading the environment directly. A test
+     * that saves a placement would therefore have overwritten the developer's
+     * OWN bookmark position, which is precisely the accident that made that
+     * override exist (see DATA_DIR_PROPERTY: two test alerts once appeared in
+     * the running app). The round-trip test added alongside this change is
+     * what would have triggered it.
+     */
+    private fun file(): File = File(DesktopPrefs.dir(), "dock.properties")
 
     fun save(edge: DockEdge, along: Float) {
         runCatching {
