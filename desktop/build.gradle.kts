@@ -101,7 +101,7 @@ compose.desktop {
             // 1638 ("another version of this product is already installed"),
             // confirmed in practice — an update MUST raise this or nobody can
             // upgrade in place.
-            packageVersion = "1.8.0"
+            packageVersion = "1.9.0"
             description = "Halacha Clock - Zmanim and Hebrew calendar"
             vendor = "Halacha Clock"
 

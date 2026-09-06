@@ -1,7 +1,8 @@
 package com.zmanimclock.desktop.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -20,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,9 +49,14 @@ import com.zmanimclock.desktop.widget.WindowPinning
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanimDesktopTheme
 import java.awt.Cursor
+import java.awt.Dimension
 import java.awt.GraphicsEnvironment
+import java.awt.MouseInfo
+import java.awt.Point
 import java.awt.Rectangle
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * The folded state of the app: a bookmark against a screen edge — any edge.
@@ -65,17 +70,47 @@ import kotlin.math.abs
  * point along that edge — the owner drops it.
  *
  * ONE POINTER GESTURE, DELIBERATELY NOT TWO. A `clickable` alongside a drag
- * detector on the same node race for the same pointer-down event; instead
- * [detectDragGestures] alone decides after the fact, by how far the pointer
- * actually moved, whether this was a click (open) or a drag (redock) — see
- * the gesture handler below.
+ * detector on the same node race for the same pointer-down event, so a single
+ * raw gesture decides after the fact — by how far the pointer actually moved —
+ * whether this was a click (open) or a drag (redock).
+ *
+ * That gesture is [awaitEachGesture] and NOT `detectDragGestures`, which this
+ * used to be and which cannot express it: a press released before the drag
+ * slop invokes NO callback at all. Read from the compiled foundation
+ * (`DragGestureDetectorKt$detectDragGestures$13`, `2284: ifnull 3013`) the
+ * null-slop branch jumps past onDragStart, onDrag, onDragCancel AND onDragEnd
+ * straight to the return — so on a control whose entire job is being clicked,
+ * a perfectly still click reached nothing. Owning the pointer-up ourselves is
+ * the only way to hear it.
+ *
+ * THE DRAG LAW IS ANCHORED, NEVER INCREMENTAL — see [dragTo], and read its
+ * signature as the proof: it takes where the window was and where the pointer
+ * was WHEN THE PRESS BEGAN, plus where the pointer is now. It does NOT take
+ * the window's current position, so it cannot feed its own output back in.
+ * This is not stylistic. The previous version added Compose's pointer delta
+ * to `window.location` on every event, and that delta is measured in the local
+ * space of the very window being moved, in Compose pixels, while setLocation
+ * speaks AWT user-space units. Writing g for the display scale, the closed
+ * loop is m(n+1) = -g*m(n) + g*d, whose characteristic root is -g:
+ *   g = 1.00 (a 100% display) — root -1, marginally stable. The tab tracked at
+ *       roughly half speed and merely felt sluggish, which is how this shipped.
+ *   g = 2.75 (the owner's display, measured: GraphicsConfiguration
+ *       .defaultTransform = 2.75) — the error is multiplied by 2.75 AND flips
+ *       sign on every mouse event, crossing a 1047-unit desktop in about five
+ *       events. The bookmark was found at (-11916, +11915) with dock.properties
+ *       reading edge=LEFT / along=1.0 — the clamp fingerprint of exactly this.
+ * The owner's report was "כאילו נעלמת" — it disappears. It was not hiding; it
+ * had been flung twelve thousand pixels off the desktop.
  *
  * DURING a drag the tab moves freely, following the cursor with no snapping,
  * so the owner gets direct visual feedback of picking it up — snapping only
  * happens once, on release, against whichever of the four edges the drop
  * point is nearest. The window's SIZE (and therefore its shape) does not
  * change until that release either, for the same reason: reflowing the shape
- * mid-drag would fight the thing the owner is actively looking at.
+ * mid-drag would fight the thing the owner is actively looking at. What DOES
+ * change mid-drag is the arrow, which turns to face the edge the tab would
+ * land on if released now — see [previewEdgeFor]. That is the answer to "ואיפה
+ * עוצרים": the tab tells you where it is going before you let go.
  *
  * Design decisions carried over from the LEFT-only original, now applied per
  * edge — see [dockBounds] and [drawDockBorder] for exactly how:
@@ -157,12 +192,12 @@ internal fun ApplicationScope.DockTabWindow(
             val hovered by interaction.collectIsHoveredAsState()
             val shape = dockShape(edge)
 
-            // Accumulated pointer travel since the current press began — the
-            // one number that decides click vs. drag on release. A physical
-            // mouse click is never perfectly stationary; DRAG_THRESHOLD_PX is
-            // comfortably above ordinary hand tremor and comfortably below an
-            // intentional drag.
-            var dragged by remember { mutableFloatStateOf(0f) }
+            // The edge the tab would land on if the button were released right
+            // now, or null when nothing is being dragged. Only the arrow reads
+            // it, and only while a drag is in flight — which is why it is
+            // separate from `edge`: `edge` is the committed placement and must
+            // not flicker just because a gesture is passing over a diagonal.
+            var previewEdge by remember { mutableStateOf<DockEdge?>(null) }
 
             Box(
                 Modifier.fillMaxSize()
@@ -188,43 +223,102 @@ internal fun ApplicationScope.DockTabWindow(
                     }
                     .hoverable(interaction)
                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { dragged = 0f },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                dragged += abs(amount.x) + abs(amount.y)
-                                // Free movement, no snapping — the redock only
-                                // happens once, in onDragEnd below.
-                                val loc = window.location
-                                window.setLocation(
-                                    (loc.x + amount.x).toInt(),
-                                    (loc.y + amount.y).toInt(),
-                                )
-                            },
-                            onDragEnd = {
-                                if (dragged < DRAG_THRESHOLD_PX) {
+                    .pointerInput(alwaysOnTop) {
+                        awaitEachGesture {
+                            // requireUnconsumed = false: nothing else on this
+                            // node competes for the press, and refusing an
+                            // already-consumed down would silently make the
+                            // bookmark dead to a click.
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+
+                            // EVERYTHING THE GESTURE NEEDS, READ ONCE, HERE.
+                            // The work area is frozen for the whole gesture so
+                            // that the edge the arrow promises and the edge the
+                            // release commits are computed against the same
+                            // screen — a resolution change mid-drag would
+                            // otherwise make the preview a lie.
+                            val grabPointer = pointerOnScreen()
+                            val grabWindow = window.location
+                            val work = workArea()
+                            val reachable = reachableBounds()
+                            val tab = Dimension(window.width, window.height)
+
+                            // Peak DISPLACEMENT from the press point, not the
+                            // length of the path walked: a slow wobble that
+                            // ends where it started is a click with a shaky
+                            // hand, and summing |dx|+|dy| per event called it a
+                            // drag and moved the bookmark.
+                            var travel = 0
+                            var released = false
+                            var preview = edge
+
+                            // A bookmark that slides behind a browser window
+                            // half way through the drag is the same complaint —
+                            // "it disappeared" — reached by a different route.
+                            // Only needed when the owner has NOT asked for
+                            // always-on-top, which is the default.
+                            if (!alwaysOnTop) WindowPinning.raiseToTop(window)
+
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    change.consume()
+                                    if (!change.pressed) {
+                                        released = true
+                                        break
+                                    }
+                                    // The cursor's ABSOLUTE position, in the
+                                    // same AWT user-space units setLocation
+                                    // speaks (measured on the owner's 275%
+                                    // display: MouseInfo reported (439,536) on
+                                    // a 1047x655 screen, so these are logical
+                                    // units, not physical pixels). Absolute is
+                                    // what breaks the feedback loop; same-units
+                                    // is what removes the scale factor. Compose
+                                    // deltas give neither.
+                                    val now = pointerOnScreen() ?: continue
+                                    if (grabPointer == null) continue
+
+                                    travel = maxOf(travel, travelledFrom(grabPointer, now))
+                                    window.setLocation(dragTo(grabWindow, grabPointer, now, tab, reachable))
+
+                                    preview = previewEdgeFor(window.bounds, preview, work).first
+                                    if (previewEdge != preview) previewEdge = preview
+                                }
+                            } finally {
+                                previewEdge = null
+                                if (!alwaysOnTop) WindowPinning.clearTopmost(window)
+
+                                if (released && travel < DRAG_SLOP_UNITS) {
                                     onOpen()
                                 } else {
-                                    val (newEdge, newAlong) = nearestEdge(window.bounds)
+                                    // Also the cancellation path — something
+                                    // else claiming the pointer mid-drag must
+                                    // never be read as a click, but must still
+                                    // leave the tab flush against a real edge
+                                    // rather than stranded wherever the last
+                                    // move put it.
+                                    val (newEdge, newAlong) = nearestEdge(window.bounds, work)
+                                    // THE WINDOW IS MOVED HERE, NOT BY THE
+                                    // EFFECT ABOVE. Routing the snap through
+                                    // onRedock alone was a real defect: Main.kt
+                                    // holds edge/along in mutableStateOf, which
+                                    // compares structurally, so re-docking to
+                                    // the placement it already had recorded no
+                                    // change — remember(edge, along) did not
+                                    // recompute and LaunchedEffect did not
+                                    // re-run, leaving the tab exactly where the
+                                    // drag dropped it with no path back. The
+                                    // clamp in nearestEdge makes repeat values
+                                    // likely, not rare. onRedock is now
+                                    // bookkeeping and persistence only.
+                                    window.bounds = dockBounds(newEdge, newAlong, work)
                                     onRedock(newEdge, newAlong)
                                 }
-                            },
-                            // A cancelled gesture (something else claims the
-                            // pointer mid-drag — rare with only this one
-                            // gesture detector on the node, but not
-                            // impossible) still leaves the window wherever
-                            // onDrag last moved it. Without this it would sit
-                            // there — wrong size, wrong shape, snapped to
-                            // nothing — until the user managed a clean drag or
-                            // restarted the app. Snapping here costs nothing
-                            // when dragged is small: it just redocks to
-                            // wherever it already was.
-                            onDragCancel = {
-                                val (newEdge, newAlong) = nearestEdge(window.bounds)
-                                onRedock(newEdge, newAlong)
-                            },
-                        )
+                            }
+                        }
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -232,8 +326,15 @@ internal fun ApplicationScope.DockTabWindow(
                 // see dockArrow. The logo was tried here once and dropped at
                 // the owner's request: at bookmark size it renders as a
                 // smudged square, and the tab needs to say exactly one thing.
+                //
+                // Mid-drag it says a second thing, which is the same thing:
+                // it points at the edge the tab is about to land on. Nothing
+                // else about the tab changes while it is in the air, so this
+                // arrow is the whole of "where does it stop" — and it is
+                // hysteretic (see previewEdgeFor) so that it states an answer
+                // rather than strobing between two of them near a diagonal.
                 Icon(
-                    dockArrow(edge),
+                    dockArrow(previewEdge ?: edge),
                     contentDescription = "פתח את שעון מעורר - זמנים הלכתיים",
                     tint = ext.accentGold,
                     modifier = Modifier.size(22.dp),
@@ -290,15 +391,137 @@ private val TAB_THICKNESS = 36.dp
 /** The bookmark's other dimension — how far it runs along the edge. */
 private val TAB_LENGTH = 96.dp
 
-/** A stationary press within this many pixels of travel is a click, not a drag. */
-private const val DRAG_THRESHOLD_PX = 6f
+/**
+ * A press that never gets this far from where it started is a click, not a drag.
+ *
+ * AWT USER-SPACE UNITS — the space [MouseInfo] and `Window.getLocation` both
+ * speak, and therefore the same on every display. The value it replaces was 6
+ * Compose pixels, which is a DIFFERENT GESTURE ON EVERY MACHINE: 6 units at
+ * 100% scaling, 2.18 at the owner's 275%. Four units is comfortably above
+ * ordinary hand tremor while releasing a button and far below any intentional
+ * drag. (It is not SM_CXDRAG, which an earlier draft of this claimed — this
+ * machine reports `DnD.gestureMotionThreshold = 2`.)
+ */
+private const val DRAG_SLOP_UNITS = 4
+
+/**
+ * How much nearer a new edge must be than the current one before the preview
+ * arrow switches to it, in AWT user-space units.
+ *
+ * Without it the arrow strobes: along the diagonals two edges are exactly
+ * equidistant, and one unit of hand tremor flips the answer several times a
+ * second, which reads as the tab not knowing where it is going. With it the
+ * arrow states one answer and holds it until the pointer has clearly committed.
+ *
+ * Deliberately NOT applied to the drop itself — [nearestEdge] commits
+ * unbiased. The two can therefore disagree, but only within 24 units of a
+ * diagonal, where the two edges are equidistant and neither answer is wrong.
+ * Biasing the commit as well would mean the tab's resting place depended on
+ * where it had been before, which is harder to explain than a 24-unit band.
+ */
+private const val PREVIEW_BIAS_UNITS = 24
 
 /**
  * The screen minus the taskbar. The one place the live display is consulted,
  * so that the geometry below can be exercised against a made-up screen.
+ *
+ * KNOWN LIMIT, deliberately not fixed here: this is
+ * `SunGraphicsEnvironment.getUsableBounds(defaultScreenDevice)` — the PRIMARY
+ * monitor's work area, never the union of all of them (Win32GraphicsEnvironment
+ * does not override it; the javadoc's "entire display area" wording describes
+ * the Xinerama case). So a tab dropped on a secondary monitor snaps back to a
+ * primary edge. Main.kt's panel has the identical limit, so at least the two
+ * agree with each other, and the owner has one display. [reachableBounds] is
+ * the union, which is what keeps a second screen reachable during the drag.
  */
 private fun workArea(): Rectangle =
     GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+
+/**
+ * Every pixel the tab may be dragged over: the union of all monitors' FULL
+ * bounds.
+ *
+ * Full bounds, not work areas, and the distinction is visible: the taskbar
+ * strip is 48 units tall on this machine and is somewhere a pointer can go, so
+ * clamping to the work area would make the tab stick and judder along an
+ * invisible line above the taskbar for the rest of the drag.
+ *
+ * Folded with `reduceOrNull` rather than `fold(Rectangle())` — an empty seed
+ * is a 0x0 rectangle AT THE ORIGIN, and `union` with it drags the result back
+ * to (0,0) on any layout whose primary screen does not start there.
+ */
+private fun reachableBounds(): Rectangle =
+    GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices
+        .map { it.defaultConfiguration.bounds }
+        .reduceOrNull { a, b -> a.union(b) }
+        ?: workArea()
+
+/** Warned about at most once per run; a per-event message would be a torrent. */
+private val pointerInfoWarned = AtomicBoolean(false)
+
+/**
+ * The cursor's absolute position in AWT user-space units, or null.
+ *
+ * Null is possible in principle (a headless or locked session), and both call
+ * sites skip the event rather than guess. That combination is silent by
+ * construction — the tab would simply not move and the release would open the
+ * panel, i.e. "dragging just opens it" — so it says so once on stderr. Silence
+ * is precisely what let the original defect survive review.
+ */
+private fun pointerOnScreen(): Point? {
+    val p = MouseInfo.getPointerInfo()?.location
+    if (p == null && pointerInfoWarned.compareAndSet(false, true)) {
+        System.err.println("DockTab: MouseInfo.getPointerInfo() returned null — the bookmark cannot be dragged")
+    }
+    return p
+}
+
+/**
+ * Where the tab window belongs right now, mid-drag.
+ *
+ * ANCHORED, NOT INCREMENTAL, and the signature is the guarantee: the window's
+ * CURRENT position is not a parameter, so no output of this function can ever
+ * become one of its inputs. That is the whole fix — see the class comment for
+ * the recurrence the incremental version produced and where it put the
+ * bookmark. Any future change that adds a current-position parameter here is
+ * reintroducing the bug and should be rejected on sight.
+ *
+ * It is also memoryless: call it with the same three points in any order, any
+ * number of times, and it answers the same thing. A dropped or coalesced mouse
+ * event therefore costs nothing — the next one is still exactly right, where
+ * an incremental law would have lost that motion permanently.
+ *
+ * Clamped so the whole tab stays somewhere a pointer can reach. The old code
+ * clamped nothing at all, which is what turned a runaway into an unrecoverable
+ * one; [com.zmanimclock.desktop.widget.WidgetPlacement] has always clamped its
+ * own restore for the same reason. `coerceAtLeast` on the maxima keeps
+ * `coerceIn` from throwing on a screen smaller than the tab.
+ */
+internal fun dragTo(
+    anchorWindow: Point,
+    anchorPointer: Point,
+    pointerNow: Point,
+    tab: Dimension,
+    reachable: Rectangle,
+): Point {
+    val x = anchorWindow.x + (pointerNow.x - anchorPointer.x)
+    val y = anchorWindow.y + (pointerNow.y - anchorPointer.y)
+    val maxX = (reachable.x + reachable.width - tab.width).coerceAtLeast(reachable.x)
+    val maxY = (reachable.y + reachable.height - tab.height).coerceAtLeast(reachable.y)
+    return Point(x.coerceIn(reachable.x, maxX), y.coerceIn(reachable.y, maxY))
+}
+
+/**
+ * How far the pointer has strayed from where the press began — Manhattan
+ * DISPLACEMENT, deliberately not the length of the path walked.
+ *
+ * The caller keeps the running maximum of this. Summing per-event distance
+ * instead (which is what the old code did) counts a shaky hand that returns to
+ * its starting point as a long drag, and then moves and saves the bookmark on
+ * what the owner performed as a click.
+ */
+internal fun travelledFrom(anchor: Point, now: Point): Int =
+    abs(now.x - anchor.x) + abs(now.y - anchor.y)
 
 /**
  * Where the bookmark sits for a given edge and position-along-that-edge.
@@ -318,8 +541,14 @@ private fun workArea(): Rectangle =
  * left offset origin, none of which need a display.
  */
 internal fun dockBounds(edge: DockEdge, along: Float, wa: Rectangle = workArea()): Rectangle {
-    val thicknessPx = TAB_THICKNESS.value.toInt()
-    val lengthPx = TAB_LENGTH.value.toInt()
+    // roundToInt, matching Compose's own Windows_desktopKt.setSizeImpl, which
+    // is what turns the identical Dp values into this window's actual size via
+    // rememberWindowState. Behaviour-identical today because 36 and 96 are
+    // whole numbers; the moment either constant gains a fraction, truncating
+    // here and rounding there leaves a one-unit gap between the tab and the
+    // screen edge on RIGHT and BOTTOM — a bookmark that is visibly not flush.
+    val thicknessPx = TAB_THICKNESS.value.roundToInt()
+    val lengthPx = TAB_LENGTH.value.roundToInt()
 
     // The tab's CENTRE lands at `along` of the way down (or across) the work
     // area, then the whole tab is pulled back inside it. The clamp is why
@@ -357,22 +586,76 @@ internal fun dockBounds(edge: DockEdge, along: Float, wa: Rectangle = workArea()
  * whichever axis is closer) instead of a coordinate-order artefact.
  */
 internal fun nearestEdge(dropped: Rectangle, wa: Rectangle = workArea()): Pair<DockEdge, Float> {
-    val centerX = dropped.x + dropped.width / 2.0
-    val centerY = dropped.y + dropped.height / 2.0
+    val edge = edgeDistances(dropped, wa).minBy { it.second }.first
+    return edge to alongFor(edge, dropped, wa)
+}
 
-    val distances = listOf(
+/**
+ * Distance from the rectangle's centre to each of the four work-area edges.
+ *
+ * THESE ARE SIGNED, AND THAT IS CORRECT — recorded here because it has now
+ * been proposed as a bug twice, by two independent reviews, and re-derived as
+ * correct both times. Take the cited case: a centre at (10, 620) on a 1047x607
+ * work area, i.e. dropped into the taskbar strip below the desktop. Signed
+ * distance picks BOTTOM. Clamping the centre into the work area first picks
+ * BOTTOM. True distance to each edge SEGMENT — the geometrically unimpeachable
+ * answer — also picks BOTTOM, 13 against 16.4 to LEFT. Wrapping these in
+ * `abs()` returns LEFT, which is simply wrong, and a proposed "fix" of exactly
+ * that shape failed its own author's regression test.
+ *
+ * In any case the clamp in [dragTo] means the tab's centre can no longer leave
+ * the reachable area at all, so a negative distance is now unreachable rather
+ * than merely rare. Please do not "fix" this a third time.
+ */
+private fun edgeDistances(rect: Rectangle, wa: Rectangle): List<Pair<DockEdge, Double>> {
+    val centerX = rect.x + rect.width / 2.0
+    val centerY = rect.y + rect.height / 2.0
+    return listOf(
         DockEdge.LEFT to (centerX - wa.x),
         DockEdge.RIGHT to (wa.x + wa.width - centerX),
         DockEdge.TOP to (centerY - wa.y),
         DockEdge.BOTTOM to (wa.y + wa.height - centerY),
     )
-    val edge = distances.minBy { it.second }.first
+}
 
+/** How far along [edge] the rectangle's centre sits, as the stored 0f..1f fraction. */
+private fun alongFor(edge: DockEdge, rect: Rectangle, wa: Rectangle): Float {
+    val centerX = rect.x + rect.width / 2.0
+    val centerY = rect.y + rect.height / 2.0
     val along = when {
-        edge.isVertical -> ((centerY - wa.y) / wa.height)
-        else -> ((centerX - wa.x) / wa.width)
+        edge.isVertical -> (centerY - wa.y) / wa.height
+        else -> (centerX - wa.x) / wa.width
     }
-    return edge to along.toFloat().coerceIn(0f, 1f)
+    return along.toFloat().coerceIn(0f, 1f)
+}
+
+/**
+ * The same question as [nearestEdge], asked mid-drag and answered stickily:
+ * which edge would this land on if the button were released right now?
+ *
+ * [current] is the edge the preview is already showing. A different edge has
+ * to be nearer by more than [biasUnits] before it takes over — see
+ * [PREVIEW_BIAS_UNITS] for why a bare `nearestEdge` here would strobe.
+ *
+ * Feeding the result back in as [current] on the next event is what makes the
+ * hysteresis a ratchet rather than a one-shot comparison; the caller does
+ * exactly that.
+ */
+internal fun previewEdgeFor(
+    dragged: Rectangle,
+    current: DockEdge,
+    wa: Rectangle = workArea(),
+    biasUnits: Int = PREVIEW_BIAS_UNITS,
+): Pair<DockEdge, Float> {
+    val distances = edgeDistances(dragged, wa)
+    val nearest = distances.minBy { it.second }
+    val currentDistance = distances.first { it.first == current }.second
+    val edge = if (nearest.first == current || nearest.second < currentDistance - biasUnits) {
+        nearest.first
+    } else {
+        current
+    }
+    return edge to alongFor(edge, dragged, wa)
 }
 
 /** Rounded on the two corners facing the desktop; flat on the screen-edge side. */
