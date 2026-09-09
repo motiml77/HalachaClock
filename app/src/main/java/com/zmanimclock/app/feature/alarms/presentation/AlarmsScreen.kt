@@ -370,7 +370,7 @@ private fun AlarmTypeChooserSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp)
                 .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
                 "שעון מעורר חדש",
@@ -418,29 +418,41 @@ private fun TypeCard(
     onClick: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    // The highlighted option is TONAL, not outlined. A 2dp primary border
+    // reads as keyboard focus — "this one is selected" — on a sheet where
+    // nothing is selected yet; a light primary fill reads as "the usual
+    // choice", which is what it is. Its icon tile inverts to stay visible
+    // against that fill.
     Card(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = cs.surface),
-        border = androidx.compose.foundation.BorderStroke(
-            if (highlighted) 2.dp else 1.dp,
-            if (highlighted) cs.primary else cs.outlineVariant,
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (highlighted) cs.primaryContainer else cs.surface,
         ),
+        border = if (highlighted) null else androidx.compose.foundation.BorderStroke(1.dp, cs.outlineVariant),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 11.dp),
+                .padding(horizontal = 14.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .background(iconBg, RoundedCornerShape(11.dp)),
+                    .size(40.dp)
+                    .background(
+                        if (highlighted) cs.primary else iconBg,
+                        RoundedCornerShape(12.dp),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 icon?.let {
-                    Icon(it, contentDescription = null, tint = iconTint, modifier = Modifier.size(21.dp))
+                    Icon(
+                        it,
+                        contentDescription = null,
+                        tint = if (highlighted) cs.onPrimary else iconTint,
+                        modifier = Modifier.size(22.dp),
+                    )
                 }
             }
             Column(modifier = Modifier.padding(horizontal = 11.dp)) {

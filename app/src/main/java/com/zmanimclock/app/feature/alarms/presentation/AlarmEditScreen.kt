@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.AlarmOff
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.WbTwilight
@@ -44,14 +46,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
@@ -66,6 +68,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,6 +83,8 @@ import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.ui.theme.Ext
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import androidx.compose.animation.animateColorAsState
 
 private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
 
@@ -116,7 +124,11 @@ fun AlarmEditScreen(
     val showAnchorToggle = !alarm.shabbatMode && preselectedZman == null
 
     var selectedTab by rememberSaveable { mutableStateOf(0) }
-    val tabs = listOf("בסיסי", "צליל", "כיבוי")
+    val tabs = listOf(
+        EditorTab("בסיסי", Icons.Filled.Alarm),
+        EditorTab("צליל", Icons.AutoMirrored.Filled.VolumeUp),
+        EditorTab("כיבוי", Icons.Filled.AlarmOff),
+    )
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Header sits above the tabs; the tab content scrolls under it
@@ -143,19 +155,7 @@ fun AlarmEditScreen(
         //  בסיסי — WHEN does it ring (name, anchor, days)
         //  צליל  — HOW does it ring (mode, tone, volume, duration, preview)
         //  כיבוי — how does it STOP (snooze, math challenge, wake check)
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = { Text(title, style = MaterialTheme.typography.titleSmall) },
-                )
-            }
-        }
+        PillTabs(tabs = tabs, selected = selectedTab, onSelect = { selectedTab = it })
 
         Column(
             modifier = Modifier
@@ -190,13 +190,39 @@ fun AlarmEditScreen(
                         }
                     }
 
-                    OutlinedTextField(
+                    // Compact and rounded, at the owner's request — the old
+                    // outlined box with a floating label AND a supporting line
+                    // stood ~110dp tall for a field most people leave empty.
+                    // No label: the placeholder IS the suggested name, so an
+                    // empty field already reads as "this is what it will be
+                    // called", which is what the supporting line used to say.
+                    TextField(
                         value = alarm.label,
                         onValueChange = { v -> viewModel.update { it.copy(label = v) } },
-                        label = { Text("שם השעון") },
-                        placeholder = { Text(defaultAlarmLabel(alarm)) },
-                        supportingText = { Text("ריק = השם המוצע") },
+                        placeholder = {
+                            Text(
+                                defaultAlarmLabel(alarm),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Outlined.Edit,
+                                contentDescription = "שם השעון",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
                         singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp),
@@ -363,8 +389,10 @@ fun AlarmEditScreen(
                                     val snapped = (Math.round(v / 5f) * 5).coerceIn(10, 180)
                                     viewModel.update { it.copy(ringDurationSeconds = snapped) }
                                 },
+                                // No `steps`: it drew 33 tick dots along the
+                                // track. Snapping to 5s lives in onValueChange
+                                // above, so the dots were decoration only.
                                 valueRange = 10f..180f,
-                                steps = 33,
                             )
                         }
                     }
@@ -508,7 +536,7 @@ fun AlarmEditScreen(
 private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp),
@@ -629,8 +657,13 @@ private fun FixedAnchorSection(alarm: AlarmEntity, update: ((AlarmEntity) -> Ala
     LaunchedEffect(timeState.hour, timeState.minute) {
         update { it.copy(hour = timeState.hour, minute = timeState.minute) }
     }
+    // Same Material dial, just less of it. At full size it filled ~60% of
+    // the screen and — measured on the emulator — swallowed the scroll
+    // gesture: a swipe meant to reach "באילו ימים?" turned 06:00 into 00:00
+    // instead. Shrinking it is the owner's call over replacing it; the
+    // margins it gives back are where scrolling now works.
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        TimePicker(state = timeState)
+        TimePicker(state = timeState, modifier = Modifier.scaledDown(DIAL_SCALE))
     }
 }
 
@@ -706,7 +739,11 @@ private fun ZmanAnchorSection(
     )
 
     preview?.let {
-        Card {
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            shape = RoundedCornerShape(14.dp),
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -742,8 +779,11 @@ private fun DaysSelector(alarm: AlarmEntity, update: ((AlarmEntity) -> AlarmEnti
                 val selected = (alarm.daysOfWeek shr index) and 1 == 1
                 Surface(
                     shape = CircleShape,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    // Tonal when unselected. `surface` on a `surface` card drew
+                    // nothing at all, so an unticked day was a bare letter
+                    // floating in white — indistinguishable from a label.
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(40.dp)
                         .clickable {
@@ -917,6 +957,86 @@ private fun QuickRingtonePicker(
 
 /** Long enough to judge a ringtone, short enough not to become the alarm. */
 private const val PREVIEW_MILLIS = 5_000L
+
+/** The dial is drawn at this fraction of Material's default size — see FixedAnchorSection. */
+private const val DIAL_SCALE = 0.84f
+
+/** One editor tab: its title and the small icon beside it. */
+private data class EditorTab(val title: String, val icon: ImageVector)
+
+/**
+ * The editor's three tabs as a rounded pill bar — a tonal track with the
+ * selected tab drawn as a filled pill that fades between positions.
+ *
+ * Replaces Material's TabRow, whose underline-and-divider look the owner
+ * asked to lose while keeping the tabs themselves. Colours animate rather
+ * than a sliding indicator: three equal-width pills fading is visually
+ * indistinguishable from a slide at this size and needs no measuring.
+ */
+@Composable
+private fun PillTabs(tabs: List<EditorTab>, selected: Int, onSelect: (Int) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Row(modifier = Modifier.padding(4.dp)) {
+            tabs.forEachIndexed { index, tab ->
+                val isSelected = index == selected
+                val background by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    label = "tabBackground",
+                )
+                val foreground by animateColorAsState(
+                    if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    label = "tabForeground",
+                )
+                Surface(
+                    onClick = { onSelect(index) },
+                    shape = RoundedCornerShape(50),
+                    color = background,
+                    contentColor = foreground,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(tab.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tab.title, style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Draw a composable at [scale] of its natural size AND take up only that
+ * much room in the layout.
+ *
+ * `Modifier.scale` alone shrinks the pixels but leaves the original footprint
+ * behind, so the dial would have floated in a void the size it used to be.
+ * Measuring at full size and reporting the scaled size gives the surrounding
+ * column the space back. `placeWithLayer` applies the transform to hit
+ * testing too, so taps still land on the numbers they appear on.
+ */
+private fun Modifier.scaledDown(scale: Float): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val width = (placeable.width * scale).roundToInt()
+    val height = (placeable.height * scale).roundToInt()
+    layout(width, height) {
+        placeable.placeWithLayer(0, 0) {
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(0f, 0f)
+        }
+    }
+}
 
 /** "40 שניות" / "דקה" / "1:30 דקות" / "3 דקות". */
 private fun formatRingDuration(seconds: Int): String = when {

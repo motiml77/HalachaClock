@@ -31,8 +31,14 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AlarmOn
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Card
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -204,6 +210,7 @@ fun SettingsContent(
         // Permission health check
         if (!exactAlarmsOk) {
             Card(
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 ),
@@ -236,6 +243,7 @@ fun SettingsContent(
         // Full-screen intent health check (Android 14+)
         if (!fullScreenOk) {
             Card(
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 ),
@@ -269,6 +277,7 @@ fun SettingsContent(
         // take over while the phone is unlocked and in use
         if (!overlayOk) {
             Card(
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                 ),
@@ -299,8 +308,14 @@ fun SettingsContent(
             }
         }
 
+        // Three groups with quiet headers. Every card used to carry the same
+        // visual weight, so the list had no hierarchy: the city you set once
+        // sat level with a diagnostic button and a paragraph about the
+        // calculation method. The headers cost 20dp each and buy a scan path.
+        SectionHeader("מיקום וזמנים")
+
         // Location
-        Card(modifier = Modifier.clickable(onClick = onCityClick)) {
+        SettingsCard(modifier = Modifier.clickable(onClick = onCityClick)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -328,7 +343,7 @@ fun SettingsContent(
         }
 
         // Candle lighting
-        Card {
+        SettingsCard {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -336,25 +351,28 @@ fun SettingsContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text("הדלקת נרות", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "${prefs.candleLightingMinutes} דקות לפני שקיעה",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        "ירושלים נוהגת 40 דק'",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                     )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        onCandleMinutesChange((prefs.candleLightingMinutes - 10).coerceAtLeast(10))
-                    }) { Text("-") }
-                    OutlinedButton(onClick = {
-                        onCandleMinutesChange((prefs.candleLightingMinutes + 10).coerceAtMost(40))
-                    }) { Text("+") }
+                    Spacer(Modifier.height(10.dp))
+                    // The customs, not a number line. "+"/"-" in tens implied
+                    // a continuum; in practice a household keeps one of these
+                    // four, and 40 is Jerusalem's. A value from an older
+                    // build that is none of them still shows correctly above
+                    // and simply has no chip lit until one is chosen.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(18, 20, 30, 40).forEach { minutes ->
+                            FilterChip(
+                                selected = prefs.candleLightingMinutes == minutes,
+                                onClick = { onCandleMinutesChange(minutes) },
+                                label = { Text(if (minutes == 40) "40 · ירושלים" else "$minutes") },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -367,14 +385,10 @@ fun SettingsContent(
             onChange = onTzeitShabbatMinutesChange,
         )
 
-        // Which zmanim may be the headline "הזמן הבא"
-        NextZmanFilterCard(
-            selected = prefs.nextZmanFilter,
-            onChange = onNextZmanFilterChange,
-        )
+        SectionHeader("התראות")
 
         // Persistent status notification
-        Card {
+        SettingsCard {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -397,11 +411,19 @@ fun SettingsContent(
             }
         }
 
+        // Which zmanim may be the headline "הזמן הבא"
+        NextZmanFilterCard(
+            selected = prefs.nextZmanFilter,
+            onChange = onNextZmanFilterChange,
+        )
+
+        SectionHeader("מערכת")
+
         // Permissions — always reachable, and loud when something is missing.
         PermissionsCard(onOpen = onOpenPermissions)
 
         // Reliability self-test + OEM guidance (A6)
-        Card {
+        SettingsCard {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("בדיקת אמינות", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -446,9 +468,17 @@ fun SettingsContent(
             }
         }
 
-        // About the calculation
-        Card {
-            Column(modifier = Modifier.padding(16.dp)) {
+        // About the calculation — collapsed by default. It is the one card
+        // that is pure reading, and it was five lines of it, permanently, in
+        // the middle of a screen people come to for a switch.
+        var methodOpen by remember { mutableStateOf(false) }
+        val chevron by animateFloatAsState(if (methodOpen) 180f else 0f, label = "methodChevron")
+        SettingsCard(modifier = Modifier.clickable { methodOpen = !methodOpen }) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .animateContentSize(),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.AutoMirrored.Filled.MenuBook,
@@ -458,9 +488,23 @@ fun SettingsContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text("שיטת החישוב", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.weight(1f))
+                    Icon(
+                        Icons.Filled.ExpandMore,
+                        contentDescription = if (methodOpen) "כיווץ" else "הרחבה",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.rotate(chevron),
+                    )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
+                if (!methodOpen) {
+                    Text(
+                        "לוח אור החיים / חזון יוסף",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                if (methodOpen) Spacer(Modifier.height(4.dp))
+                if (methodOpen) Text(
                     "הזמנים מחושבים לפי שיטת מרן — לוח אור החיים / " +
                         "חזון יוסף (הרב יצחק יוסף): שעות זמניות לפי היום " +
                         "המישורי (זריחה–שקיעה בגובה פני הים), וחצות בנקודת " +
@@ -474,7 +518,7 @@ fun SettingsContent(
 
         // Privacy policy — required to be reachable from inside the app for
         // the Play Store listing, not only linked from the store page itself.
-        Card(modifier = Modifier.clickable(onClick = onOpenPrivacyPolicy)) {
+        SettingsCard(modifier = Modifier.clickable(onClick = onOpenPrivacyPolicy)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -495,6 +539,39 @@ fun SettingsContent(
 }
 
 /**
+ * Every card on this screen, one way: white, 20dp corners, full width.
+ *
+ * Before this, PermissionsCard set its own white while everything else took
+ * Material's filled-Card default — a fill the theme never defined, so it came
+ * out in Material's lavender grey — and the reliability card was narrower than
+ * its neighbours because nothing inside it asked for the full width. Three
+ * card styles on one screen read as three apps.
+ */
+@Composable
+private fun SettingsCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        content = content,
+    )
+}
+
+/** A quiet group label: small, primary-coloured, with air above it. */
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+    )
+}
+
+/**
  * צאת שבת picker.
  *
  * This is the one zman in the app the user is asked to choose, because the
@@ -509,7 +586,7 @@ fun SettingsContent(
 private fun TzeitShabbatCard(minutes: Int, onChange: (Int) -> Unit) {
     var showInfo by remember { mutableStateOf(false) }
 
-    Card {
+    SettingsCard {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -610,7 +687,7 @@ private fun TzeitShabbatCard(minutes: Int, onChange: (Int) -> Unit) {
 private fun NextZmanFilterCard(selected: Set<String>, onChange: (Set<String>) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card {
+    SettingsCard {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -709,6 +786,8 @@ private fun PermissionsCard(onOpen: () -> Unit) {
     // the clock was broken when it was not.
     val alarming = summary.missingRequired.isNotEmpty()
     Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         // A missing required permission is a real reliability problem, so it
         // is coloured like one instead of sitting quietly in a list.
         colors = CardDefaults.cardColors(
