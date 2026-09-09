@@ -66,7 +66,7 @@ class AlarmEditViewModel @Inject constructor(
             _alarm.value = AlarmEntity(
                 type = AlarmType.ZMAN,
                 zmanId = "SHKIA",
-                offsetMinutes = 5,
+                offsetMinutes = SHABBAT_ENTRY_OFFSET_MINUTES,
                 offsetBefore = true,
                 daysOfWeek = AlarmEntity.FRIDAY_ONLY,
                 shabbatMode = true,
@@ -271,3 +271,11 @@ fun defaultAlarmLabel(a: AlarmEntity): String = when {
     }
     else -> "השכמה"
 }
+
+/**
+ * How many minutes before the location's sunset the Shabbat-entry alarm
+ * rings. ONE definition, read by both the preset that builds the alarm and
+ * the chooser sheet that describes it — the sheet used to carry its own
+ * literal, said "4", and was wrong; the alarm has always rung at 5.
+ */
+internal const val SHABBAT_ENTRY_OFFSET_MINUTES = 5
