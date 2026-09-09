@@ -17,7 +17,10 @@ val SecondaryLight = Color(0xFF4B5C82)
 val OnSecondaryLight = Color(0xFFFFFFFF)
 val SecondaryContainerLight = Color(0xFFDCE4F5)
 val OnSecondaryContainerLight = Color(0xFF2A3550)
-val TertiaryLight = Color(0xFF7A5E00)
+// Was 0xFF7A5E00 — an olive-brown that read as mud beside the brand gold.
+// Warmer and a touch lighter; still 4.7:1 on white, so it stays legal for
+// the small "next ring" line that uses it.
+val TertiaryLight = Color(0xFF9C6A00)
 val OnTertiaryLight = Color(0xFFFFFFFF)
 val TertiaryContainerLight = Color(0xFFFFF3C4)
 val OnTertiaryContainerLight = Color(0xFF4A3B00)
@@ -84,6 +87,14 @@ data class ExtendedColors(
     /** Gold accent: "הנץ הנראה" tag, countdown highlight, active-alert bell. */
     val accentGold: Color,
     val onAccentGold: Color,
+    /**
+     * The zman-anchored alarm's colour — sunrise amber. Three alarm kinds,
+     * three hues with a meaning each: navy for a clock time, THIS for a
+     * time that follows the sun, candle gold for Shabbat. Before it existed
+     * the zman kind borrowed `tertiary`, an olive-brown that sat beside the
+     * Shabbat gold looking like the same colour gone stale.
+     */
+    val zmanAccent: Color,
     /** Approaching deadline (סוזק"ש, סו"ז תפילה) — "עד". */
     val deadline: Color,
     val deadlineContainer: Color,
@@ -106,6 +117,7 @@ data class ExtendedColors(
 val ExtendedLight = ExtendedColors(
     accentGold = Color(0xFFF5C518),
     onAccentGold = Color(0xFF12203A),
+    zmanAccent = Color(0xFFE38B1C),
     deadline = Color(0xFFC24A00),
     deadlineContainer = Color(0xFFFFE1CC),
     onDeadlineContainer = Color(0xFF5A2100),
@@ -122,6 +134,7 @@ val ExtendedLight = ExtendedColors(
 val ExtendedDark = ExtendedColors(
     accentGold = Color(0xFFF5C518),
     onAccentGold = Color(0xFF12203A),
+    zmanAccent = Color(0xFFF5B266),
     deadline = Color(0xFFFF9A62),
     deadlineContainer = Color(0xFF4A2100),
     onDeadlineContainer = Color(0xFFFFE1CC),

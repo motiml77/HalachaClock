@@ -211,11 +211,14 @@ private fun AlarmCard(
     // one level of emphasis, so the name and time stay properly readable.
     val contentAlpha = if (active) 1f else 0.72f
 
-    // Accent stripe identifies the alarm's kind at a glance, in our palette:
-    // navy = wake-up clock, gold = halachic zman, candle-gold = Shabbat entry.
+    // Accent stripe identifies the alarm's kind at a glance, one hue each:
+    // navy = a clock time, sunrise amber = a time that follows the sun,
+    // candle gold = Shabbat entry. The zman kind used to borrow `tertiary`,
+    // whose olive-brown read as the Shabbat gold gone stale — two kinds in
+    // one muddy family instead of three you can tell apart across a room.
     val accent = when {
         alarm.shabbatMode -> Ext.colors.accentGold
-        isZman -> cs.tertiary
+        isZman -> Ext.colors.zmanAccent
         else -> cs.primary
     }
     // Keep a HINT of the kind colour when off — a grey stripe would throw away
@@ -389,8 +392,8 @@ private fun AlarmTypeChooserSheet(
             )
             TypeCard(
                 icon = Icons.Filled.WbTwilight,
-                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
-                iconBg = MaterialTheme.colorScheme.tertiaryContainer,
+                iconTint = Ext.colors.zmanAccent,
+                iconBg = Ext.colors.zmanAccent.copy(alpha = 0.16f),
                 title = "שעון לפי זמן הלכתי",
                 subtitle = "למשל 30 דק' לפני הנץ — מתעדכן כל יום לפי המיקום",
                 onClick = { onChoose(AlarmType.ZMAN) },
@@ -400,7 +403,7 @@ private fun AlarmTypeChooserSheet(
                 iconTint = MaterialTheme.colorScheme.tertiary,
                 iconBg = MaterialTheme.colorScheme.tertiaryContainer,
                 title = "התראת כניסת שבת",
-                subtitle = "כל שישי, 4 דק' לפני השקיעה — מסך נרות וצליל מיוחד",
+                subtitle = "כל שישי, $SHABBAT_ENTRY_OFFSET_MINUTES דק' לפני השקיעה — מסך נרות וצליל מיוחד",
                 onClick = onChooseShabbat,
             )
         }
