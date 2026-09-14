@@ -10,6 +10,51 @@ plugins {
 
 // Release signing — credentials live in keystore.properties (git-ignored).
 // Falls back gracefully so debug builds work without the keystore present.
+// See the PAYWALL SWITCH note in defaultConfig.
+//
+// PARSED STRICTLY. `"1".toBoolean()` and `"yes".toBoolean()` are false in
+// Kotlin, so a lenient parse turns a typo into a production build that gives
+// the app away. Only the words true and false are accepted.
+val paywallProperty = project.findProperty("paywall") as String?
+val paywallEnabled = when (paywallProperty?.trim()?.lowercase()) {
+    null -> false
+    "true" -> true
+    "false" -> false
+    else -> throw GradleException(
+        "-Ppaywall must be exactly true or false (got '$paywallProperty')."
+    )
+}
+logger.lifecycle(
+    if (paywallEnabled) "PAYWALL: ON  — this build charges after the free trial"
+    else "PAYWALL: OFF — closed-testing build, nobody is ever charged"
+)
+
+// A RELEASE BUILD MUST SAY WHETHER IT CHARGES. Failing closed, found by an
+// adversarial review: with the flag defaulting to OFF, the ordinary way of
+// building a release — `./gradlew :app:bundleRelease`, or Android Studio's
+// "Generate Signed Bundle" — produced a bundle that gave the app away, and
+// nothing anywhere failed. The only signal was one log line in Gradle's
+// output and a Settings label visible only after installing from Play. Now
+// the build refuses to start, and says what to type. Debug builds keep the
+// OFF default so day-to-day development and tests need nothing extra.
+gradle.taskGraph.whenReady {
+    val buildsRelease = allTasks.any {
+        it.project == project &&
+            it.name.matches(Regex("(bundle|assemble|package|install)Release"))
+    }
+    if (buildsRelease && paywallProperty == null) {
+        throw GradleException(
+            """
+            |A release build must say whether it charges. Rebuild with one of:
+            |    Production (charges after the free trial):  -Ppaywall=true
+            |    Closed testing (never charges):             -Ppaywall=false
+            |e.g.  ./gradlew :app:bundleRelease -Ppaywall=true
+            |NEVER promote a closed-testing (paywall=false) bundle to Production in Play Console.
+            """.trimMargin()
+        )
+    }
+}
+
 val keystorePropsFile = rootProject.file("keystore.properties")
 val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) load(keystorePropsFile.inputStream())
@@ -44,6 +89,23 @@ android {
         versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // THE PAYWALL SWITCH. Release builds must choose explicitly (the build
+        // refuses otherwise — see the check at the top of this file):
+        //
+        //     ./gradlew :app:bundleRelease -Ppaywall=true    production
+        //     ./gradlew :app:bundleRelease -Ppaywall=false   closed testing
+        //
+        // Off by default because the closed-testing track needs 12 testers for
+        // 14 days, and asking them to put a card into Google Play to join
+        // would make that impossible to recruit. The code is identical either
+        // way — only AccessPolicy's first argument changes — so what testers
+        // exercise is exactly what production ships, minus the lock.
+        //
+        // Printed on every build (below) and shown in Settings ("גרסת בדיקה —
+        // ללא חיוב") so a production bundle built WITHOUT the flag cannot go
+        // out unnoticed: that mistake would silently give the app away again.
+        buildConfigField("boolean", "PAYWALL_ENABLED", paywallEnabled.toString())
     }
 
     ksp {
@@ -93,6 +155,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

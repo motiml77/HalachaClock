@@ -27,7 +27,11 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefsRepository: UserPreferencesRepository,
     private val alarmDao: AlarmDao,
+    billingRepository: com.zmanimclock.app.feature.subscription.BillingRepository,
 ) : ViewModel() {
+
+    /** Current entitlement, for the subscription card. Decides nothing. */
+    val entitlement = billingRepository.entitlement
 
     val preferences: StateFlow<UserPreferences> = prefsRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserPreferences())

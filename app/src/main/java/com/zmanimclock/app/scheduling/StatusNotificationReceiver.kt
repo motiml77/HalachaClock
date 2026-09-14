@@ -40,6 +40,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
     @Inject lateinit var zmanimRepository: ZmanimRepository
     @Inject lateinit var alarmScheduler: AlarmScheduler
     @Inject lateinit var notificationHelper: NotificationHelper
+    @Inject lateinit var entitlementStore: com.zmanimclock.app.feature.subscription.EntitlementStore
 
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
@@ -62,7 +63,17 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         // so a setting that reads as being about the notification silently
         // froze the home-screen widget and killed the boundary chain that
         // drives both. Turning the notification off must not stop the clock.
-        val showNotification = prefs.persistentNotification
+        // THE STATUS LINE IS PART OF THE PAID APP too — the next zman and the
+        // next alarm, always on the lock screen. While the app is locked it is
+        // withdrawn (the subscription-lapsed notification is what the user
+        // sees instead), and the widget refresh below draws its locked state.
+        val unlocked = com.zmanimclock.app.feature.subscription.AccessPolicy.appAccess(
+            com.zmanimclock.app.BuildConfig.PAYWALL_ENABLED,
+            entitlementStore.cached(),
+            offers = null,
+            firstCheckDone = true,
+        ) == com.zmanimclock.app.feature.subscription.AppAccess.Allowed
+        val showNotification = prefs.persistentNotification && unlocked
 
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId

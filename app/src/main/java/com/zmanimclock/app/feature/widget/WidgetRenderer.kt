@@ -51,6 +51,7 @@ class WidgetRenderer @Inject constructor(
     private val zmanimRepository: ZmanimRepository,
     private val alarmDao: AlarmDao,
     private val alarmScheduler: AlarmScheduler,
+    private val entitlementStore: com.zmanimclock.app.feature.subscription.EntitlementStore,
 ) {
     private val dateFmt = DateTimeFormatter.ofPattern("d.M.yyyy")
 
@@ -99,6 +100,24 @@ class WidgetRenderer @Inject constructor(
         // per-widget color/opacity — no city, no zmanim lookup, no alarms.
         if (hebrewDateIds.isNotEmpty()) renderHebrewDateWidgets(manager, hebrewDateIds, today, zone)
         if (ids.isEmpty()) return
+
+        // THE ZMANIM WIDGET IS PART OF THE PAID APP. Found by an adversarial
+        // review: with the app locked behind the paywall, this widget still
+        // drew today's zmanim, the live next-zman countdown and the user's
+        // alarms on the home screen, for free, indefinitely. Same rule as the
+        // app's front door (AccessPolicy.appAccess), read from the Direct
+        // Boot-safe cache because this runs from receivers. The Hebrew-date-
+        // only widget above is left alone: a date is not the product.
+        val unlocked = com.zmanimclock.app.feature.subscription.AccessPolicy.appAccess(
+            com.zmanimclock.app.BuildConfig.PAYWALL_ENABLED,
+            entitlementStore.cached(),
+            offers = null,
+            firstCheckDone = true,
+        ) == com.zmanimclock.app.feature.subscription.AppAccess.Allowed
+        if (!unlocked) {
+            for (id in ids) manager.updateAppWidget(id, lockedViews())
+            return
+        }
 
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
@@ -262,6 +281,23 @@ class WidgetRenderer @Inject constructor(
             manager.updateAppWidget(id, views)
         }
     }
+
+    /**
+     * The zmanim widget while the subscription is not active: one line saying
+     * so, and a tap that opens the app — which is the paywall. Built from the
+     * existing layout's date section so no second layout has to be kept in step.
+     */
+    private fun lockedViews(): RemoteViews =
+        RemoteViews(context.packageName, R.layout.widget_zmanim).apply {
+            setViewVisibility(R.id.widget_date_section, View.VISIBLE)
+            setTextViewText(R.id.widget_hebrew_date, "המנוי אינו פעיל")
+            setTextViewText(R.id.widget_city, "הקש לחידוש המנוי")
+            setViewVisibility(R.id.widget_gregorian_date, View.GONE)
+            setViewVisibility(R.id.widget_next_section, View.GONE)
+            setViewVisibility(R.id.widget_zmanim_section, View.GONE)
+            setViewVisibility(R.id.widget_alarms_section, View.GONE)
+            setOnClickPendingIntent(R.id.widget_root, openAppIntent())
+        }
 
     private data class AlarmLine(val label: String, val time: String)
 

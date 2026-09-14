@@ -47,6 +47,8 @@ class AlarmScheduler @Inject constructor(
     private val alarmDao: AlarmDao,
     private val zmanimRepository: ZmanimRepository,
     private val prefsRepository: UserPreferencesRepository,
+    private val entitlementStore: com.zmanimclock.app.feature.subscription.EntitlementStore,
+    private val notificationHelper: NotificationHelper,
 ) {
     companion object {
         private const val TAG = "AlarmScheduler"
@@ -76,6 +78,30 @@ class AlarmScheduler @Inject constructor(
         val cityId = if (prefs.useGps) null else prefs.cityId
 
         val alarms = alarmDao.getActiveAlarmsList()
+
+        // No subscription: disarm, keep the alarms, and SAY SO. The rows stay
+        // active in the database, so the moment the subscription is renewed
+        // the next reschedule arms every one of them again with nothing for
+        // the user to re-enter. The notification is what keeps "the alarms
+        // stop too" from ever meaning "an alarm went silent and nobody knew".
+        if (!alarmsAllowedNow()) {
+            Log.w(TAG, "Subscription not active — disarming ${alarms.size} alarms")
+            alarms.forEach { cancelAlarm(it.id) }
+            if (alarms.isNotEmpty()) {
+                runCatching {
+                    notificationHelper.showSubscriptionLapsed(
+                        unverified = com.zmanimclock.app.feature.subscription.AccessPolicy
+                            .blockedOnlyForLackOfVerification(
+                                com.zmanimclock.app.BuildConfig.PAYWALL_ENABLED,
+                                entitlementStore.cached(),
+                            ),
+                    )
+                }
+            }
+            return
+        }
+        runCatching { notificationHelper.cancelSubscriptionLapsed() }
+
         Log.i(TAG, "Rescheduling ${alarms.size} active alarms")
         alarms.forEach { alarm ->
             // Isolate each alarm: one bad row (missing zman, bad city data…) must
@@ -190,6 +216,9 @@ class AlarmScheduler @Inject constructor(
 
     /** The earliest upcoming firing across ALL active alarms (for the status bar). */
     suspend fun nextAlarmOccurrence(cacheOnly: Boolean = false): Pair<AlarmEntity, Instant>? {
+        // A disarmed alarm is not a "next alarm". Advertising it would be a
+        // promise the trigger receiver is about to break.
+        if (!alarmsAllowedNow()) return null
         val prefs = prefsRepository.schedulingPreferences()
         val location = prefsRepository.prefsToGeoLocation(prefs)
         val cityId = if (prefs.useGps) null else prefs.cityId
@@ -315,7 +344,22 @@ class AlarmScheduler @Inject constructor(
         return null
     }
 
+    /** See AccessPolicy.alarmsAllowed — the one rule, read from the Direct Boot-safe cache. */
+    private fun alarmsAllowedNow(): Boolean =
+        com.zmanimclock.app.feature.subscription.AccessPolicy.alarmsAllowed(
+            com.zmanimclock.app.BuildConfig.PAYWALL_ENABLED,
+            entitlementStore.cached(),
+        )
+
     private fun arm(alarm: AlarmEntity, fireTime: Instant, zone: ZoneId) {
+        // Every arming path funnels through here — save, toggle, skip, undo,
+        // שומר לערבית — not just rescheduleAll. AlarmTriggerReceiver refuses
+        // to ring anyway, but an armed alarm also shows as the system's "next
+        // alarm" in the status bar, which would be a false promise.
+        if (!alarmsAllowedNow()) {
+            Log.w(TAG, "Not arming alarm ${alarm.id} — subscription not active")
+            return
+        }
         setExact(fireTime.toEpochMilli(), triggerPendingIntent(alarm.id))
         val display = DateTimeFormatter.ofPattern("dd/MM ${ZmanTime.PATTERN_24H}").format(fireTime.atZone(zone))
         Log.i(TAG, "Armed alarm ${alarm.id} (${alarm.type}) at $display")

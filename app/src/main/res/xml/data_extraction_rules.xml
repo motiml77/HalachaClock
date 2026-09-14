@@ -6,16 +6,28 @@
   while the alarms table is empty, so the user would silently lose every alarm
   AND never see onboarding again. Exclude that state so a restored device
   starts clean and walks through setup.
+
+  THE SHADOW FILES LIVE IN DEVICE-PROTECTED STORAGE TOO, so they need the
+  device_sharedpref domain. The `sharedpref` entries alone — which is all this
+  file had until an adversarial review — exclude a credential-storage path
+  that never contains them, and excluded nothing: a cached "subscribed" answer
+  could ride a device transfer onto a phone whose Google account never paid,
+  and keep its alarms ringing until Play was next asked. Both domains are kept,
+  so the rule holds wherever the file ends up.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="datastore/" />
-    <exclude domain="sharedpref" path="scheduling_shadow.xml" />
-    <exclude domain="sharedpref" path="entitlement_shadow.xml" />
+        <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+        <exclude domain="sharedpref" path="entitlement_shadow.xml" />
+        <exclude domain="device_sharedpref" path="scheduling_shadow.xml" />
+        <exclude domain="device_sharedpref" path="entitlement_shadow.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/" />
-    <exclude domain="sharedpref" path="scheduling_shadow.xml" />
-    <exclude domain="sharedpref" path="entitlement_shadow.xml" />
+        <exclude domain="sharedpref" path="scheduling_shadow.xml" />
+        <exclude domain="sharedpref" path="entitlement_shadow.xml" />
+        <exclude domain="device_sharedpref" path="scheduling_shadow.xml" />
+        <exclude domain="device_sharedpref" path="entitlement_shadow.xml" />
     </device-transfer>
 </data-extraction-rules>

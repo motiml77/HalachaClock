@@ -317,8 +317,19 @@ class BillingRepository @Inject constructor(
         return result.responseCode == BillingClient.BillingResponseCode.OK
     }
 
-    private companion object {
-        const val TAG = "BillingRepository"
+    companion object {
+        private const val TAG = "BillingRepository"
+
+        /**
+         * Play's own page for this subscription: cancel, change payment
+         * method, see the renewal date. Play's subscriptions policy requires
+         * an easy way to cancel from inside the app, and this is the only
+         * place a cancellation can actually happen — the app cannot cancel
+         * anything itself.
+         */
+        fun manageSubscriptionUrl(packageName: String): String =
+            "https://play.google.com/store/account/subscriptions" +
+                "?sku=${BillingIds.SUBSCRIPTION_PRODUCT_ID}&package=$packageName"
     }
 }
 
@@ -354,6 +365,15 @@ data class SubscriptionOffers(
     val standardOfferToken: String?,
     /** e.g. "2.20 ILS" — Play's own localised string, never built by us. */
     val formattedPrice: String?,
+    /**
+     * ISO-8601 length of the free phase as Play has it configured ("P1M",
+     * "P30D"), or null when there is no trial. Shown on the paywall through
+     * [hebrewPeriod] rather than a hardcoded "30 יום": the screen must promise
+     * exactly what the checkout will sell.
+     */
+    val trialPeriod: String? = null,
+    /** ISO-8601 billing period of the paid plan, e.g. "P1M". */
+    val billingPeriod: String? = null,
 ) {
     val hasFreeTrial: Boolean get() = trialOfferToken != null
 
@@ -388,6 +408,10 @@ data class SubscriptionOffers(
                 trialOfferToken = trial?.offerToken,
                 standardOfferToken = standard?.offerToken,
                 formattedPrice = price,
+                trialPeriod = trial?.pricingPhases?.pricingPhaseList
+                    ?.firstOrNull { it.priceAmountMicros == 0L }?.billingPeriod,
+                billingPeriod = standard?.pricingPhases?.pricingPhaseList
+                    ?.lastOrNull { it.priceAmountMicros > 0L }?.billingPeriod,
             )
         }
     }

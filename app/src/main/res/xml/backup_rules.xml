@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pre-Android-12 equivalent of data_extraction_rules.xml (see the note there). -->
+<!-- Pre-Android-12 equivalent of data_extraction_rules.xml (see the note there,
+     including why the device_sharedpref entries are the ones that matter). -->
 <full-backup-content>
     <exclude domain="file" path="datastore/" />
     <exclude domain="sharedpref" path="scheduling_shadow.xml" />
     <exclude domain="sharedpref" path="entitlement_shadow.xml" />
+    <exclude domain="device_sharedpref" path="scheduling_shadow.xml" />
+    <exclude domain="device_sharedpref" path="entitlement_shadow.xml" />
 </full-backup-content>

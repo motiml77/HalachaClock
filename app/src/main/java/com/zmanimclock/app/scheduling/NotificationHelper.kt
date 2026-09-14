@@ -68,8 +68,12 @@ class NotificationHelper @Inject constructor(
         private const val CHANNEL_SERVICE_LEGACY = "zmanim_service"
         private const val CHANNEL_SERVICE_V2 = "zmanim_status_v2"
 
+        /** "The subscription ended, your alarms are off" — see [showSubscriptionLapsed]. */
+        const val CHANNEL_ACCOUNT = "zmanim_account"
+
         const val ALARM_NOTIFICATION_ID = 1001
         const val STATUS_NOTIFICATION_ID = 1002
+        const val SUBSCRIPTION_LAPSED_NOTIFICATION_ID = 1003
 
         /** style-1D primary — notification accent. */
         private const val ACCENT = 0xFF123A8B.toInt()
@@ -132,6 +136,67 @@ class NotificationHelper @Inject constructor(
 
     fun cancelOngoingStatus() {
         context.getSystemService<NotificationManager>()?.cancel(STATUS_NOTIFICATION_ID)
+    }
+
+    /**
+     * Tells the user, in words, that their alarms are OFF because the
+     * subscription is.
+     *
+     * This is the half of the owner's choice that makes "the alarms stop too"
+     * acceptable for an app people daven by: an alarm must never go silent
+     * without the person knowing. Posted the moment alarms are disarmed (so
+     * usually the evening before, not at 5am) and again if a stale trigger
+     * fires anyway. Replaces itself — one notification, however often posted.
+     */
+    fun showSubscriptionLapsed(unverified: Boolean = false) {
+        val manager = context.getSystemService<NotificationManager>() ?: return
+        val open = PendingIntent.getActivity(
+            context,
+            SUBSCRIPTION_LAPSED_NOTIFICATION_ID,
+            Intent(context, com.zmanimclock.app.MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        // Two different truths, two different messages. "The subscription
+        // ended" said to a subscriber whose phone simply could not reach
+        // Google Play for weeks would be a false accusation — see
+        // AccessPolicy.blockedOnlyForLackOfVerification.
+        val title = if (unverified) {
+            "לא הצלחנו לאמת את המנוי — השעונים המעוררים לא יצלצלו"
+        } else {
+            "המנוי הסתיים — השעונים המעוררים לא יצלצלו"
+        }
+        val text = if (unverified) {
+            "התחבר לאינטרנט ופתח את האפליקציה כדי להפעיל מחדש את השעונים"
+        } else {
+            "הקש כדי לחדש את המנוי ולהפעיל מחדש את השעונים"
+        }
+        val big = if (unverified) {
+            "כבר זמן רב לא הצלחנו להתחבר ל-Google Play כדי לאמת את המנוי, ולכן השעונים " +
+                "המעוררים כבויים. השעונים שלך שמורים — ודא שיש חיבור לאינטרנט ושחנות Play " +
+                "פעילה, ופתח את האפליקציה. ברגע שהמנוי יאומת הם יופעלו מחדש אוטומטית."
+        } else {
+            "המנוי לשעון מעורר - זמנים הלכתיים אינו פעיל, ולכן השעונים המעוררים " +
+                "כבויים. השעונים שלך שמורים — ברגע שהמנוי יחודש הם יופעלו מחדש " +
+                "אוטומטית. הקש כדי לחדש."
+        }
+        val notification = NotificationCompat.Builder(context, CHANNEL_ACCOUNT)
+            .setSmallIcon(R.drawable.ic_stat_zman)
+            .setColor(ACCENT)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(big))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setAutoCancel(true)
+            .setContentIntent(open)
+            .build()
+        manager.notify(SUBSCRIPTION_LAPSED_NOTIFICATION_ID, notification)
+    }
+
+    fun cancelSubscriptionLapsed() {
+        context.getSystemService<NotificationManager>()?.cancel(SUBSCRIPTION_LAPSED_NOTIFICATION_ID)
     }
 
     fun createChannels() {
@@ -200,9 +265,18 @@ class NotificationHelper @Inject constructor(
         // Retire the old status channels so upgraders don't keep their settings
         // locked in — a channel's importance/sound/vibration are immutable
         // once created, so bumping the id is the only way to change them.
+        val account = NotificationChannel(
+            CHANNEL_ACCOUNT,
+            "מנוי",
+            NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            description = "הודעה כשהמנוי הסתיים והשעונים המעוררים כבויים"
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+        }
+
         runCatching { manager.deleteNotificationChannel(CHANNEL_SERVICE_LEGACY) }
         runCatching { manager.deleteNotificationChannel(CHANNEL_SERVICE_V2) }
-        manager.createNotificationChannels(listOf(alarm, alarmFallback, reminder, service))
+        manager.createNotificationChannels(listOf(alarm, alarmFallback, reminder, service, account))
     }
 
     /**

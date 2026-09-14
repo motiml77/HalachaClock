@@ -81,6 +81,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
+    val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Enabling the persistent status line is pointless without notification
@@ -175,8 +176,31 @@ fun SettingsScreen(
                 Intent(Intent.ACTION_VIEW, android.net.Uri.parse(PRIVACY_POLICY_URL))
             )
         },
+        subscription = SubscriptionStatus(
+            paywallEnabled = com.zmanimclock.app.BuildConfig.PAYWALL_ENABLED,
+            entitlement = entitlement,
+        ),
+        onManageSubscription = {
+            runCatching {
+                context.startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        android.net.Uri.parse(
+                            com.zmanimclock.app.feature.subscription.BillingRepository
+                                .manageSubscriptionUrl(context.packageName),
+                        ),
+                    )
+                )
+            }
+        },
     )
 }
+
+/** What the subscription card shows. A plain value so SettingsContent stays previewable. */
+data class SubscriptionStatus(
+    val paywallEnabled: Boolean,
+    val entitlement: com.zmanimclock.app.feature.subscription.Entitlement,
+)
 
 /** Also the URL declared to Google Play under App content → Privacy policy. */
 const val PRIVACY_POLICY_URL = "https://github.com/motiml77/HalachaClock/blob/main/PRIVACY.md"
@@ -199,6 +223,8 @@ fun SettingsContent(
     onRequestFullScreen: () -> Unit = {},
     onOpenAutostart: () -> Unit = {},
     onOpenPrivacyPolicy: () -> Unit = {},
+    subscription: SubscriptionStatus? = null,
+    onManageSubscription: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -419,6 +445,8 @@ fun SettingsContent(
 
         SectionHeader("מערכת")
 
+        subscription?.let { SubscriptionCard(it, onManageSubscription) }
+
         // Permissions — always reachable, and loud when something is missing.
         PermissionsCard(onOpen = onOpenPermissions)
 
@@ -558,6 +586,41 @@ private fun SettingsCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         content = content,
     )
+}
+
+/**
+ * The subscription, as the user can see it: whether it is active, and the one
+ * way to cancel or change it — Play's own page. Play's subscriptions policy
+ * requires that path to be reachable from inside the app.
+ *
+ * In a closed-testing build it says so, in so many words. That line is also
+ * the check before uploading a production bundle: if it still reads "גרסת
+ * בדיקה", the bundle was built without -Ppaywall=true and would give the app
+ * away.
+ */
+@Composable
+private fun SubscriptionCard(status: SubscriptionStatus, onManage: () -> Unit) {
+    val e = status.entitlement
+    SettingsCard {
+        Column(Modifier.padding(16.dp)) {
+            Text("מנוי", style = MaterialTheme.typography.titleMedium)
+            Text(
+                when {
+                    !status.paywallEnabled -> "גרסת בדיקה — ללא חיוב"
+                    e.state == com.zmanimclock.app.feature.subscription.EntitlementState.ENTITLED -> "המנוי פעיל"
+                    e.isRunningOnCache -> "המנוי פעיל (לא נבדק לאחרונה — אין חיבור ל-Google Play)"
+                    else -> "המנוי אינו פעיל"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            if (status.paywallEnabled) {
+                OutlinedButton(onClick = onManage, modifier = Modifier.padding(top = 10.dp)) {
+                    Text("ניהול מנוי ב-Google Play")
+                }
+            }
+        }
+    }
 }
 
 /** A quiet group label: small, primary-coloured, with air above it. */

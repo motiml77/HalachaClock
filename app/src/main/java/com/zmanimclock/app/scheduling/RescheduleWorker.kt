@@ -23,10 +23,24 @@ class RescheduleWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val alarmScheduler: AlarmScheduler,
+    private val billingRepository: com.zmanimclock.app.feature.subscription.BillingRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
+            // Ask Play first, so this run arms against today's answer. Without
+            // it, a subscriber who cancelled and never opens the app again
+            // keeps a cached YES — and, since a stale YES deliberately still
+            // rings (AccessPolicy.alarmsAllowed), keeps their alarms forever.
+            // This worker runs daily whether or not the app is ever opened,
+            // which bounds that to a day. Bounded by a timeout so a wedged
+            // Play service can never stop alarms from being re-armed; a failed
+            // query leaves the cache untouched, which is the safe direction.
+            if (com.zmanimclock.app.BuildConfig.PAYWALL_ENABLED) {
+                runCatching {
+                    kotlinx.coroutines.withTimeoutOrNull(BILLING_TIMEOUT_MS) { billingRepository.refresh() }
+                }.onFailure { Log.w(TAG, "Entitlement refresh failed; using cache", it) }
+            }
             alarmScheduler.rescheduleAll()
             StatusNotificationReceiver.ping(applicationContext)
             com.zmanimclock.app.feature.widget.ZmanWidgetProvider.refresh(applicationContext)
@@ -40,6 +54,7 @@ class RescheduleWorker @AssistedInject constructor(
     companion object {
         private const val TAG = "RescheduleWorker"
         const val PERIODIC_WORK_NAME = "daily_alarm_reschedule"
+        private const val BILLING_TIMEOUT_MS = 15_000L
 
         /**
          * The unique work name every one-off reschedule request should use.
