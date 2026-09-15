@@ -14,8 +14,16 @@ import java.time.LocalDate
  * הנץ מישור is a DISPLAY row and must stay one.
  *
  * The request was explicitly "show it without affecting anything else", so
- * these tests pin the "anything else" half: adding the row must not move a
- * single computed value, and it must not show the same instant twice.
+ * these tests pin the "anything else" half: showing the row — and, since the
+ * owner's later call, showing it even on a day it rounds to the same
+ * displayed minute as הנץ — must not move a single computed value.
+ *
+ * It is shown whenever there is an actual visible netz to compare against
+ * (basedOnVisibleSunrise), even if the two happen to land in the same
+ * displayed minute today. It stays hidden with no terrain data at all,
+ * because then הנץ has already fallen back to this same value — there is no
+ * second measurement in that case, just one number under two identical
+ * "(מישור)"-suffixed labels.
  */
 class HanetzMishorTest {
 
@@ -48,20 +56,16 @@ class HanetzMishorTest {
     }
 
     @Test
-    fun `a visible netz inside the same minute is still suppressed`() {
-        // Caught on a device, not by the first version of this test: Jerusalem
-        // HAS ChaiTables data, but its visible netz falls in the same minute
-        // as the mishor one, so gating on "terrain data exists" printed
-        // 05:58 twice. What matters is whether the rendered minute differs.
+    fun `a visible netz inside the same minute still gets its own row`() {
+        // Owner's call: always show it, even when it renders as the same
+        // clock minute as הנץ (the two rows then repeat each other's time).
         val mishor = engine.calculate(jerusalem, date).hanetzMishor!!
         val sameMinute = engine.calculate(
             jerusalem, date, visibleSunrise = mishor.plus(Duration.ofSeconds(8)),
         )
         assertTrue(
-            "a visible netz 8s later renders as the same minute and must not add a row",
-            sameMinute.relevantTimedZmanim(date).none { it.first == ZmanKind.HANETZ_MISHOR },
+            sameMinute.relevantTimedZmanim(date).any { it.first == ZmanKind.HANETZ_MISHOR },
         )
-        // One minute apart is a different number on screen, so it does appear.
         val nextMinute = engine.calculate(
             jerusalem, date, visibleSunrise = mishor.plus(Duration.ofMinutes(1)),
         )
@@ -71,14 +75,16 @@ class HanetzMishorTest {
     }
 
     @Test
-    fun `without terrain data the row is suppressed instead of duplicating הנץ`() {
-        // HANETZ already falls back to the mishor time, so listing both would
-        // print one moment twice — which reads as a bug, not as information.
+    fun `without terrain data the row is still suppressed instead of duplicating הנץ`() {
+        // Not the same case as "same minute" above: with NO terrain data at
+        // all, HANETZ has already fallen back to this exact hanetzMishor
+        // value (and carries the same "(מישור)" label via hebrewNameOf), so
+        // there is no second measurement to show — only one number, twice.
         val day = engine.calculate(jerusalem, date)
         val rows = day.relevantTimedZmanim(date)
         assertEquals(day.hanetzMishor, day.instantOf(ZmanKind.HANETZ))
         assertTrue(
-            "הנץ מישור must not be listed when it equals הנץ",
+            "הנץ מישור must not be listed when HANETZ is already the mishor value",
             rows.none { it.first == ZmanKind.HANETZ_MISHOR },
         )
     }

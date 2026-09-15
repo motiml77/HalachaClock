@@ -6,7 +6,6 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.util.GregorianCalendar
 
 /**
@@ -161,12 +160,16 @@ fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>
     val zone = ZoneId.of(location.timeZoneId)
     return ZmanKind.entries
         .filter { kind -> isZmanRelevantOn(kind, date, zone) }
-        // הנץ מישור earns a row only when the user would actually READ a
-        // different number. "A visible netz exists" is not that test: in
-        // Jerusalem the terrain time lands in the same minute as the mishor
-        // one, so gating on existence printed 05:58 twice. Gate on the
-        // displayed minute instead — the same unit the row is rendered in.
-        .filter { kind -> kind != ZmanKind.HANETZ_MISHOR || showsDistinctMishorNetz(zone) }
+        // הנץ מישור is always shown ALONGSIDE a real visible netz, even when
+        // the two happen to round to the same displayed minute — the owner's
+        // call, so the few-second-to-few-minute gap is visible to anyone who
+        // wants it, not just on days it clears a whole minute. It is still
+        // hidden when there is no terrain data at all: then HANETZ has
+        // already fallen back to this exact same value (see hebrewNameOf's
+        // "(מישור)" suffix on HANETZ itself), so the row would repeat one
+        // number under two identical labels — not a second measurement, the
+        // same one twice.
+        .filter { kind -> kind != ZmanKind.HANETZ_MISHOR || basedOnVisibleSunrise }
         .mapNotNull { kind -> instantOf(kind)?.let { kind to it } }
         .sortedBy { (_, instant) -> instant }
 }
@@ -245,20 +248,6 @@ fun nextRelevantZman(
         ?.let { ZmanKind.CHATZOT_LAYLA to it }
     return (if (fromYesterday != null) candidates + fromYesterday else candidates)
         .minByOrNull { (_, instant) -> instant }
-}
-
-/**
- * Whether הנץ מישור would render as a different clock time from הנץ.
- *
- * Compared at MINUTE resolution in the location's own zone, because that is
- * what the list shows: two instants seconds apart are the same row to a
- * reader, and printing them twice reads as a bug rather than as information.
- */
-private fun DayZmanim.showsDistinctMishorNetz(zone: ZoneId): Boolean {
-    val visible = hanetzVisible ?: return false
-    val mishor = hanetzMishor ?: return false
-    return visible.atZone(zone).truncatedTo(ChronoUnit.MINUTES) !=
-        mishor.atZone(zone).truncatedTo(ChronoUnit.MINUTES)
 }
 
 /** The concrete time of [kind] on this day (visible-netz-based when available). */
