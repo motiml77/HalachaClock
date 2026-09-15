@@ -211,7 +211,17 @@ dependencies {
     // The halachic engine + the luach verification tests. KosherJava comes in
     // transitively (declared `api` there), so it is not repeated here — one
     // module owns the version.
-    implementation(project(":zmanim-engine"))
+    //
+    // org.json excluded: :zmanim-engine needs a REAL org.json to parse the
+    // bundled ChaiTables asset in its own compile/test scope and for the
+    // desktop build, which has no platform-provided one. A real device
+    // already provides org.json itself; bundling a second copy into the APK
+    // is dead weight this app has never needed at runtime. The unit-test
+    // classpath is unaffected — it gets its own real org.json below,
+    // because the mockable android.jar's JSONObject cannot actually parse.
+    implementation(project(":zmanim-engine")) {
+        exclude(group = "org.json", module = "json")
+    }
 
 
     // Google Play Billing — the monthly subscription.

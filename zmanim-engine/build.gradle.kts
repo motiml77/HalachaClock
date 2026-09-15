@@ -40,6 +40,10 @@ dependencies {
     // JSR-330, not Android. Kept so Hilt can constructor-inject the engine in
     // :app without this module knowing Hilt exists.
     api(libs.javax.inject)
+    // Parses the shared chai_tables_preloaded.json asset (ChaiTablesBundledAsset)
+    // — the real org.json, since neither :app's mockable android.jar nor a
+    // plain desktop JVM has one otherwise.
+    implementation(libs.org.json)
 
     testImplementation(libs.junit)
 }

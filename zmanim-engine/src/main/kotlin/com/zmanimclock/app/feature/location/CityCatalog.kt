@@ -3,9 +3,10 @@ package com.zmanimclock.app.feature.location
 /**
  * One place in the bundled city list.
  *
- * NOTE ON ELEVATION: carried for the ChaiTables metro lookup only. It is NOT
- * fed into the astronomical calculation — see EngineLocation and the mishor
- * doctrine in MaranZmanimEngine.
+ * NOTE ON ELEVATION: fed into EngineLocation on every platform — the
+ * seasonal-hour grid runs on the elevation-based sunrise (see
+ * MaranZmanimEngine), not sea level. Already clamped to >= 0 here for
+ * below-sea-level localities (KosherJava throws on a negative value).
  */
 data class CityInfo(
     val id: String,

@@ -265,25 +265,30 @@ class ChaiTablesRepository @Inject constructor(
             return null // corrupt row — fall back to the astronomical sunrise
         }
         val zone = ZoneId.of(location.timeZone.id)
-        val stored = LocalTime.of(entry.sunriseHour, entry.sunriseMinute, entry.sunriseSecond)
 
+        // Prefer the row's OWN recorded date — shared with the bundled-asset
+        // loader (ChaiTablesBundledAsset.rebasedInstant) so both paths use the
+        // exact same DST correction. A Hebrew year spans two Gregorian years,
+        // so inferring the year from fetchedAt is wrong for roughly half the
+        // rows, and since Israel's DST boundary moves annually, that mis-dating
+        // shows up as a full-hour error on the days between the two years'
+        // boundaries. Rows with no source date (only possible from an asset
+        // older than this one, or an already-cached live fetch predating
+        // sourceEpochDay) fall back to the old heuristic.
+        if (entry.sourceEpochDay > 0) {
+            return ChaiTablesBundledAsset.rebasedInstant(
+                entry.sunriseHour, entry.sunriseMinute, entry.sunriseSecond,
+                entry.sourceEpochDay, date, zone.id,
+            )
+        }
+
+        val stored = LocalTime.of(entry.sunriseHour, entry.sunriseMinute, entry.sunriseSecond)
         val corrected = runCatching {
             val rules = zone.rules
-            // Prefer the row's OWN recorded date. A Hebrew year spans two
-            // Gregorian years, so inferring the year from fetchedAt is wrong
-            // for roughly half the rows — and since Israel's DST boundary
-            // moves annually, that mis-dating shows up as a full-hour error on
-            // the days between the two years' boundaries. Older rows (and the
-            // bundled asset) have no source date, so they keep the old
-            // heuristic, which is right for the majority of the table.
-            val sourceDate = entry.sourceEpochDay
-                .takeIf { it > 0 }
-                ?.let { LocalDate.ofEpochDay(it) }
-                ?: SolarDayKey.toDate(
-                    entry.dayOfYear,
-                    Instant.ofEpochMilli(entry.fetchedAt).atZone(zone).year,
-                )
-                ?: return@runCatching stored
+            val sourceDate = SolarDayKey.toDate(
+                entry.dayOfYear,
+                Instant.ofEpochMilli(entry.fetchedAt).atZone(zone).year,
+            ) ?: return@runCatching stored
             val sourceOffset = rules.getOffset(sourceDate.atTime(stored))
             val targetOffset = rules.getOffset(date.atTime(stored))
             stored.plusSeconds((targetOffset.totalSeconds - sourceOffset.totalSeconds).toLong())

@@ -64,13 +64,10 @@ data class DayView(
  * platforms. Pinned by DesktopMatchesPhoneTest, which compares real elevation
  * on both sides rather than assuming agreement.
  *
- * CURRENT LIMITATION, STATED RATHER THAN HIDDEN: the ChaiTables visible-sunrise
- * layer is not wired up yet, so this build never has a terrain-based netz and
- * reports basedOnVisibleSunrise = false. The UI shows the same muted "מישור"
- * tag Android shows when IT has no terrain data, so the difference is visible
- * to the user rather than silent. Only the הנץ row is affected by this
- * particular limitation — every other zman, including the elevation-driven
- * grid, already matches Android exactly.
+ * The visible netz uses the same bundled ChaiTables asset Android ships
+ * with ([DesktopChaiTablesRepository]) — no live network fetch here, so a
+ * city outside that bundled set falls back to the mishor sunrise, exactly
+ * like Android does for an unsupported or offline city.
  */
 class DesktopZmanimService(initialPrefs: DesktopPrefs) {
 
@@ -78,6 +75,7 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
         private set
 
     private val engine = MaranZmanimEngine()
+    private val chaiTables = DesktopChaiTablesRepository()
     private val dayCache = object : LinkedHashMap<LocalDate, DayZmanim>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<LocalDate, DayZmanim>) = size > 90
     }
@@ -127,6 +125,7 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
             engine.calculate(
                 location = location(),
                 date = date,
+                visibleSunrise = chaiTables.getVisibleSunrise(city.id, date, city.timeZoneId),
                 candleLightingOffsetMinutes = prefs.candleLightingMinutes,
                 tzeitShabbatMinutes = prefs.tzeitShabbatMinutes,
             )

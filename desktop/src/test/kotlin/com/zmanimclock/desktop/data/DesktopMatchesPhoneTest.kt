@@ -37,6 +37,7 @@ import java.time.ZoneId
 class DesktopMatchesPhoneTest {
 
     private val engine = MaranZmanimEngine()
+    private val chaiTables = DesktopChaiTablesRepository()
 
     /**
      * Deliberately spread: latitude, elevation, season, and both DST edges.
@@ -78,7 +79,13 @@ class DesktopMatchesPhoneTest {
         // Android — a hardcoded 0.0 here would silently match it against
         // whatever the desktop happens to use instead of actually comparing.
         val loc = EngineLocation(c.nameHebrew, c.latitude, c.longitude, c.elevation, c.timeZoneId)
-        val day = engine.calculate(loc, date)
+        // The real visible sunrise for a bundled city (ChaiTablesPreloaderTest
+        // pins Android's own Room-backed lookup to these same values) —
+        // omitting it would silently match the desktop against a "phone"
+        // that never has terrain data, hiding exactly the drift this test
+        // exists to catch.
+        val visibleSunrise = chaiTables.getVisibleSunrise(cityId, date, c.timeZoneId)
+        val day = engine.calculate(loc, date, visibleSunrise = visibleSunrise)
         return day.relevantTimedZmanim(date)
             // hebrewNameOf, not kind.hebrewName: the netz row is renamed per
             // day depending on whether it is the visible or the mishor sunrise,
@@ -136,10 +143,10 @@ class DesktopMatchesPhoneTest {
     }
 
     /**
-     * The desktop's own zman list must not lose a kind the engine offers. If a
-     * row is deliberately unavailable there — as the ChaiTables visible-sunrise
-     * layer currently is — it must be missing on BOTH platforms for the same
-     * date, never on one alone.
+     * The desktop's own zman list must not lose a kind the engine offers. For
+     * a city with no bundled ChaiTables data (no live network fetch on
+     * desktop), the visible-netz row is unavailable — it must be missing on
+     * BOTH platforms for the same date, never on one alone.
      */
     @Test
     fun `no zman kind is shown on one platform and hidden on the other`() {
