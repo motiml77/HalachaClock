@@ -157,6 +157,16 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Without this, any unmocked Android framework call (e.g.
+            // android.util.Log, used by ChaiTablesPreloader/Repository) throws
+            // "Method ... not mocked" and the test fails before its own logic
+            // even runs.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -222,4 +232,5 @@ dependencies {
 
     // Unit tests (zmanim engine verification against the luach)
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }

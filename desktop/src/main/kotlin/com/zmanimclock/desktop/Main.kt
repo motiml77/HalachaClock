@@ -384,8 +384,8 @@ private fun runApp(args: Array<String>) = application {
 private enum class MainTab(val label: String, val width: Dp) {
     // Every width here is the MEASURED floor, not a guess: each pane was
     // rendered offscreen at a sweep of widths and read for clipping.
-    //   320 — the zman list. At 300 the long labels ("פלג המנחה (מהשקיעה)",
-    //         "הנץ החמה (מישורי)") touch the row edge with no margin left.
+    //   320 — the zman list. At 300 the longest label ("פלג המנחה (מהשקיעה)")
+    //         touches the row edge with no margin left.
     //   660 — the calendar: the fixed zmanim column PLUS room for the month.
     //         The two sides used to split the window 45/55, which meant
     //         opening the calendar re-proportioned the zmanim list instead of

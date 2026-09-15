@@ -21,6 +21,7 @@ jsoup = "1.17.2"
 okhttp = "4.12.0"
 desugar = "2.1.3"
 junit = "4.13.2"
+orgJson = "20240303"
 javaxInject = "1"
 composeMultiplatform = "1.10.0"
 jna = "5.14.0"
@@ -91,6 +92,10 @@ desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", ver
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+# Real org.json for :app unit tests — the mockable android.jar's JSONObject
+# does not actually parse, so anything exercising ChaiTablesPreloader's real
+# asset-loading code needs this on the unit-test runtime classpath.
+org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaxInject" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 jna-platform = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }

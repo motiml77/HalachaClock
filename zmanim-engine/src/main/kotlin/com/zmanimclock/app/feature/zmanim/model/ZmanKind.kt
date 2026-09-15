@@ -20,7 +20,7 @@ import java.util.GregorianCalendar
  * selection goes through [canonicalNames] for the same reason.
  *
  * [hebrewName] is the full list label, carrying the shita qualifier, and is
- * what notifications fall back to; screens localize via resources.
+ * what notifications fall back to.
  * [shortName] is the compact display used in notifications — no degree or
  * minute suffixes, per the user's preference.
  */
@@ -29,13 +29,20 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
     ALOT_HASHACHAR("עלות השחר"),
     MISHEYAKIR("משיכיר"),
     HANETZ("הנץ החמה"),
-    // Display only. HANETZ already falls back to the mishor time when no
-    // ChaiTables data exists, so this row exists purely so that a user WITH
-    // terrain data can also see the plain astronomical sunrise. It feeds
-    // nothing: the seasonal-hour grid was always built on the mishor day
-    // regardless (see MaranZmanimEngine), so adding this row changes no
-    // computed value anywhere.
-    HANETZ_MISHOR("הנץ מישור (אסטרונומי)", "הנץ מישור"),
+    // Display only. HANETZ already falls back to the mishor (sea-level) time
+    // when no ChaiTables terrain data exists, so this row exists purely so
+    // that a user WITH terrain data can also see the plain sea-level
+    // sunrise. It feeds nothing: the seasonal-hour grid is built on the
+    // ELEVATION sunrise regardless (see MaranZmanimEngine), so adding this
+    // row changes no computed value anywhere.
+    //
+    // "(מישור)" — never "(אסטרונומי)": ChaiTables and 2net both use
+    // "astronomical" for a THIRD sunrise (elevation only, ignoring terrain),
+    // and Yalkut Yosef 89:3 uses it for the luach's VISIBLE netz — the
+    // opposite of what this row shows. "מישור" had one meaning in every
+    // source checked: the flat, sea-level horizon. Same wording the ROY
+    // Android app (Rav Yitzchak Yosef haskama) uses for this row.
+    HANETZ_MISHOR("הנץ החמה (מישור)", "הנץ מישור"),
     // TWO MGA readings of each morning deadline, and the suffix says which:
     // _72_ZMANIYOT is the luach's own shita — the day stretched by 72
     // ZMANIYOT minutes at each end — while _16_1_DEG is the fixed 16.1° solar
@@ -135,7 +142,7 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
  * The name to print for [kind] ON THIS DAY.
  *
  * Almost every zman's name is fixed, but the netz row's is not: the app shows
- * either the terrain-corrected visible sunrise or the sea-level astronomical
+ * either the terrain-corrected visible sunrise or the plain sea-level (מישור)
  * one, and which of the two it got depends on whether ChaiTables data exists
  * for this place. That difference used to be announced by a "מישור" / "הנץ
  * הנראה" badge at the top of the screen — a label parked over the WHOLE day
@@ -147,7 +154,7 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
  * gone. Both platforms call this, so neither can drift from the other.
  */
 fun DayZmanim.hebrewNameOf(kind: ZmanKind): String =
-    if (kind == ZmanKind.HANETZ && !basedOnVisibleSunrise) "${kind.hebrewName} (מישורי)"
+    if (kind == ZmanKind.HANETZ && !basedOnVisibleSunrise) "${kind.hebrewName} (מישור)"
     else kind.hebrewName
 
 fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>> {

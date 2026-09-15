@@ -7,6 +7,7 @@ import com.zmanimclock.app.feature.chaitables.data.local.ChaiTablesEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -14,8 +15,9 @@ import javax.inject.Singleton
 /**
  * Loads pre-bundled ChaiTables visible sunrise data from the shared module on first launch.
  *
- * The data covers 8 Israeli metro areas with 365 entries each (one per Gregorian day-of-year).
- * Cities without direct ChaiTables terrain data are mapped to the nearest metro area.
+ * The data covers 8 Israeli metro areas with one row per (month, day) for a
+ * full solar year each. Cities without direct ChaiTables terrain data are
+ * mapped to the nearest metro area.
  *
  * This eliminates the need for network access for Israeli cities.
  */
@@ -29,67 +31,59 @@ class ChaiTablesPreloader @Inject constructor(
         // On the classpath, in :zmanim-engine — one copy, shared with the
         // desktop build, for the same reason cities.json moved there.
         private const val ASSET_FILE = "/chai_tables_preloaded.json"
-        private const val MIN_ENTRIES_PER_METRO = 300
+
+        // A reserved location key — never a real city or metro id — that
+        // holds one row recording which asset VERSION is already loaded.
+        // Older code gated on "does jerusalem already have ≥300 rows",
+        // which could never tell a stale table from a fresh one: an app
+        // update that ships a corrected asset (e.g. fixing the 2026-10-25
+        // DST bug) needs its rows to overwrite the old ones on every
+        // existing install, not just on a clean database. The version
+        // number is stashed in the row's sunriseHour field, the same way
+        // ChaiTablesRepository reuses entity fields for its own markers
+        // (FETCHED_YEAR_HOUR, the sentinel).
+        private const val VERSION_LOCATION_KEY = "__preloaded_version__"
+        private const val VERSION_MARKER_DAY = 1
     }
 
     /**
-     * Load pre-bundled data into Room database if not already loaded.
-     * Should be called once at app startup.
+     * Load pre-bundled data into Room database if the bundled asset is newer
+     * than what is already loaded. Should be called once at app startup.
      *
-     * @return true if data was loaded or already exists
+     * @return true if data is loaded (already current, or loaded just now)
      */
     suspend fun ensureDataLoaded(): Boolean = withContext(Dispatchers.IO) {
         try {
-            // Check if data already exists for Jerusalem (our canary city)
-            val existingCount = dao.getCountForLocation("jerusalem")
-            if (existingCount >= MIN_ENTRIES_PER_METRO) {
-                Log.d(TAG, "Pre-loaded data already exists ($existingCount entries for jerusalem)")
+            val jsonStr = javaClass.getResourceAsStream(ASSET_FILE)!!.bufferedReader().use { it.readText() }
+            val json = JSONObject(jsonStr)
+            val assetVersion = json.optInt("version", 1)
+
+            val installedVersion = dao.getSunrise(VERSION_LOCATION_KEY, VERSION_MARKER_DAY)?.sunriseHour ?: 0
+            if (installedVersion >= assetVersion) {
+                Log.d(TAG, "Pre-loaded data already at version $installedVersion")
                 return@withContext true
             }
 
-            Log.i(TAG, "Loading pre-bundled ChaiTables data...")
-            val jsonStr = javaClass.getResourceAsStream(ASSET_FILE)!!.bufferedReader().use { it.readText() }
-            val json = JSONObject(jsonStr)
-
-            // The Gregorian year whose day-of-year numbering the asset used.
-            // The bundled table covers a Hebrew year spanning two Gregorian
-            // years, but day-of-year → (month, day) is identical for both
-            // unless one is a leap year, so the generation year is the right
-            // reference to decode it with.
-            val assetSourceYear = json.optString("generatedAt", "")
-                .take(4).toIntOrNull() ?: 2026
-
+            Log.i(TAG, "Loading pre-bundled ChaiTables data (asset version $assetVersion, installed $installedVersion)...")
             val metros = json.getJSONObject("metros")
             val cityToMetro = json.getJSONObject("cityToMetro")
+            val now = System.currentTimeMillis()
             var totalEntries = 0
 
-            // Load each metro area's data
+            // Load each metro area's data. insertAll REPLACEs by primary key
+            // (locationKey, dayOfYear), so this naturally overwrites only the
+            // rows for these 8 keys — a live-fetched city under any other key
+            // is untouched.
             val metroNames = metros.keys()
             while (metroNames.hasNext()) {
                 val metroName = metroNames.next()
-                val entries = metros.getJSONArray(metroName)
-
-                val entities = mutableListOf<ChaiTablesEntity>()
-                for (i in 0 until entries.length()) {
-                    val entry = entries.getJSONArray(i)
-                    entities.add(
-                        ChaiTablesEntity(
-                            locationKey = metroName,
-                            dayOfYear = solarKey(entry.getInt(0), assetSourceYear),
-                            sunriseHour = entry.getInt(1),
-                            sunriseMinute = entry.getInt(2),
-                            sunriseSecond = entry.getInt(3),
-                            fetchedAt = System.currentTimeMillis(),
-                        )
-                    )
-                }
-
+                val entities = entitiesFromRows(metros.getJSONArray(metroName), metroName, now)
                 dao.insertAll(entities)
                 totalEntries += entities.size
                 Log.d(TAG, "Loaded $metroName: ${entities.size} entries")
             }
 
-            // Now create entries for mapped cities (aliases)
+            // Now create entries for mapped cities (aliases) — same overwrite reasoning.
             val cityKeys = cityToMetro.keys()
             while (cityKeys.hasNext()) {
                 val cityId = cityKeys.next()
@@ -98,32 +92,30 @@ class ChaiTablesPreloader @Inject constructor(
                 // Skip if cityId == metroName (already loaded)
                 if (cityId == metroName) continue
 
-                // Check if city data already exists
-                val cityCount = dao.getCountForLocation(cityId)
-                if (cityCount >= MIN_ENTRIES_PER_METRO) continue
-
-                // Copy metro data to city key
-                val metroEntries = metros.optJSONArray(metroName) ?: continue
-                val cityEntities = mutableListOf<ChaiTablesEntity>()
-                for (i in 0 until metroEntries.length()) {
-                    val entry = metroEntries.getJSONArray(i)
-                    cityEntities.add(
-                        ChaiTablesEntity(
-                            locationKey = cityId,
-                            dayOfYear = solarKey(entry.getInt(0), assetSourceYear),
-                            sunriseHour = entry.getInt(1),
-                            sunriseMinute = entry.getInt(2),
-                            sunriseSecond = entry.getInt(3),
-                            fetchedAt = System.currentTimeMillis(),
-                        )
-                    )
-                }
+                val metroRows = metros.optJSONArray(metroName) ?: continue
+                val cityEntities = entitiesFromRows(metroRows, cityId, now)
                 dao.insertAll(cityEntities)
                 totalEntries += cityEntities.size
                 Log.d(TAG, "Loaded $cityId (mapped from $metroName): ${cityEntities.size} entries")
             }
 
-            Log.i(TAG, "Pre-loaded $totalEntries total entries")
+            // Record the version LAST: if the process dies mid-load, the next
+            // launch retries the whole thing (insertAll is idempotent REPLACE)
+            // instead of getting stuck believing a half-written table is current.
+            dao.insertAll(
+                listOf(
+                    ChaiTablesEntity(
+                        locationKey = VERSION_LOCATION_KEY,
+                        dayOfYear = VERSION_MARKER_DAY,
+                        sunriseHour = assetVersion,
+                        sunriseMinute = 0,
+                        sunriseSecond = 0,
+                        fetchedAt = now,
+                    )
+                )
+            )
+
+            Log.i(TAG, "Pre-loaded $totalEntries total entries at version $assetVersion")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load pre-bundled ChaiTables data", e)
@@ -132,16 +124,24 @@ class ChaiTablesPreloader @Inject constructor(
     }
 
     /**
-     * The bundled asset stores Gregorian DAY-OF-YEAR for [sourceYear]. Convert
-     * it to the leap-safe (month, day) key so lookups are correct in every
-     * year — otherwise a table generated in a leap year is read one day off
-     * for the three following years.
+     * Each row is `[month, day, hour, minute, second, sourceEpochDay]`. The
+     * (month, day) pair keys the cache directly (that pair IS what
+     * [SolarDayKey] encodes), and sourceEpochDay is the row's own real
+     * Gregorian date — required so [ChaiTablesRepository] can re-base
+     * Israel's DST offset correctly instead of guessing the year from
+     * whenever the app happened to load this asset.
      */
-    private fun solarKey(dayOfYear: Int, sourceYear: Int): Int = runCatching {
-        val maxDay = if (java.time.Year.isLeap(sourceYear.toLong())) 366 else 365
-        SolarDayKey.of(
-            java.time.LocalDate.ofYearDay(sourceYear, dayOfYear.coerceIn(1, maxDay))
-        )
-    }.getOrDefault(dayOfYear)
-
+    private fun entitiesFromRows(rows: JSONArray, locationKey: String, fetchedAt: Long): List<ChaiTablesEntity> =
+        (0 until rows.length()).map { i ->
+            val row = rows.getJSONArray(i)
+            ChaiTablesEntity(
+                locationKey = locationKey,
+                dayOfYear = SolarDayKey.of(month = row.getInt(0), dayOfMonth = row.getInt(1)),
+                sunriseHour = row.getInt(2),
+                sunriseMinute = row.getInt(3),
+                sunriseSecond = row.getInt(4),
+                fetchedAt = fetchedAt,
+                sourceEpochDay = row.getLong(5),
+            )
+        }
 }

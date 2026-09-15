@@ -23,7 +23,10 @@ import java.time.LocalDate
 object SolarDayKey {
 
     /** month * 100 + dayOfMonth, e.g. 1 April → 401. */
-    fun of(date: LocalDate): Int = date.monthValue * 100 + date.dayOfMonth
+    fun of(date: LocalDate): Int = of(date.monthValue, date.dayOfMonth)
+
+    /** Same key, from a (month, dayOfMonth) pair with no year attached. */
+    fun of(month: Int, dayOfMonth: Int): Int = month * 100 + dayOfMonth
 
     /** The key to try when [of] has no row — 29 Feb falls back to 28 Feb. */
     fun fallbackFor(date: LocalDate): Int? =
