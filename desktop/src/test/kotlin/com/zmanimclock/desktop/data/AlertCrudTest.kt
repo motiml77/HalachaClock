@@ -148,11 +148,13 @@ class AlertCrudTest {
      */
     @Test
     fun `a large offset moves an alert past one on a later zman`() {
-        // Jerusalem, 26.8.2026: מנחה קטנה 16:28, שקיעה 19:10. Four hours
-        // before שקיעה is 15:10 — earlier than מנחה קטנה — so the alert hung
-        // off the LATER zman must sort FIRST. (The first draft of this test
-        // used two hours and failed: 17:10 is still after 16:28. Worth
-        // keeping the real numbers written down.)
+        // Jerusalem (at its real elevation, 786m), 26.8.2026: מנחה קטנה
+        // 16:30, שקיעה 19:14. Four hours before שקיעה is 15:14 — earlier
+        // than מנחה קטנה — so the alert hung off the LATER zman must sort
+        // FIRST. (The first draft of this test used two hours and failed:
+        // 17:10 is still after 16:28, the sea-level values from when the
+        // desktop hard-coded elevation 0. Worth keeping the real numbers
+        // written down.)
         val svc = service(
             alert(id = "late-zman", kind = ZmanKind.SHKIA, offset = -240),
             alert(id = "early-zman", kind = ZmanKind.MINCHA_KETANA, offset = 0),
@@ -161,8 +163,8 @@ class AlertCrudTest {
         val rows = svc.alertsInFiringOrder(LocalDate.of(2026, 8, 26))
 
         assertEquals(listOf("late-zman", "early-zman"), rows.map { it.alert.id })
-        assertEquals("15:10", rows.first().firesAt)
-        assertEquals("16:28", rows.last().firesAt)
+        assertEquals("15:14", rows.first().firesAt)
+        assertEquals("16:30", rows.last().firesAt)
     }
 
     /**

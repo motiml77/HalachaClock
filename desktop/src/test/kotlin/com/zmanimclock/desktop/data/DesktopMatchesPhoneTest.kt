@@ -74,7 +74,10 @@ class DesktopMatchesPhoneTest {
     private fun phoneRows(cityId: String, date: LocalDate): List<Pair<String, String>> {
         val c = CityCatalog.byId(cityId) ?: error("unknown city $cityId")
         val zone = ZoneId.of(c.timeZoneId)
-        val loc = EngineLocation(c.nameHebrew, c.latitude, c.longitude, 0.0, c.timeZoneId)
+        // The real elevation, exactly as ZmanimRepository passes it on
+        // Android — a hardcoded 0.0 here would silently match it against
+        // whatever the desktop happens to use instead of actually comparing.
+        val loc = EngineLocation(c.nameHebrew, c.latitude, c.longitude, c.elevation, c.timeZoneId)
         val day = engine.calculate(loc, date)
         return day.relevantTimedZmanim(date)
             // hebrewNameOf, not kind.hebrewName: the netz row is renamed per

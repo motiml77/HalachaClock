@@ -133,7 +133,7 @@ private fun LocationHalf(service: DesktopZmanimService, modifier: Modifier) {
                     "היישוב שנבחר. אם הזמנים בטלפון שונים — השווה קודם את " +
                     "הקואורדינטות, לרוב זה כל ההבדל.",
             )
-            Hint("הגובה אינו נכנס לחישוב — הכל לפי היום המישורי.")
+            Hint("הגובה של היישוב כן נכנס לחישוב, בדיוק כמו בטלפון — רק הנץ ושקיעה מישורית מוצגים תמיד בגובה פני הים.")
         }
 
         // The search box, the count and the list are ONE thing — picking a

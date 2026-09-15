@@ -58,12 +58,19 @@ data class DayView(
  * show different times for the same city and day. The only logic that lives
  * here is presentation: which datum headlines a day, and how notes are worded.
  *
+ * The city's real elevation is passed in below, exactly as Android's
+ * ZmanimRepository does, so the seasonal-hour grid (see MaranZmanimEngine —
+ * it runs on the ELEVATION day, not sea level) gives the same answer on both
+ * platforms. Pinned by DesktopMatchesPhoneTest, which compares real elevation
+ * on both sides rather than assuming agreement.
+ *
  * CURRENT LIMITATION, STATED RATHER THAN HIDDEN: the ChaiTables visible-sunrise
- * layer is not wired up yet, so this build computes on the mishor (sea-level)
- * day and reports basedOnVisibleSunrise = false. The UI shows the same muted
- * "מישור" tag Android shows when it has no terrain data, so the difference is
- * visible to the user rather than silent. Only the הנץ row is affected — the
- * seasonal-hour grid runs on the mishor day on both platforms regardless.
+ * layer is not wired up yet, so this build never has a terrain-based netz and
+ * reports basedOnVisibleSunrise = false. The UI shows the same muted "מישור"
+ * tag Android shows when IT has no terrain data, so the difference is visible
+ * to the user rather than silent. Only the הנץ row is affected by this
+ * particular limitation — every other zman, including the elevation-driven
+ * grid, already matches Android exactly.
  */
 class DesktopZmanimService(initialPrefs: DesktopPrefs) {
 
@@ -106,9 +113,12 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
         name = city.nameEnglish,
         latitude = city.latitude,
         longitude = city.longitude,
-        // Zero on purpose: the mishor doctrine. Terrain is ChaiTables' job,
-        // never elevation math. See MaranZmanimEngine.
-        elevationMeters = 0.0,
+        // The city's real height, same as Android's ZmanimRepository — the
+        // seasonal-hour grid runs on the elevation day (MaranZmanimEngine),
+        // so this must match the phone or the two builds silently diverge
+        // for every hill town. Already clamped to >= 0 in cities.json for
+        // below-sea-level localities (KosherJava throws on a negative value).
+        elevationMeters = city.elevation,
         timeZoneId = city.timeZoneId,
     )
 
