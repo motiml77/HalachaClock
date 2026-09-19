@@ -101,6 +101,17 @@ class NotificationHelper @Inject constructor(
             Intent(context, com.zmanimclock.app.MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        // Swiped away (Android 14+ allows it for anything that is not a
+        // foreground service) → straight back. Fires only for a USER dismissal,
+        // never when this code cancels or replaces the notification, so it
+        // cannot loop with cancelOngoingStatus() or the update below.
+        val restoreIntent = PendingIntent.getBroadcast(
+            context,
+            STATUS_NOTIFICATION_ID,
+            Intent(context, StatusNotificationReceiver::class.java)
+                .setAction(StatusNotificationReceiver.ACTION_DISMISSED),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         // A CUSTOM view guarantees the zman name is bold on every OEM skin —
         // the standard title slot is rendered in regular weight by several
         // skins, and partial StyleSpans get stripped. DecoratedCustomViewStyle
@@ -130,6 +141,7 @@ class NotificationHelper @Inject constructor(
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setContentIntent(contentIntent)
+            .setDeleteIntent(restoreIntent)
             .build()
         manager.notify(STATUS_NOTIFICATION_ID, notification)
     }

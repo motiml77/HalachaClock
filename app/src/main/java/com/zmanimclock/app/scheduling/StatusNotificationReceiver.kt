@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.zmanimclock.app.feature.zmanim.format.asZmanTime
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -32,6 +33,17 @@ import javax.inject.Inject
  * the current "next zman" passes — so the line flips right on time. Pinged
  * from app launch, boot/time changes, alarm reschedules and the settings
  * toggle.
+ *
+ * IT MUST ALSO HEAL. Since Android 14 a notification that is not tied to a
+ * foreground service can be swiped away, and this one is not. Two ways it
+ * comes back, both without the user opening the app:
+ *  - the notification's delete intent points here ([ACTION_DISMISSED]), so a
+ *    swipe re-posts it at once;
+ *  - the chain never sleeps longer than [STATUS_HEAL_INTERVAL] ([statusNextWake]),
+ *    so anything that removes the line WITHOUT a delete intent — an OEM
+ *    cleaner, "clear all" — is undone within minutes instead of at the next
+ *    zman, which can be hours away.
+ * The Settings switch stays the way to turn the line off for good.
  */
 @AndroidEntryPoint
 class StatusNotificationReceiver : BroadcastReceiver() {
@@ -43,6 +55,10 @@ class StatusNotificationReceiver : BroadcastReceiver() {
     @Inject lateinit var entitlementStore: com.zmanimclock.app.feature.subscription.EntitlementStore
 
     override fun onReceive(context: Context, intent: Intent) {
+        // Android 14+ lets the user swipe an ongoing notification away. The
+        // delete intent lands here, and the refresh below posts it straight
+        // back — that IS the recovery, so there is nothing else to do.
+        if (intent.action == ACTION_DISMISSED) Log.d(TAG, "Status line dismissed — restoring")
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
@@ -98,7 +114,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
             com.zmanimclock.app.feature.zmanim.model.nextRelevantZman(
                 dayToday, today, now, dayYesterday, prefs.nextZmanFilter,
             )
-        } ?: nextZman(location, cityId, today.plusDays(1), now, candle, tzeitShabbat)
+        } ?: nextZman(location, cityId, today.plusDays(1), now, candle, tzeitShabbat, prefs.nextZmanFilter)
         val zmanName = next?.first?.shortName ?: "—"
         val zmanTime = next?.let { (_, instant) -> instant.asZmanTime(zone) } ?: ""
 
@@ -144,10 +160,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         // them. That is the "stuck on an old time" report at its worst,
         // because it never recovers on its own.
         val am = context.getSystemService<AlarmManager>() ?: return
-        val wakeAt = next?.second?.plusSeconds(30)
-            // No zman to wait for: try again within the hour so a transient
-            // failure cannot become permanent.
-            ?: Instant.now().plusSeconds(3600)
+        val wakeAt = statusNextWake(next?.second, Instant.now())
         am.setAndAllowWhileIdle(
             AlarmManager.RTC,
             wakeAt.toEpochMilli(),
@@ -158,6 +171,14 @@ class StatusNotificationReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "StatusNotification"
         private const val REQUEST_CODE = 7001
+
+        /**
+         * Carried by the notification's delete intent: the user swiped the line
+         * away. [onReceive] treats it like any other ping — which re-posts it —
+         * but a distinct action keeps that PendingIntent separate from the
+         * AlarmManager one and says what happened in a log.
+         */
+        const val ACTION_DISMISSED = "com.zmanimclock.app.status.DISMISSED"
 
         /** Ask for an immediate refresh of the status notification. */
         fun ping(context: Context) {
@@ -180,6 +201,7 @@ class StatusNotificationReceiver : BroadcastReceiver() {
         now: Instant,
         candleLightingMinutes: Long,
         tzeitShabbatMinutes: Long,
+        filter: Set<String>,
     ): Pair<ZmanKind, Instant>? {
         // cacheOnly: a receiver must not hit the network (goAsync ~10s budget)
         val day = zmanimRepository.getDayZmanim(
@@ -188,7 +210,36 @@ class StatusNotificationReceiver : BroadcastReceiver() {
             tzeitShabbatMinutes = tzeitShabbatMinutes,
         )
         return day.relevantTimedZmanim(date)
-            .filter { (_, instant) -> instant.isAfter(now) }
+            // The same filter as nextRelevantZman's own tomorrow fallback
+            // (see WidgetRenderer) — otherwise the status line reverts to
+            // announcing every zman, unfiltered, the moment today's selected
+            // ones have all passed. That silent revert is exactly the "it
+            // just shows everything again" report.
+            .filter { (kind, instant) -> instant.isAfter(now) && (filter.isEmpty() || kind.name in filter) }
             .minByOrNull { (_, instant) -> instant }
     }
+}
+
+/**
+ * The longest the status chain may sleep before it looks again. Long enough to
+ * cost nothing (a cache-only read and one `notify`), short enough that a line
+ * something removed comes back before anyone has missed it. 15 minutes is also
+ * about the floor Android grants an inexact alarm while the device dozes, so a
+ * shorter cap would only be rounded up.
+ */
+internal val STATUS_HEAL_INTERVAL: Duration = Duration.ofMinutes(15)
+
+/** How long after a zman passes the line is re-drawn — after, so it reads the NEXT one. */
+private const val BOUNDARY_SLACK_SECONDS = 30L
+
+/**
+ * When the status chain should next run: 30 seconds after [nextZman] passes so
+ * the line flips right on time, but never later than [STATUS_HEAL_INTERVAL]
+ * from [now]. With no upcoming zman (no cached table yet, a failed lookup) it
+ * is simply the heal interval — the retry a transient failure needs.
+ */
+internal fun statusNextWake(nextZman: Instant?, now: Instant): Instant {
+    val healBy = now.plus(STATUS_HEAL_INTERVAL)
+    val atBoundary = nextZman?.plusSeconds(BOUNDARY_SLACK_SECONDS) ?: return healBy
+    return if (atBoundary.isBefore(healBy)) atBoundary else healBy
 }
