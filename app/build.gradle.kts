@@ -78,15 +78,26 @@ android {
         applicationId = "com.motiml77.halachaclock"
         minSdk = 26
         targetSdk = 36
-        // Bumped: Play requires a new versionCode per upload, and this build
-        // fixes real defects an adversarial pre-upload audit found in the
-        // first draft (com.motiml77.halachaclock v1 was never sent to
-        // testers) — wrong foreground-service type for the alarm ringer
-        // (mediaPlayback -> specialUse), a battery-optimization permission
-        // Play policy restricts and the alarm engine doesn't need, and the
-        // fixed-alarm timezone bug (AlarmScheduler.zoneFor).
-        versionCode = 4
-        versionName = "1.0.3"
+        // Play requires a UNIQUE versionCode across EVERY track, so each upload
+        // takes the next number, and one source is often built twice — once
+        // per paywall setting. History: 5, 7, 8 went to Internal Testing
+        // (paywall=true); 6, 9 to Closed Testing (paywall=false); 10 (Internal)
+        // and 11 (Closed) are the same source.
+        //
+        // 10/11: the status notification restores itself after being swiped
+        // away (a delete intent, plus a 15-minute cap on its wake chain), and
+        // the widget gains a שומר לערבית button that opens the zmanim screen's
+        // own dialog. Earlier in the 1.1 line: the visible-netz table rebuilt
+        // from real ChaiTables data, the מישור netz row shown beside a real
+        // visible one, the seasonal-hour grid on the device's real elevation,
+        // the "הזמן הבא" filter honoured by the status line's tomorrow
+        // fallback, and a redesigned paywall.
+        //
+        // versionName moves to 1.1.1 so Settings → Apps visibly changes when
+        // an update lands. versionCode alone is invisible there, and "did the
+        // phone actually take the new build" has been the recurring question.
+        versionCode = 11
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
