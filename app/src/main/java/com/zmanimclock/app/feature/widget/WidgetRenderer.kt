@@ -20,6 +20,7 @@ import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
+import com.zmanimclock.app.feature.zmanim.presentation.guardArmedAt
 import com.zmanimclock.app.scheduling.AlarmScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.zmanimclock.app.feature.zmanim.format.asZmanTime
@@ -52,6 +53,7 @@ class WidgetRenderer @Inject constructor(
     private val alarmDao: AlarmDao,
     private val alarmScheduler: AlarmScheduler,
     private val entitlementStore: com.zmanimclock.app.feature.subscription.EntitlementStore,
+    private val tzeitGuardController: com.zmanimclock.app.feature.zmanim.presentation.TzeitGuardController,
 ) {
     private val dateFmt = DateTimeFormatter.ofPattern("d.M.yyyy")
 
@@ -158,6 +160,14 @@ class WidgetRenderer @Inject constructor(
         val configs = ids.associateWith { WidgetPrefs.getConfig(context, it) }
         val upcomingAlarms =
             if (configs.values.any { it.showAlarms }) upcomingAlarms(zone) else emptyList()
+
+        // Whether tonight's שומר לערבית is armed — only asked for when some
+        // widget draws the button, for the same receiver-budget reason.
+        val armedAt = if (configs.values.any { it.showTzeitGuard }) {
+            runCatching { guardArmedAt(tzeitGuardController.current()) }.getOrNull()
+        } else {
+            null
+        }
 
         val hebrew = hebrewDate(today, zone)
         val gregorian = dateFmt.format(today)
@@ -275,6 +285,21 @@ class WidgetRenderer @Inject constructor(
                 views.setTextViewText(R.id.widget_gregorian_date, gregorian)
             }
 
+            // --- The שומר לערבית button ---
+            // Not counted in `anyVisible`: it is a control, not content.
+            if (config.showTzeitGuard) {
+                views.setViewVisibility(R.id.widget_guard, View.VISIBLE)
+                views.setTextViewText(R.id.widget_guard, guardButtonLabel(armedAt))
+                views.setInt(
+                    R.id.widget_guard,
+                    "setBackgroundResource",
+                    if (armedAt != null) R.drawable.widget_guard_armed else R.drawable.widget_guard,
+                )
+                views.setOnClickPendingIntent(R.id.widget_guard, guardIntent())
+            } else {
+                views.setViewVisibility(R.id.widget_guard, View.GONE)
+            }
+
             // Tap anywhere → open the app
             views.setOnClickPendingIntent(R.id.widget_root, openAppIntent())
 
@@ -296,6 +321,8 @@ class WidgetRenderer @Inject constructor(
             setViewVisibility(R.id.widget_next_section, View.GONE)
             setViewVisibility(R.id.widget_zmanim_section, View.GONE)
             setViewVisibility(R.id.widget_alarms_section, View.GONE)
+            // No button while locked: an alarm armed now would never ring.
+            setViewVisibility(R.id.widget_guard, View.GONE)
             setOnClickPendingIntent(R.id.widget_root, openAppIntent())
         }
 
@@ -381,4 +408,29 @@ class WidgetRenderer @Inject constructor(
         Intent(context, MainActivity::class.java),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+
+    /**
+     * The שומר לערבית button: the zmanim screen's own dialog (see
+     * [TzeitGuardActivity]). A distinct request code, or this PendingIntent
+     * would be the same object as [openAppIntent]'s.
+     */
+    private fun guardIntent(): PendingIntent = PendingIntent.getActivity(
+        context,
+        REQUEST_GUARD,
+        Intent(context, TzeitGuardActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private companion object {
+        const val REQUEST_GUARD = 1
+    }
 }
+
+/**
+ * What the widget's שומר לערבית button says. Unarmed it is just the name;
+ * armed it also says when, which the zmanim screen's disc cannot fit — the
+ * one advantage of a button wide enough for words.
+ */
+internal fun guardButtonLabel(armedAt: String?): String =
+    if (armedAt == null) "שומר לערבית" else "שומר לערבית · דרוך ל-$armedAt"

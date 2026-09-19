@@ -79,6 +79,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 var showZmanim by remember { mutableStateOf(initial.showZmanim) }
                 var showAlarms by remember { mutableStateOf(initial.showAlarms) }
                 var alarmCount by remember { mutableIntStateOf(initial.alarmCount) }
+                var showGuard by remember { mutableStateOf(initial.showTzeitGuard) }
                 val selected = remember {
                     mutableStateListOf<String>().apply { addAll(initial.zmanim) }
                 }
@@ -120,6 +121,7 @@ class WidgetConfigActivity : ComponentActivity() {
                                     zmanim = if (showZmanim) selected.toList() else emptyList(),
                                     showAlarms = showAlarms,
                                     alarmCount = alarmCount,
+                                    showGuard = showGuard,
                                 )
                             }
 
@@ -228,6 +230,17 @@ class WidgetConfigActivity : ComponentActivity() {
                                     }
                                 }
                             }
+
+                            item {
+                                SectionCard {
+                                    ToggleRow(
+                                        title = "כפתור שומר לערבית",
+                                        subtitle = "התראה חד-פעמית להערב, בלחיצה אחת מהמסך הראשי",
+                                        checked = showGuard,
+                                        onChange = { showGuard = it },
+                                    )
+                                }
+                            }
                         }
 
                         if (nothingOn) {
@@ -256,6 +269,7 @@ class WidgetConfigActivity : ComponentActivity() {
                                         zmanim = selected.toList(),
                                         showAlarms = showAlarms,
                                         alarmCount = alarmCount,
+                                        showTzeitGuard = showGuard,
                                     )
                                 )
                             },

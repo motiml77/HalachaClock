@@ -1,5 +1,7 @@
 package com.zmanimclock.app.feature.widget
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -115,6 +117,7 @@ internal val SAMPLE_TIMES = mapOf(
 )
 
 private val Navy = Color(0xFF123A8B)
+private val GuardRedPill = Color(0xD9D32F2F)
 private val Gold = Color(0xFFF5C518)
 private val SoftBlue = Color(0xFF9FB3D9)
 private val BodyBlue = Color(0xFFEAF0FF)
@@ -140,6 +143,7 @@ internal fun WidgetMockPreview(
     zmanim: List<String>,
     showAlarms: Boolean,
     alarmCount: Int,
+    showGuard: Boolean = false,
 ) {
     Column {
         Text(
@@ -246,6 +250,25 @@ internal fun WidgetMockPreview(
                                 fontWeight = FontWeight.Bold,
                             )
                         }
+                    }
+                }
+
+                if (showGuard) {
+                    Spacer(Modifier.height(8.dp))
+                    // The same red pill the real widget draws (widget_guard.xml)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .background(GuardRedPill, RoundedCornerShape(22.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "שומר לערבית",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }

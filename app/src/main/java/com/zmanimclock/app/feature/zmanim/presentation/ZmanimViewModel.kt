@@ -6,7 +6,6 @@ import com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter
 import com.kosherjava.zmanim.hebrewcalendar.JewishDate
 import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.alarms.data.AlarmType
-import com.zmanimclock.app.scheduling.RescheduleWorker
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
 import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
@@ -41,8 +40,7 @@ class ZmanimViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val zmanimRepository: ZmanimRepository,
     private val alarmDao: AlarmDao,
-    @dagger.hilt.android.qualifiers.ApplicationContext
-    private val context: android.content.Context,
+    private val tzeitGuardController: TzeitGuardController,
 ) : ViewModel() {
 
     /**
@@ -241,51 +239,17 @@ class ZmanimViewModel @Inject constructor(
 
     /**
      * Arms tonight's שומר לערבית at [hour]:[minute] — the day's tzeit, or a
-     * time the user picked instead.
-     *
-     * A FIXED alarm, deliberately, even when the chosen moment IS the zman.
-     * A ZMAN-anchored alarm re-derives its time every day and would roll to
-     * tomorrow's tzeit the instant tonight's passed; this alert exists only
-     * for tonight, so it is pinned to tonight's wall clock and nothing about
-     * it moves afterwards.
-     *
-     * Replaces rather than stacks: arming it twice is the user changing their
-     * mind, not asking for two alarms.
+     * time the user picked instead. What it arms, and why, is
+     * [buildGuardAlarm]; the home-screen widget's button goes through the same
+     * [TzeitGuardController].
      */
     fun armTzeitGuard(hour: Int, minute: Int) {
-        viewModelScope.launch {
-            tzeitGuard.value?.let { runCatching { alarmDao.deleteById(it.id) } }
-            alarmDao.insertAlarm(
-                AlarmEntity(
-                    type = AlarmType.FIXED,
-                    hour = hour,
-                    minute = minute,
-                    // 0 = one-time. Bit-for-bit the same "fires once" the
-                    // alarms screen uses, so the scheduler needs no new case.
-                    daysOfWeek = 0,
-                    soundEnabled = true,
-                    vibrate = true,
-                    ringDurationSeconds = TZEIT_GUARD_RING_SECONDS,
-                    // No snooze: this is a nudge for one moment, and a snooze
-                    // would also keep the row alive past the ring it is
-                    // supposed to disappear with.
-                    maxSnoozes = 0,
-                    label = TZEIT_GUARD_LABEL,
-                    deleteAfterFiring = true,
-                ),
-            )
-            RescheduleWorker.enqueueUnique(context)
-        }
+        viewModelScope.launch { tzeitGuardController.arm(hour, minute) }
     }
 
     /** Disarms it and removes every trace, the same as firing would. */
     fun cancelTzeitGuard() {
-        viewModelScope.launch {
-            tzeitGuard.value?.let {
-                runCatching { alarmDao.deleteById(it.id) }
-                RescheduleWorker.enqueueUnique(context)
-            }
-        }
+        viewModelScope.launch { tzeitGuardController.cancel() }
     }
 
     private fun hebrewDate(date: LocalDate, zone: ZoneId): String {

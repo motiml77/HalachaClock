@@ -221,4 +221,27 @@
             <TextView android:id="@+id/widget_alarm_time_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:fontFeatureSettings="tnum" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- ===== The שומר לערבית button =====
+         A control, not a section: it is not part of what the widget "shows",
+         so the renderer never counts it towards the widget being non-empty.
+         Hidden here and revealed by the renderer, so that any view built from
+         this layout without going through it — the locked state included —
+         never shows a button that would arm an alarm the app will not ring. -->
+    <TextView
+        android:id="@+id/widget_guard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="40dp"
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:background="@drawable/widget_guard"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone"
+        tools:text="שומר לערבית" />
 </LinearLayout>

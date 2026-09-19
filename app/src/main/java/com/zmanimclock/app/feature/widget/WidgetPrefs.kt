@@ -30,8 +30,18 @@ object WidgetPrefs {
         val zmanim: List<String> = DEFAULT_SELECTION,
         val showAlarms: Boolean = false,
         val alarmCount: Int = 3,
+        /**
+         * The red שומר לערבית button. On by default — including for widgets
+         * placed before it existed, whose stored config has no such key.
+         * A control, not content: it never counts towards [isEmpty], so a
+         * widget with only the button on would still be a blank rectangle.
+         */
+        val showTzeitGuard: Boolean = true,
     ) {
-        /** Everything switched off would render an empty box. */
+        /**
+         * Everything switched off would render an empty box. [showTzeitGuard]
+         * is deliberately absent — see its doc.
+         */
         val isEmpty: Boolean
             get() = !showHebrewDate && !showNextZman &&
                 (!showZmanim || zmanim.isEmpty()) && !showAlarms
@@ -63,6 +73,7 @@ object WidgetPrefs {
             zmanim = zmanim,
             showAlarms = p.getBoolean(key(widgetId, "alarms"), false),
             alarmCount = p.getInt(key(widgetId, "alarm_count"), 3).coerceIn(1, MAX_ALARMS),
+            showTzeitGuard = p.getBoolean(key(widgetId, "guard"), true),
         )
         // A widget configured down to nothing is a blank rectangle the user
         // cannot recover from without removing it — fall back to the date.
@@ -77,6 +88,7 @@ object WidgetPrefs {
             .putString(zmanimKey(widgetId), config.zmanim.joinToString(","))
             .putBoolean(key(widgetId, "alarms"), config.showAlarms)
             .putInt(key(widgetId, "alarm_count"), config.alarmCount)
+            .putBoolean(key(widgetId, "guard"), config.showTzeitGuard)
             .apply()
     }
 
@@ -88,6 +100,7 @@ object WidgetPrefs {
             .remove(key(widgetId, "zmanim"))
             .remove(key(widgetId, "alarms"))
             .remove(key(widgetId, "alarm_count"))
+            .remove(key(widgetId, "guard"))
             .apply()
     }
 

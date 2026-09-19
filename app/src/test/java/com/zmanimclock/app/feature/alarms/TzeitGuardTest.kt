@@ -4,6 +4,8 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.zmanim.presentation.GUARD_OFFSET_MINUTES
 import com.zmanimclock.app.feature.zmanim.presentation.ZmanimViewModel
+import com.zmanimclock.app.feature.zmanim.presentation.buildGuardAlarm
+import com.zmanimclock.app.feature.zmanim.presentation.guardArmedAt
 import com.zmanimclock.app.feature.zmanim.presentation.shiftClock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,19 +25,11 @@ import java.time.DayOfWeek
  */
 class TzeitGuardTest {
 
-    /** Exactly what ZmanimViewModel.armTzeitGuard builds. */
-    private fun guard(hour: Int = 19, minute: Int = 36) = AlarmEntity(
-        type = AlarmType.FIXED,
-        hour = hour,
-        minute = minute,
-        daysOfWeek = 0,
-        soundEnabled = true,
-        vibrate = true,
-        ringDurationSeconds = ZmanimViewModel.TZEIT_GUARD_RING_SECONDS,
-        maxSnoozes = 0,
-        label = ZmanimViewModel.TZEIT_GUARD_LABEL,
-        deleteAfterFiring = true,
-    )
+    /**
+     * The REAL builder — the one both the zmanim screen and the home-screen
+     * widget arm through — not a copy of it, so this file pins what ships.
+     */
+    private fun guard(hour: Int = 19, minute: Int = 36) = buildGuardAlarm(hour, minute)
 
     // ---- one-time -----------------------------------------------------------
 
@@ -187,5 +181,19 @@ class TzeitGuardTest {
         val (h, m) = shiftClock(23, 59, 2)
         assertTrue("hour must stay a legal wall clock", h in 0..23)
         assertTrue("minute must stay a legal wall clock", m in 0..59)
+    }
+
+    // ---- what the widget button shows -----------------------------------------
+
+    @Test
+    fun `an armed guard reads as its wall clock, zero padded`() {
+        assertEquals("19:36", guardArmedAt(guard(19, 36)))
+        assertEquals("07:05", guardArmedAt(guard(7, 5)))
+        assertEquals("00:01", guardArmedAt(guard(0, 1)))
+    }
+
+    @Test
+    fun `no guard reads as not armed`() {
+        assertEquals(null, guardArmedAt(null))
     }
 }

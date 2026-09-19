@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The widget's שומר לערבית button, not yet armed: the same red as the badge on
+    the zmanim screen (0xFFD32F2F) at the same 85% it wears there. A pill rather
+    than the screen's 44dp disc, because a widget row has the width for the
+    words on one line and a bigger target for a thumb.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#D9D32F2F" />
+    <corners android:radius="22dp" />
+</shape>

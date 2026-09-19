@@ -4,4 +4,15 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- An activity with no surface of its own: the dialog it hosts floats over
+         whatever was on screen — the launcher, when the widget's שומר לערבית
+         button opened it — instead of covering it. The dialog draws its own scrim. -->
+    <style name="Theme.ZmanimClock.Translucent" parent="Theme.ZmanimClock">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

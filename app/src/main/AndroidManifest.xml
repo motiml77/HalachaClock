@@ -160,6 +160,17 @@
             </intent-filter>
         </activity>
 
+        <!-- The widget's שומר לערבית button: the zmanim screen's own dialog, floating
+             over the launcher. Its own empty-affinity task, out of Recents, so
+             opening it never drags the app's task forward or leaves a card behind. -->
+        <activity
+            android:name=".feature.widget.TzeitGuardActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.ZmanimClock.Translucent" />
+
         <!-- Home-screen widget: the Hebrew date alone, in a chosen color and transparency -->
         <receiver
             android:name=".feature.widget.HebrewDateWidgetProvider"
