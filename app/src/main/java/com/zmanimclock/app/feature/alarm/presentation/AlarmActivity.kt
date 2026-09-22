@@ -200,9 +200,26 @@ private fun AlarmScreen(
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
 ) {
-    var problem by remember { mutableStateOf(MathChallenge.generate(challenge)) }
-    var answerText by remember { mutableStateOf("") }
-    var wrongCount by remember { mutableStateOf(0) }
+    // Keyed on `challenge`, not bare `remember` — [AlarmUiArgs.challenge] can
+    // change UNDER this same composable instance: onNewIntent (the
+    // singleInstance re-fire documented on the class above) updates
+    // [argsState] without ever leaving/re-entering composition, and even a
+    // single alarm's own first ring can arrive this way — the placeholder
+    // notification AlarmSoundService.start() posts before its Room lookup
+    // completes carries no challenge, and the real one lands moments later
+    // via that same onNewIntent path once the ring() call resolves it. A bare
+    // `remember` computes [problem] ONCE from whatever `challenge` this
+    // composable first saw and then never again — reproduced live: firing a
+    // no-challenge alarm, then a second, challenged alarm while the first was
+    // still ringing, left אישור dismissing the second alarm with no problem
+    // ever shown, silently defeating the gate for exactly the alarm that
+    // asked for it. Keying on `challenge` regenerates the problem (and clears
+    // any half-typed answer / wrong-count) the moment it actually changes,
+    // while leaving the "wrong answer → new problem" reassignment inside
+    // tryDismiss() untouched — that already reads the current `challenge`.
+    var problem by remember(challenge) { mutableStateOf(MathChallenge.generate(challenge)) }
+    var answerText by remember(challenge) { mutableStateOf("") }
+    var wrongCount by remember(challenge) { mutableStateOf(0) }
 
     // The snooze button appears only while there is a snooze to give: -1 is
     // unlimited, >0 is a remaining budget, 0 is none.
