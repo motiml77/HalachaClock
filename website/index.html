@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halacha Clock — שעון מעורר וזמנים הלכתיים</title>
+<meta name="description" content="אפליקציית זמנים הלכתיים ושעון מעורר לפי זמן: הנץ, שקיעה, צאת הכוכבים, כניסת שבת ועוד — לפי לוח אור החיים / חזון יוסף. חינם, בעברית, לאנדרואיד ול-Windows.">
+<meta name="keywords" content="זמנים הלכתיים, שעון מעורר הלכתי, אפליקציית זמני היום, לוח אור החיים, חזון יוסף, זמני שבת, צאת שבת, הדלקת נרות, הנץ החמה, שקיעה, זמני תפילה, לוח שנה עברי, שעון מעורר לפי זמן">
+<meta name="author" content="Moti Levi">
+<link rel="canonical" href="https://halacha-clock.web.app/">
+<link rel="icon" type="image/png" href="img/brand-mark.png">
+<meta name="robots" content="index, follow">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="he_IL">
+<meta property="og:title" content="Halacha Clock — שעון מעורר וזמנים הלכתיים">
+<meta property="og:description" content="18 זמנים הלכתיים לפי לוח אור החיים / חזון יוסף, ושעון מעורר שנקבע ביחס אליהם. חינם, בעברית, לאנדרואיד ול-Windows.">
+<meta property="og:url" content="https://halacha-clock.web.app/">
+<meta property="og:site_name" content="Halacha Clock">
+<meta property="og:image" content="https://halacha-clock.web.app/img/og-cover.jpg">
+<meta property="og:image:width" content="1024">
+<meta property="og:image:height" content="500">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Halacha Clock — שעון מעורר וזמנים הלכתיים">
+<meta name="twitter:description" content="זמנים הלכתיים ושעון מעורר לפי זמן, לפי לוח אור החיים / חזון יוסף. חינם, בעברית.">
+<meta name="twitter:image" content="https://halacha-clock.web.app/img/og-cover.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "MobileApplication",
+  "name": "Halacha Clock",
+  "alternateName": "שעון מעורר — זמנים הלכתיים",
+  "operatingSystem": "ANDROID",
+  "applicationCategory": "LifestyleApplication",
+  "url": "https://halacha-clock.web.app/",
+  "image": "https://halacha-clock.web.app/img/brand-mark.png",
+  "inLanguage": "he",
+  "description": "אפליקציית זמנים הלכתיים ושעון מעורר לפי זמן, לפי לוח אור החיים / חזון יוסף. הנץ, שקיעה, צאת הכוכבים, כניסת שבת, לוח שנה עברי ווידג'ט למסך הבית.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ILS" },
+  "installUrl": "https://play.google.com/store/apps/details?id=com.motiml77.halachaclock",
+  "downloadUrl": "https://play.google.com/store/apps/details?id=com.motiml77.halachaclock",
+  "author": { "@type": "Person", "name": "Moti Levi" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "לפי איזו שיטה מחושבים הזמנים?",
+     "acceptedAnswer": {"@type": "Answer", "text": "לפי שיטת מרן — לוח אור החיים / חזון יוסף של הרב יצחק יוסף, בשעות זמניות לפי היום. החישוב הושווה מול הלוח המודפס בחמש ערים."}},
+    {"@type": "Question", "name": "האפליקציה עובדת בלי אינטרנט?",
+     "acceptedAnswer": {"@type": "Answer", "text": "כן. כל הזמנים והשעונים המעוררים מחושבים ונקבעים על המכשיר עצמו. החיבור היחיד לרשת הוא שליפת טבלת ההנץ הנראה, שנשמרת במכשיר."}},
+    {"@type": "Question", "name": "אפשר לשנות את זמן צאת השבת?",
+     "acceptedAnswer": {"@type": "Answer", "text": "כן, בהגדרות. אפשר לבחור בין כ״ה, ל׳, ל״ה, מ׳, מ״ב, נ׳ וע״ב דקות אחרי השקיעה. ברירת המחדל היא מ׳ דקות."}},
+    {"@type": "Question", "name": "האפליקציה אוספת מידע עליי?",
+     "acceptedAnswer": {"@type": "Answer", "text": "לא. אין הרשמה, אין חשבון משתמש, אין פרסומות, ואין שרת שלנו. ההגדרות נשמרות במכשיר בלבד, והסרת ההתקנה מוחקת אותן לחלוטין."}},
+    {"@type": "Question", "name": "יש גרסה למחשב?",
+     "acceptedAnswer": {"@type": "Answer", "text": "כן — תוכנת Windows שמציגה את אותם זמנים ואת אותו לוח שנה, עם וידג'ט צף ותזכורות, על אותו מנוע חישוב כמו האפליקציה."}}
+  ]
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Heebo:wght@300;400;500;700;900&display=swap">
+
+<style>
+:root{
+  direction: rtl;
+
+  /* The app's own palette, taken from its Compose theme. */
+  --navy:      #123A8B;
+  --navy-deep: #0A2260;
+  --gold:      #F5C518;
+  --ink:       #101A2E;
+  --slate:     #5B6B8C;
+  --paper:     #F6F8FD;
+  --card:      #FFFFFF;
+  --mist:      #E3EAF8;
+  --rule:      rgba(18,58,139,.16);
+  --shadow:    0 1px 2px rgba(10,34,96,.06), 0 12px 32px -12px rgba(10,34,96,.22);
+  --shadow-lg: 0 2px 4px rgba(10,34,96,.08), 0 32px 64px -24px rgba(10,34,96,.38);
+
+  --display: "Frank Ruhl Libre", "Times New Roman", serif;
+  --body: "Heebo", -apple-system, "Segoe UI", system-ui, sans-serif;
+
+  --maxw: 1120px;
+  --gutter: clamp(16px, 4vw, 40px);
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --navy:      #2E5BC0;
+    --navy-deep: #07102A;
+    --ink:       #E9EEFA;
+    --slate:     #93A5C7;
+    --paper:     #0A1128;
+    --card:      #101B36;
+    --mist:      #1B2947;
+    --rule:      rgba(147,165,199,.22);
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 12px 32px -12px rgba(0,0,0,.6);
+    --shadow-lg: 0 2px 4px rgba(0,0,0,.5), 0 32px 64px -24px rgba(0,0,0,.75);
+  }
+}
+:root[data-theme="dark"]{
+  --navy:      #2E5BC0;
+  --navy-deep: #07102A;
+  --ink:       #E9EEFA;
+  --slate:     #93A5C7;
+  --paper:     #0A1128;
+  --card:      #101B36;
+  --mist:      #1B2947;
+  --rule:      rgba(147,165,199,.22);
+  --shadow:    0 1px 2px rgba(0,0,0,.4), 0 12px 32px -12px rgba(0,0,0,.6);
+  --shadow-lg: 0 2px 4px rgba(0,0,0,.5), 0 32px 64px -24px rgba(0,0,0,.75);
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.65;
+  direction: rtl;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,h2,h3{ font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.2; }
+p{ margin: 0; }
+a{ color: inherit; }
+img{ display: block; max-width: 100%; }
+
+.wrap{
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* ─────────── the luach row: the site's structural motif ───────────
+   Every section opens the way a printed luach lists a zman — the name
+   on the right, a leader rule, the "time" (here: what the section is)
+   on the left. It is the app's own information shape, reused. */
+.luach-head{
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 10px;
+  margin-bottom: clamp(24px, 4vw, 44px);
+}
+.luach-head h2{
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.luach-head .leader{ flex: 1; }
+.luach-head .mark{
+  font-family: var(--body);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+section{ padding-block: clamp(48px, 8vw, 92px); }
+
+/* ─────────────────────────── hero ─────────────────────────── */
+.hero{
+  background:
+    radial-gradient(120% 90% at 85% 0%, rgba(245,197,24,.16), transparent 58%),
+    linear-gradient(170deg, #123A8B 0%, #0A2260 68%, #071841 100%);
+  color: #fff;
+  padding-block: clamp(40px, 7vw, 76px) clamp(48px, 8vw, 84px);
+  overflow: hidden;
+}
+.hero-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(32px, 5vw, 56px);
+  align-items: center;
+}
+@media (min-width: 900px){
+  .hero-grid{ grid-template-columns: 1.05fr .95fr; }
+}
+
+.brandline{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.brandline img{ width: 44px; height: 44px; border-radius: 12px; }
+.brandline b{
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: .95rem;
+  letter-spacing: .04em;
+}
+.brandline span{
+  font-size: .82rem;
+  color: rgba(255,255,255,.62);
+  border-inline-start: 1px solid rgba(255,255,255,.22);
+  padding-inline-start: 12px;
+}
+
+.hero h1{
+  font-size: clamp(2.3rem, 6.4vw, 4rem);
+  font-weight: 900;
+  letter-spacing: -.01em;
+  margin-bottom: 18px;
+}
+.hero h1 em{ font-style: normal; color: var(--gold); }
+.hero .lede{
+  font-size: clamp(1.05rem, 2.1vw, 1.25rem);
+  color: rgba(255,255,255,.82);
+  max-width: 46ch;
+  font-weight: 300;
+}
+
+.pills{ display: flex; flex-wrap: wrap; gap: 9px; margin-top: 26px; }
+.pill{
+  font-size: .85rem;
+  font-weight: 500;
+  padding: 7px 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.26);
+  color: rgba(255,255,255,.92);
+  background: rgba(255,255,255,.06);
+}
+
+.cta-row{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.btn{
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: .98rem;
+  padding: 14px 26px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.btn-gold{ background: var(--gold); color: #1A1400; box-shadow: 0 10px 26px -10px rgba(245,197,24,.7); }
+.btn-ghost{ border: 1px solid rgba(255,255,255,.32); color: #fff; }
+.btn:hover{ transform: translateY(-2px); }
+.btn-ghost:hover{ background: rgba(255,255,255,.1); }
+@media (prefers-reduced-motion: reduce){ .btn:hover{ transform: none; } }
+
+.hero-note{
+  margin-top: 18px;
+  font-size: .85rem;
+  color: rgba(255,255,255,.6);
+}
+
+/* the app's own "next zman" card, rebuilt in HTML */
+.zman-card{
+  background: rgba(7,20,56,.72);
+  border: 1px solid rgba(159,179,217,.26);
+  border-radius: 22px;
+  padding: 22px 24px;
+  max-width: 460px;
+  margin-inline: auto;
+  backdrop-filter: blur(2px);
+}
+.zman-card .head{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(159,179,217,.2);
+}
+.zman-card .head b{ font-family: var(--display); font-size: 1.22rem; font-weight: 700; }
+.zman-card .head span{ font-size: .84rem; color: #9FB3D9; }
+.zman-card .next{ padding-block: 16px 14px; }
+.zman-card .next .label{
+  color: var(--gold);
+  font-weight: 700;
+  font-size: .95rem;
+  margin-bottom: 2px;
+}
+.zman-card .next .time{
+  font-size: 2.9rem;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+.zman-card .next .in{ font-size: .9rem; color: #C9D6EE; }
+.zman-card .rows{ display: grid; gap: 7px; padding-top: 14px; border-top: 1px solid rgba(159,179,217,.2); }
+.zman-card .row{ display: flex; justify-content: space-between; font-size: .95rem; color: #DCE5F7; }
+.zman-card .row b{ font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
+.zman-card figcaption{
+  margin-top: 12px;
+  font-size: .76rem;
+  color: rgba(255,255,255,.5);
+  text-align: center;
+}
+
+/* ─────────────────────── phone frames ─────────────────────── */
+.phone{
+  background: #0B1225;
+  border-radius: 34px;
+  padding: 9px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255,255,255,.1);
+}
+.phone img{ border-radius: 26px; width: 100%; }
+
+.shots{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: clamp(22px, 3.4vw, 38px);
+  align-items: start;
+}
+.shot figcaption{ margin-top: 16px; }
+.shot h3{
+  font-family: var(--body);
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.shot p{ font-size: .9rem; color: var(--slate); line-height: 1.55; }
+
+/* ─────────────────────── feature cards ─────────────────────── */
+.features{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.feature{
+  background: var(--card);
+  padding: clamp(22px, 3vw, 30px);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.feature .tag{
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--navy);
+}
+:root[data-theme="dark"] .feature .tag{ color: #8FB0F0; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .feature .tag{ color: #8FB0F0; } }
+.feature h3{ font-family: var(--body); font-size: 1.08rem; font-weight: 700; }
+.feature p{ font-size: .93rem; color: var(--slate); }
+
+/* ───────────────────── the zmanim table ───────────────────── */
+.zmanim-table{
+  columns: 2;
+  column-gap: clamp(24px, 5vw, 64px);
+}
+@media (max-width: 620px){ .zmanim-table{ columns: 1; } }
+.zt-row{
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-block: 9px;
+  border-bottom: 1px dotted var(--rule);
+  break-inside: avoid;
+}
+.zt-row .name{ font-weight: 500; }
+.zt-row .dots{ flex: 1; border-bottom: 1px dotted var(--rule); transform: translateY(-4px); }
+.zt-row .note{ font-size: .82rem; color: var(--slate); white-space: nowrap; }
+
+/* ───────────────────────── split blocks ───────────────────────── */
+.split{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(28px, 5vw, 56px);
+  align-items: center;
+}
+@media (min-width: 860px){
+  .split{ grid-template-columns: 1fr 1fr; }
+  .split.narrow-media{ grid-template-columns: 1.1fr .9fr; }
+}
+.split h3{
+  font-size: clamp(1.35rem, 2.8vw, 1.85rem);
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.split p{ color: var(--slate); margin-bottom: 14px; }
+.ticks{ display: grid; gap: 10px; margin-top: 18px; }
+.tick{ display: flex; gap: 11px; align-items: flex-start; font-size: .95rem; }
+.tick svg{ flex: none; margin-top: 4px; }
+
+.surface{ background: var(--card); border: 1px solid var(--rule); border-radius: 18px; padding: clamp(18px, 3vw, 26px); box-shadow: var(--shadow); }
+.surface img{ border-radius: 10px; }
+.surface .cap{ font-size: .8rem; color: var(--slate); margin-top: 12px; text-align: center; }
+
+.band{ background: var(--mist); }
+
+/* ───────────────────────────── FAQ ───────────────────────────── */
+.faq{ display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.faq details{
+  border-bottom: 1px solid var(--rule);
+  padding-block: 4px;
+}
+.faq summary{
+  cursor: pointer;
+  list-style: none;
+  padding-block: 18px;
+  font-weight: 700;
+  font-size: 1.02rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.faq summary::-webkit-details-marker{ display: none; }
+.faq summary::after{
+  content: "+";
+  font-weight: 400;
+  font-size: 1.5rem;
+  color: var(--navy);
+  line-height: 1;
+  flex: none;
+  transition: transform .2s ease;
+}
+:root[data-theme="dark"] .faq summary::after{ color: #8FB0F0; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .faq summary::after{ color: #8FB0F0; } }
+.faq details[open] summary::after{ transform: rotate(45deg); }
+.faq .answer{ padding-bottom: 20px; color: var(--slate); max-width: 68ch; }
+.faq summary:focus-visible{ outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+
+/* ─────────────────────────── download ─────────────────────────── */
+.download{
+  background: linear-gradient(165deg, #123A8B, #0A2260 72%, #071841);
+  color: #fff;
+  border-radius: 26px;
+  padding: clamp(30px, 5vw, 56px);
+  text-align: center;
+}
+.download h2{ font-size: clamp(1.7rem, 4vw, 2.5rem); font-weight: 900; margin-bottom: 14px; }
+.download p{ color: rgba(255,255,255,.8); max-width: 54ch; margin-inline: auto; }
+.download .cta-row{ justify-content: center; }
+.platforms{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 34px;
+  text-align: start;
+}
+.platform{
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 16px;
+  padding: 20px 22px;
+  text-decoration: none;
+  color: #fff;
+  transition: background .16s ease, transform .16s ease, border-color .16s ease;
+}
+.platform:hover{ background: rgba(255,255,255,.15); border-color: var(--gold); transform: translateY(-2px); }
+.platform:focus-visible{ outline: 2px solid var(--gold); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce){ .platform:hover{ transform: none; } }
+.platform .glyph{ flex: none; color: var(--gold); display: flex; }
+.platform .txt{ display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.platform .txt b{ font-size: 1.08rem; font-weight: 700; line-height: 1.3; }
+.platform .txt > span{ font-size: .93rem; color: rgba(255,255,255,.88); }
+.platform .txt small{ font-size: .78rem; color: rgba(255,255,255,.58); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.platform .arrow{ flex: none; font-size: 1.3rem; color: var(--gold); }
+.fineprint{
+  margin-top: 26px;
+  font-size: .84rem;
+  color: rgba(255,255,255,.62) !important;
+}
+.fineprint code{
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: .95em;
+  background: rgba(255,255,255,.12);
+  padding: 1px 6px;
+  border-radius: 5px;
+}
+
+/* ──────────────────────────── footer ──────────────────────────── */
+footer{
+  border-top: 1px solid var(--rule);
+  padding-block: 40px 54px;
+  font-size: .9rem;
+  color: var(--slate);
+}
+.foot-grid{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px 36px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.foot-links{ display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.foot-links a{ text-decoration: none; border-bottom: 1px solid var(--rule); padding-bottom: 2px; }
+.foot-links a:hover{ border-color: currentColor; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════ HERO ════════════════════════════ -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="brandline">
+        <img src="img/brand-mark.png" alt="הלוגו של Halacha Clock">
+        <b>Halacha Clock</b>
+        <span>שעון מעורר · זמנים הלכתיים</span>
+      </div>
+
+      <h1>השעון המעורר שיודע <em>את זמני ההלכה</em></h1>
+      <p class="lede">
+        18 זמנים הלכתיים שמחושבים על המכשיר שלך לפי לוח אור החיים / חזון יוסף,
+        ושעון מעורר שנקבע ביחס אליהם — ומזיז את עצמו בכל בוקר.
+      </p>
+
+      <div class="pills">
+        <span class="pill">ללא פרסומות</span>
+        <span class="pill">עובד בלי אינטרנט</span>
+        <span class="pill">ללא חשבון והרשמה</span>
+        <span class="pill">415 יישובים</span>
+        <span class="pill">עברית מלאה</span>
+      </div>
+
+      <div class="cta-row">
+        <a class="btn btn-gold" href="https://play.google.com/store/apps/details?id=com.motiml77.halachaclock">
+          <svg width="18" height="20" viewBox="0 0 24 27" aria-hidden="true"><path fill="currentColor" d="M1.6.5a2 2 0 0 0-.6 1.4v22.7a2 2 0 0 0 .6 1.4l13-12.7zM17.4 9.4 4.2.6l11 10.8zM4.2 25.9l13.2-8.8-2.2-2.2zM22.6 11.6l-3.4-2-2.6 2.6 2.6 2.5 3.4-2a1.9 1.9 0 0 0 0-3.1z"/></svg>
+          הורדה ב-Google Play
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/motiml77/HalachaClock/releases/latest/download/HalachaClock-Setup.exe">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 4.9 10.2 4v7.3H3zM11.3 3.8 21 2.5v8.8h-9.7zM3 12.4h7.2v7.3L3 18.7zM11.3 12.4H21v8.8l-9.7-1.3z"/></svg>
+          הורדה ל-Windows
+        </a>
+      </div>
+      <p class="hero-note">אנדרואיד 8 ומעלה · Windows 10 ומעלה · בעברית מלאה</p>
+    </div>
+
+    <figure class="zman-card">
+      <div class="head">
+        <b>כ״ב אב תשפ״ו</b>
+        <span>ירושלים</span>
+      </div>
+      <div class="next">
+        <div class="label">הזמן הבא — מנחה קטנה</div>
+        <div class="time">16:42</div>
+        <div class="in">בעוד 3:54 שע׳</div>
+      </div>
+      <div class="rows">
+        <div class="row"><span>הנץ החמה</span><b>05:57</b></div>
+        <div class="row"><span>סוף זמן ק״ש גר״א</span><b>09:21</b></div>
+        <div class="row"><span>פלג המנחה</span><b>18:22</b></div>
+        <div class="row"><span>שקיעה</span><b>19:32</b></div>
+      </div>
+      <figcaption>הזמנים להמחשה — באפליקציה הם מחושבים למיקום שלך</figcaption>
+    </figure>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ SCREENS ═══════════════════════════ -->
+<section id="screens">
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>ארבעה מסכים</h2>
+      <span class="leader"></span>
+      <span class="mark">מה רואים באפליקציה</span>
+    </div>
+
+    <div class="shots">
+      <figure class="shot">
+        <div class="phone"><img src="img/zmanim.png" alt="מסך הזמנים: התאריך העברי, הזמן ההלכתי הבא, ורשימת כל הזמנים של היום"></div>
+        <figcaption>
+          <h3>זמנים</h3>
+          <p>התאריך העברי, הזמן הבא עם ספירה לאחור, וכל זמני היום מתחת. ליד כל זמן פעמון — לחיצה אחת קובעת עליו שעון.</p>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone"><img src="img/calendar.png" alt="לוח שנה עברי חודשי עם חגים, ומתחתיו זמני היום שנבחר"></div>
+        <figcaption>
+          <h3>לוח שנה</h3>
+          <p>חודש עברי שלם עם מועדים ופרשיות. בחירת יום מציגה את הזמנים שלו למטה, בלי לצאת מהמסך.</p>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone"><img src="img/alarms.png" alt="רשימת שעונים מעוררים מקובצת לפי מחר ולשבוע הבא"></div>
+        <figcaption>
+          <h3>מעורר</h3>
+          <p>השעונים מסודרים לפי מתי הם באמת יצלצלו — מחר, השבוע הבא — עם הזמן שנותר, וכפתור דילוג על הצלצול הקרוב.</p>
+        </figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="phone"><img src="img/settings.png" alt="מסך הגדרות: מיקום, הדלקת נרות, צאת שבת ושורת מצב"></div>
+        <figcaption>
+          <h3>הגדרות</h3>
+          <p>מיקום, דקות הדלקת נרות, שיטת צאת שבת, ושורת המצב הקבועה — כל אחד עם ההסבר שלו לידו.</p>
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ FEATURES ═══════════════════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>למה דווקא כאן</h2>
+      <span class="leader"></span>
+      <span class="mark">התכונות</span>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <span class="tag">שעון שזז</span>
+        <h3>שעון לפי זמן הלכתי</h3>
+        <p>״30 דקות לפני הנץ״ נשמר כהוראה, לא כשעה. בכל לילה הוא מחושב מחדש לפי הזמנים של מחר במקום שלך, ומצלצל בדקה הנכונה.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">שיטת מרן</span>
+        <h3>לוח אור החיים / חזון יוסף</h3>
+        <p>הזמנים מחושבים לפי שיטת מרן הרב יצחק יוסף — שעות זמניות לפי היום. החישוב נבדק מול הלוח המודפס בחמש ערים.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">הנץ אמיתי</span>
+        <h3>הנץ הנראה, לא רק החישובי</h3>
+        <p>לתפילת ותיקין צריך את ההנץ שבאמת נראה מעל ההרים. האפליקציה מציגה אותו מנתוני ChaiTables, לצד הנץ המישור.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">שבת</span>
+        <h3>כניסת שבת ויציאתה</h3>
+        <p>התראת כניסת שבת בכל יום שישי עם מסך נרות וצליל משלה, דקות הדלקת נרות לבחירתך, וצאת שבת בשבע שיטות — מכ״ה ועד ע״ב דקות.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">ערבית</span>
+        <h3>שומר לערבית</h3>
+        <p>לחיצה אחת דורכת התראה חד-פעמית לערב הזה בלבד, בסמוך לצאת הכוכבים. היא מוחקת את עצמה אחרי שצלצלה.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">אמינות</span>
+        <h3>מצלצל גם כשהמסך כבוי</h3>
+        <p>אזעקות מדויקות, מסך צלצול מעל המסך הנעול, חזרה אוטומטית אחרי הפעלה מחדש — ובהגדרות יש ״בדיקת אמינות״ שמצלצלת בעוד דקה כדי שתדע שזה עובד.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">שליטה</span>
+        <h3>נגד הנודניק</h3>
+        <p>הגבלת מספר הנודניקים, שאלת חשבון שצריך לפתור כדי לכבות, ובדיקת ערות שמצלצלת שוב אם לא אישרת שקמת.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">פרטיות</span>
+        <h3>שום דבר לא יוצא מהמכשיר</h3>
+        <p>אין חשבון, אין פרסומות, אין כלי מעקב או אנליטיקס, ואין שרת שלנו. החישוב כולו מקומי, וההסרה מוחקת הכול.</p>
+      </div>
+
+      <div class="feature">
+        <span class="tag">מחשב</span>
+        <h3>גם על שולחן העבודה</h3>
+        <p>תוכנת Windows נלווית מציגה את אותם זמנים ואת אותו לוח שנה, עם וידג׳ט צף ותזכורות — לימוד ועבודה מול אותו לוח.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ ZMANIM ═══════════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>שמונה־עשר זמנים</h2>
+      <span class="leader"></span>
+      <span class="mark">מה מחושב בכל יום</span>
+    </div>
+
+    <div class="zmanim-table">
+      <div class="zt-row"><span class="name">חצות לילה</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">עלות השחר</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">משיכיר</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">הנץ החמה</span><span class="dots"></span><span class="note">הנץ הנראה</span></div>
+      <div class="zt-row"><span class="name">הנץ החמה (מישור)</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">סוף זמן ק״ש מג״א</span><span class="dots"></span><span class="note">72 ד״ז · 16.1°</span></div>
+      <div class="zt-row"><span class="name">סוף זמן ק״ש גר״א</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">סוף זמן תפילה מג״א</span><span class="dots"></span><span class="note">72 ד״ז · 16.1°</span></div>
+      <div class="zt-row"><span class="name">סוף זמן תפילה גר״א</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">חצות היום</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">מנחה גדולה</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">מנחה קטנה</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">פלג המנחה</span><span class="dots"></span><span class="note">מצאה״כ ומהשקיעה</span></div>
+      <div class="zt-row"><span class="name">שקיעה</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">צאת הכוכבים</span><span class="dots"></span><span class="note">לקולא ולחומרא</span></div>
+      <div class="zt-row"><span class="name">צאת שבת</span><span class="dots"></span><span class="note">שבע שיטות</span></div>
+      <div class="zt-row"><span class="name">רבנו תם</span><span class="dots"></span></div>
+      <div class="zt-row"><span class="name">הדלקת נרות</span><span class="dots"></span><span class="note">18 · 20 · 30 · 40</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ ALARMS ═══════════════════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>שלושה סוגי שעון</h2>
+      <span class="leader"></span>
+      <span class="mark">המעורר</span>
+    </div>
+
+    <div class="split">
+      <div>
+        <h3>שעה קבועה, זמן הלכתי, או כניסת שבת</h3>
+        <p>
+          השעון הרגיל הוא שעון רגיל. השעון ההלכתי נקבע ביחס לזמן — 30 דקות לפני הנץ,
+          ברגע מנחה קטנה, רבע שעה אחרי השקיעה — והאפליקציה מחשבת אותו מחדש כל יום.
+          התראת כניסת שבת מגיעה לבד בכל יום שישי, עם מסך נרות וצליל נפרד.
+        </p>
+        <div class="ticks">
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>ימים חוזרים, או שעון חד-פעמי שמכבה את עצמו</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>דילוג אוטומטי על שבת ועל יום טוב</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>צליל לבחירתך, עוצמה עד 120% ועלייה הדרגתית</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>משך צלצול מ-10 שניות ועד 3 דקות</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>התראה שקטה ברטט בלבד, כשצריך</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="shots">
+        <figure class="shot">
+          <div class="phone"><img src="img/alarm_types.png" alt="בחירה בין שעון מעורר רגיל, שעון לפי זמן הלכתי והתראת כניסת שבת"></div>
+        </figure>
+        <figure class="shot">
+          <div class="phone"><img src="img/alarm_zman.png" alt="עורך שעון לפי זמן הלכתי: בחירת הזמן, כמה דקות לפניו, ותצוגת השעה שתצא מחר"></div>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ WIDGET + STATUS LINE ════════════════════ -->
+<section>
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>גם בלי לפתוח</h2>
+      <span class="leader"></span>
+      <span class="mark">וידג׳ט ושורת מצב</span>
+    </div>
+
+    <div class="split narrow-media">
+      <div>
+        <h3>הזמן הבא נמצא כבר במסך הנעילה</h3>
+        <p>
+          שורת מצב קבועה מציגה את הזמן ההלכתי הבא ואת השעון המעורר הבא, בלי לפתוח כלום.
+          אם מחקת אותה בטעות בהחלקה — היא חוזרת בעצמה.
+        </p>
+        <div class="surface" style="margin-top: 20px;">
+          <img src="img/notification.png" alt="שורת המצב: חצות לילה 00:32, ומתחת השעון הבא 06:26 הנץ החמה">
+          <p class="cap">שורת המצב הקבועה, כפי שהיא נראית בהתראות</p>
+        </div>
+      </div>
+
+      <div>
+        <h3>וידג׳ט למסך הבית</h3>
+        <p>
+          וידג׳ט 4×2 שמציג את הזמנים שבחרת ואת הזמן הבא, עם כפתור ״שומר לערבית״ מובנה —
+          ווידג׳ט 2×2 קטן לתאריך העברי בלבד.
+        </p>
+        <div class="surface" style="margin-top: 20px;">
+          <img src="img/widget_zmanim.png" alt="וידג׳ט הזמנים במסך הבית: תאריך עברי, הזמן הבא, ושלושה זמנים נבחרים">
+          <p class="cap">וידג׳ט הזמנים — אתה בוחר אילו זמנים יופיעו בו</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ FAQ ═══════════════════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>שאלות</h2>
+      <span class="leader"></span>
+      <span class="mark">ותשובות</span>
+    </div>
+
+    <div class="faq">
+      <details open>
+        <summary>לפי איזו שיטה מחושבים הזמנים?</summary>
+        <div class="answer">
+          לפי שיטת מרן — לוח אור החיים / חזון יוסף של הרב יצחק יוסף, בשעות זמניות לפי היום.
+          החישוב הושווה מול הלוח המודפס בחמש ערים, וההפרשים נבדקים אוטומטית בכל שינוי בקוד.
+        </div>
+      </details>
+
+      <details>
+        <summary>האפליקציה עובדת בלי אינטרנט?</summary>
+        <div class="answer">
+          כן. כל הזמנים מחושבים על המכשיר עצמו, וגם השעונים המעוררים נקבעים מקומית.
+          החיבור היחיד לרשת הוא שליפת טבלת ההנץ הנראה מ-chaitables.com, והיא נשמרת במכשיר —
+          בלעדיה האפליקציה ממשיכה לעבוד עם שאר שיטות החישוב.
+        </div>
+      </details>
+
+      <details>
+        <summary>מה ההבדל בין ״הנץ החמה״ ל״הנץ החמה (מישור)״?</summary>
+        <div class="answer">
+          הנץ המישור הוא הרגע שבו השמש היתה עולה אילו האופק היה ישר. ההנץ הנראה הוא הרגע
+          שבו היא באמת מתגלה מעל ההרים שסביב המקום שלך — ולתפילת ותיקין הוא זה שקובע.
+          האפליקציה מציגה את שניהם, זה מעל זה, כדי שההפרש יהיה גלוי.
+        </div>
+      </details>
+
+      <details>
+        <summary>אפשר לשנות את זמן צאת השבת?</summary>
+        <div class="answer">
+          כן, בהגדרות. אפשר לבחור בין כ״ה, ל׳, ל״ה, מ׳, מ״ב, נ׳ וע״ב דקות אחרי השקיעה.
+          ברירת המחדל היא מ׳ דקות, כמנהג הרווח בארץ. גם דקות הדלקת הנרות ניתנות לשינוי —
+          18, 20, 30, או 40 דקות כמנהג ירושלים.
+        </div>
+      </details>
+
+      <details>
+        <summary>מה קורה אם הטלפון במצב חיסכון בסוללה?</summary>
+        <div class="answer">
+          במסך ההיכרות האפליקציה מבקשת פטור מאופטימיזציית סוללה ומסבירה בדיוק איפה לאשר אותו,
+          כי בלעדיו מערכת ההפעלה עלולה ״להרדים״ את השעון. בהגדרות יש ״בדיקת אמינות״ —
+          כפתור שקובע צלצול בעוד דקה, כדי שתראה במו עיניך שהשעון עובד על הטלפון שלך.
+        </div>
+      </details>
+
+      <details>
+        <summary>מה זה ״שומר לערבית״?</summary>
+        <div class="answer">
+          התראה חד-פעמית לערב הזה בלבד, שנדרכת בלחיצה אחת ממסך הזמנים או מהוידג׳ט,
+          בסמוך לצאת הכוכבים. היא לא חוזרת מחר ולא נשארת ברשימה — אחרי שצלצלה היא נמחקת.
+        </div>
+      </details>
+
+      <details>
+        <summary>האפליקציה אוספת מידע עליי?</summary>
+        <div class="answer">
+          לא. אין הרשמה, אין חשבון משתמש, אין פרסומות, אין SDK של אנליטיקס או מעקב, ואין שרת שלנו.
+          המיקום שבחרת, השעונים וההגדרות נשמרים באחסון הפרטי של האפליקציה במכשיר בלבד,
+          והסרת ההתקנה מוחקת אותם לחלוטין.
+        </div>
+      </details>
+
+      <details>
+        <summary>יש גרסה למחשב?</summary>
+        <div class="answer">
+          כן — תוכנת Windows שמציגה את אותם זמנים ואת אותו לוח שנה, עם וידג׳ט צף
+          שאפשר לעגן בקצה המסך ותזכורות לזמנים. היא עובדת על אותו מנוע חישוב כמו האפליקציה,
+          ומותקנת בקובץ התקנה רגיל. ההורדה בראש העמוד ובתחתיתו.
+        </div>
+      </details>
+
+      <details>
+        <summary>צריך את שתי הגרסאות?</summary>
+        <div class="answer">
+          לא. כל אחת עומדת בפני עצמה, והן לא מסתנכרנות ביניהן — אין חשבון משתמש ואין שרת.
+          הטלפון הוא זה שמצלצל ומעיר; המחשב נוח ללימוד ולעבודה מול אותו לוח.
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ DOWNLOAD ═══════════════════════════ -->
+<section id="download">
+  <div class="wrap">
+    <div class="download">
+      <h2>להוריד עכשיו</h2>
+      <p>שתי גרסאות, אותו מנוע חישוב. בוחרים פלטפורמה ומתחילים.</p>
+
+      <div class="platforms">
+        <a class="platform" href="https://play.google.com/store/apps/details?id=com.motiml77.halachaclock">
+          <span class="glyph" aria-hidden="true">
+            <svg width="30" height="33" viewBox="0 0 24 27"><path fill="currentColor" d="M1.6.5a2 2 0 0 0-.6 1.4v22.7a2 2 0 0 0 .6 1.4l13-12.7zM17.4 9.4 4.2.6l11 10.8zM4.2 25.9l13.2-8.8-2.2-2.2zM22.6 11.6l-3.4-2-2.6 2.6 2.6 2.5 3.4-2a1.9 1.9 0 0 0 0-3.1z"/></svg>
+          </span>
+          <span class="txt">
+            <b>אנדרואיד</b>
+            <span>הורדה ב-Google Play</span>
+            <small>אנדרואיד 8 ומעלה</small>
+          </span>
+          <span class="arrow" aria-hidden="true">←</span>
+        </a>
+
+        <a class="platform" href="https://github.com/motiml77/HalachaClock/releases/latest/download/HalachaClock-Setup.exe">
+          <span class="glyph" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24"><path fill="currentColor" d="M3 4.9 10.2 4v7.3H3zM11.3 3.8 21 2.5v8.8h-9.7zM3 12.4h7.2v7.3L3 18.7zM11.3 12.4H21v8.8l-9.7-1.3z"/></svg>
+          </span>
+          <span class="txt">
+            <b>Windows</b>
+            <span>הורדת קובץ ההתקנה</span>
+            <small>הגרסה העדכנית · כ-100MB · Windows 10 ומעלה</small>
+          </span>
+          <span class="arrow" aria-hidden="true">←</span>
+        </a>
+      </div>
+
+      <p class="fineprint">
+        ההתקנה ל-Windows היא קובץ <code>.exe</code> רגיל. אם SmartScreen מציג אזהרה על מפתח לא מוכר —
+        ״מידע נוסף״ ואז ״הפעל בכל זאת״.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ FOOTER ════════════════════════════ -->
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <div style="font-family: var(--display); font-weight: 700; font-size: 1.15rem; color: var(--ink); margin-bottom: 4px;">
+        Halacha Clock · שעון מעורר — זמנים הלכתיים
+      </div>
+      <div>אנדרואיד 8 ומעלה · עברית · Windows</div>
+    </div>
+
+    <div class="foot-links">
+      <a href="https://play.google.com/store/apps/details?id=com.motiml77.halachaclock">Google Play</a>
+      <a href="https://github.com/motiml77/HalachaClock/releases/latest/download/HalachaClock-Setup.exe">הורדה ל-Windows</a>
+      <a href="https://github.com/motiml77/HalachaClock/blob/main/PRIVACY.md">מדיניות פרטיות</a>
+      <a href="mailto:motiml77@gmail.com">יצירת קשר</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top: 26px; font-size: .82rem;">
+    הזמנים באתר זה להמחשה בלבד. הזמנים המחייבים הם אלה שהאפליקציה מחשבת למיקום שלך.
+  </div>
+</footer>
+</body>
+</html>
