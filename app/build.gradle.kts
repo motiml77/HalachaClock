@@ -82,9 +82,12 @@ android {
         // takes the next number, and one source is often built twice — once
         // per paywall setting. History: 5, 7, 8 went to Internal Testing
         // (paywall=true); 6, 9 to Closed Testing (paywall=false); 10 (Internal)
-        // and 11 (Closed) are the same source.
+        // and 11 (Closed) are the same source. 11 was never actually sent for
+        // review, but Play still burns a versionCode the moment a bundle
+        // carrying it finishes upload processing on ANY draft — deleting the
+        // draft does not give it back. 12 replaces 11 for Closed Testing.
         //
-        // 10/11: the status notification restores itself after being swiped
+        // 10/12: the status notification restores itself after being swiped
         // away (a delete intent, plus a 15-minute cap on its wake chain), and
         // the widget gains a שומר לערבית button that opens the zmanim screen's
         // own dialog. Earlier in the 1.1 line: the visible-netz table rebuilt
@@ -96,7 +99,7 @@ android {
         // versionName moves to 1.1.1 so Settings → Apps visibly changes when
         // an update lands. versionCode alone is invisible there, and "did the
         // phone actually take the new build" has been the recurring question.
-        versionCode = 11
+        versionCode = 12
         versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
