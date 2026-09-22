@@ -80,26 +80,31 @@ android {
         targetSdk = 36
         // Play requires a UNIQUE versionCode across EVERY track, so each upload
         // takes the next number, and one source is often built twice — once
-        // per paywall setting. History: 5, 7, 8 went to Internal Testing
-        // (paywall=true); 6, 9 to Closed Testing (paywall=false); 10 (Internal)
-        // and 11 (Closed) are the same source. 11 was never actually sent for
-        // review, but Play still burns a versionCode the moment a bundle
-        // carrying it finishes upload processing on ANY draft — deleting the
-        // draft does not give it back. 12 replaces 11 for Closed Testing.
+        // per paywall setting. History: 5, 7, 8, then 10 went to Internal
+        // Testing (paywall=true); 6, 9, then 12 to Closed Testing
+        // (paywall=false) — 11 was skipped; it was never sent for review, but
+        // Play still burns a versionCode the moment a bundle carrying it
+        // finishes upload processing on ANY draft, and deleting the draft
+        // does not give it back. 13 (Internal) and 14 (Closed) are this
+        // source, both a full release behind where Internal was sitting (it
+        // had been stuck on 8 / 1.1.0 since the widget/status-line/paywall
+        // work went out to Closed alone).
         //
-        // 10/12: the status notification restores itself after being swiped
-        // away (a delete intent, plus a 15-minute cap on its wake chain), and
-        // the widget gains a שומר לערבית button that opens the zmanim screen's
-        // own dialog. Earlier in the 1.1 line: the visible-netz table rebuilt
-        // from real ChaiTables data, the מישור netz row shown beside a real
-        // visible one, the seasonal-hour grid on the device's real elevation,
-        // the "הזמן הבא" filter honoured by the status line's tomorrow
-        // fallback, and a redesigned paywall.
+        // 13/14, on top of everything already in 1.1.1 (status notification
+        // restore + next-zman filter fix, the שומר לערבית widget button, the
+        // redesigned paywall): the math dismiss-challenge could silently stop
+        // gating אישור — a second alarm firing while the first was still
+        // ringing re-fronted the same ringing screen (by design) but left the
+        // question behind, so it dismissed instantly with none asked. And the
+        // Friday-candle-lighting alarm now actually rings differently, easing
+        // in over its first half-minute, rather than the plain instant full
+        // volume every other alarm gets — its own picker already promised
+        // that and it never delivered.
         //
         // versionName moves to 1.1.1 so Settings → Apps visibly changes when
         // an update lands. versionCode alone is invisible there, and "did the
         // phone actually take the new build" has been the recurring question.
-        versionCode = 12
+        versionCode = 14
         versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
