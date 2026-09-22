@@ -150,6 +150,27 @@ class CalendarDayMetaTest {
         assertEquals(49, count)
     }
 
+    @Test
+    fun `the omer is unaffected by the extra Adar in a leap year`() {
+        // 5787 is a leap year (13 months) — same fact the Purim test above
+        // relies on. Adar I falls BEFORE Nissan, so a correct implementation
+        // counts identically to a plain year; this is the case a
+        // hand-rolled "days since Rosh Hashana" offset would get wrong.
+        val leap = 5787
+        assertTrue("5787 must actually be the leap year this test needs", JewishDate(leap, 7, 1).isJewishLeapYear)
+        assertEquals(1, meta(leap, 1, 16).omerDay)
+        assertEquals(49, meta(leap, 3, 5).omerDay)
+        assertNull(meta(leap, 1, 14).omerDay)
+        assertNull(meta(leap, 1, 15).omerDay)
+        assertNull(meta(leap, 3, 6).omerDay)
+
+        val months = listOf(1, 2, 3)
+        val count = months.sumOf { m ->
+            (1..HebrewMonthRef(leap, m).daysInMonth).count { meta(leap, m, it).omerDay != null }
+        }
+        assertEquals(49, count)
+    }
+
     // ------------------------------------------------------------ chanukah
 
     @Test
