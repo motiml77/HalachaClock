@@ -64,23 +64,18 @@ class AlarmEditViewModel @Inject constructor(
             // last warning before shkia itself, so the extra minute is the
             // side to err on.
             //
-            // "Special sound" used to be untrue: neither soundUri nor
-            // volumePercent nor gradualVolume were set here, so this rang
-            // through the exact same instant full-volume default as any
-            // other alarm — an adversarial review caught the gap between
-            // that and what AlarmsScreen's own picker promises the user
-            // ("מסך נרות וצליל מיוחד") before they ever create it. No new
-            // audio asset (that's a taste call, not this fix's to make);
-            // gradualVolume=true is the one already-built, low-risk way to
-            // make the RING itself genuinely distinct: AlarmVolume ramps
-            // from 20% of target up to full over 60% of ringDurationSeconds
-            // (here, 36 of the 60 seconds), so the moment someone is most
-            // likely to actually notice — the first one — is soft, while
-            // full loudness still arrives well before this alarm's own
-            // auto-silence if it is genuinely needed. volumePercent is left
-            // at the ordinary 100 default on purpose: candle-lighting has a
-            // real deadline, so the CEILING must stay exactly as loud as
-            // every other alarm — only how briskly it gets there changes.
+            // "Special sound" used to be untrue: soundUri and volumePercent
+            // were never set here, so this rang through the exact same
+            // instant full-volume default as any other alarm — an
+            // adversarial review caught the gap between that and what
+            // AlarmsScreen's own picker promises the user ("מסך נרות וצליל
+            // מיוחד") before they ever create it. The owner's ruling: full
+            // 100% volume, immediately — candle-lighting has a real
+            // deadline, this is not the alarm to ease into. What makes it
+            // actually distinct is the SCREEN (shabbatMode=true → Candles()
+            // below), not the ring; gradualVolume stays at its ordinary
+            // AlarmEntity default (false) on purpose, matching every other
+            // alarm's ceiling and onset both.
             _alarm.value = AlarmEntity(
                 type = AlarmType.ZMAN,
                 zmanId = "SHKIA",
@@ -90,7 +85,6 @@ class AlarmEditViewModel @Inject constructor(
                 shabbatMode = true,
                 label = "כניסת שבת",
                 ringDurationSeconds = 60,
-                gradualVolume = true,
             )
             refreshPreview()
         } else {

@@ -7,6 +7,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -280,7 +287,7 @@ private fun AlarmScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             if (shabbatMode) {
-                Candles(modifier = Modifier.size(width = 150.dp, height = 130.dp))
+                Candles(modifier = Modifier.size(width = 190.dp, height = 230.dp))
                 Spacer(Modifier.height(18.dp))
                 Text(
                     "שבת נכנסת!",
@@ -407,51 +414,144 @@ private fun AlarmScreen(
     }
 }
 
-/** Two Shabbat candles with warm flames — drawn, no assets. */
+/**
+ * Two Shabbat candles — drawn, no assets: holders on a shadowed table, a
+ * layered warm glow, and a slow flicker (the two candles on different
+ * periods so they never move in lockstep, which reads as fake). This scene
+ * IS the special thing about this alarm — the ring itself is deliberately
+ * ordinary (see the AlarmEditViewModel comment on volumePercent/gradual):
+ * the owner's ruling was full volume immediately, since candle-lighting has
+ * a real deadline, so the moment being warm and unmistakable was left
+ * entirely to what's on screen.
+ */
 @Composable
 private fun Candles(modifier: Modifier = Modifier) {
+    val infinite = rememberInfiniteTransition(label = "candle-flicker")
+    @Composable
+    fun flicker(periodMs: Int, from: Float, to: Float) = infinite.animateFloat(
+        initialValue = from,
+        targetValue = to,
+        animationSpec = infiniteRepeatable(
+            animation = tween(periodMs, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "flame",
+    )
+    val flickerLeft by flicker(1100, 0.90f, 1.08f)
+    val flickerRight by flicker(1450, 0.93f, 1.10f)
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val candleWidth = w * 0.13f
-        val candleTop = h * 0.42f
-        val candleBottom = h * 0.98f
 
-        listOf(w * 0.32f, w * 0.68f).forEach { cx ->
-            // body
+        // Ambient bloom behind everything — candlelight filling the room,
+        // not just the flames themselves.
+        val bloomCenter = Offset(w * 0.5f, h * 0.36f)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0x40FFC969), Color(0x00FFC969)),
+                center = bloomCenter,
+                radius = w * 0.9f,
+            ),
+            radius = w * 0.9f,
+            center = bloomCenter,
+        )
+
+        val candleWidth = w * 0.16f
+        val candleTop = h * 0.28f
+        val candleBottom = h * 0.78f
+        val holderBottom = h * 0.88f
+        val tableY = h * 0.92f
+
+        // Contact shadow on the table, grounding the whole scene.
+        drawOval(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0x4D000000), Color(0x00000000)),
+                center = Offset(w * 0.5f, tableY),
+                radius = w * 0.46f,
+            ),
+            topLeft = Offset(w * 0.06f, tableY - h * 0.035f),
+            size = androidx.compose.ui.geometry.Size(w * 0.88f, h * 0.07f),
+        )
+
+        listOf(w * 0.30f to flickerLeft, w * 0.70f to flickerRight).forEach { (cx, flicker) ->
+            // Brass candlestick: a wide foot and a narrow stem/cup.
+            drawRoundRect(
+                color = Color(0xFFC79A4B),
+                topLeft = Offset(cx - candleWidth * 0.62f, holderBottom - h * 0.018f),
+                size = androidx.compose.ui.geometry.Size(candleWidth * 1.24f, h * 0.03f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.012f),
+            )
+            drawRoundRect(
+                color = Color(0xFFB8863A),
+                topLeft = Offset(cx - candleWidth * 0.2f, candleBottom - h * 0.01f),
+                size = androidx.compose.ui.geometry.Size(candleWidth * 0.4f, holderBottom - candleBottom),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(candleWidth * 0.08f),
+            )
+
+            // Candle body.
             drawRoundRect(
                 color = Color(0xFFFDF6E3),
                 topLeft = Offset(cx - candleWidth / 2, candleTop),
                 size = androidx.compose.ui.geometry.Size(candleWidth, candleBottom - candleTop),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(candleWidth * 0.3f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(candleWidth * 0.22f),
             )
-            // wick
+            // A soft highlight down one side, for roundness rather than a flat bar.
+            drawRoundRect(
+                color = Color(0x52FFFFFF),
+                topLeft = Offset(cx - candleWidth * 0.3f, candleTop + h * 0.015f),
+                size = androidx.compose.ui.geometry.Size(
+                    candleWidth * 0.2f,
+                    (candleBottom - candleTop) - h * 0.03f,
+                ),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(candleWidth * 0.1f),
+            )
+
+            // Wick.
             drawLine(
-                color = Color(0xFF6B5B45),
+                color = Color(0xFF4A3B2A),
                 start = Offset(cx, candleTop),
-                end = Offset(cx, candleTop - h * 0.05f),
-                strokeWidth = w * 0.012f,
+                end = Offset(cx, candleTop - h * 0.032f),
+                strokeWidth = w * 0.01f,
+                cap = StrokeCap.Round,
             )
-            // flame glow
+
+            val flameBase = Offset(cx, candleTop - h * 0.09f)
+            // Outer halo — the part that "flickers" most visibly.
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xCCFFC969), Color(0x00FFC969)),
-                    center = Offset(cx, candleTop - h * 0.14f),
-                    radius = h * 0.14f,
+                    colors = listOf(Color(0xB3FFC969), Color(0x00FFC969)),
+                    center = flameBase,
+                    radius = h * 0.16f * flicker,
                 ),
-                radius = h * 0.14f,
-                center = Offset(cx, candleTop - h * 0.14f),
+                radius = h * 0.16f * flicker,
+                center = flameBase,
             )
-            // flame core
+            // Flame body, teardrop-ish from three stacked ovals: deep orange
+            // base, golden middle, near-white hot tip.
             drawOval(
-                color = Color(0xFFFFB300),
-                topLeft = Offset(cx - w * 0.035f, candleTop - h * 0.21f),
-                size = androidx.compose.ui.geometry.Size(w * 0.07f, h * 0.16f),
+                color = Color(0xFFFF8A1F),
+                topLeft = Offset(
+                    cx - w * 0.044f * flicker,
+                    candleTop - h * 0.145f * flicker,
+                ),
+                size = androidx.compose.ui.geometry.Size(w * 0.088f * flicker, h * 0.155f * flicker),
             )
             drawOval(
-                color = Color(0xFFFFF3C4),
-                topLeft = Offset(cx - w * 0.018f, candleTop - h * 0.15f),
-                size = androidx.compose.ui.geometry.Size(w * 0.036f, h * 0.09f),
+                color = Color(0xFFFFC94D),
+                topLeft = Offset(
+                    cx - w * 0.027f * flicker,
+                    candleTop - h * 0.122f * flicker,
+                ),
+                size = androidx.compose.ui.geometry.Size(w * 0.054f * flicker, h * 0.10f * flicker),
+            )
+            drawOval(
+                color = Color(0xFFFFF7E0),
+                topLeft = Offset(
+                    cx - w * 0.012f * flicker,
+                    candleTop - h * 0.088f * flicker,
+                ),
+                size = androidx.compose.ui.geometry.Size(w * 0.024f * flicker, h * 0.045f * flicker),
             )
         }
     }
