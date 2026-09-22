@@ -96,10 +96,12 @@ android {
         // gating אישור — a second alarm firing while the first was still
         // ringing re-fronted the same ringing screen (by design) but left the
         // question behind, so it dismissed instantly with none asked. And the
-        // Friday-candle-lighting alarm now actually rings differently, easing
-        // in over its first half-minute, rather than the plain instant full
-        // volume every other alarm gets — its own picker already promised
-        // that and it never delivered.
+        // Friday-candle-lighting alarm's screen is now an actual candle scene
+        // (holders, warm glow, a slow flicker) instead of two small floating
+        // shapes — the ring itself stays plain 100% immediate, same as every
+        // other alarm, by the owner's own call: candle-lighting has a real
+        // deadline, so only the screen carries the "special" its own picker
+        // already promised.
         //
         // versionName moves to 1.1.1 so Settings → Apps visibly changes when
         // an update lands. versionCode alone is invisible there, and "did the
