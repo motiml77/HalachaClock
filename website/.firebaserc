@@ -1,5 +1,15 @@
 {
   "projects": {
-    "default": "halacha-clock"
-  }
+    "default": "video-filter-licenses"
+  },
+  "targets": {
+    "video-filter-licenses": {
+      "hosting": {
+        "halacha-clock": [
+          "halacha-clock"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
