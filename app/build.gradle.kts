@@ -80,34 +80,28 @@ android {
         targetSdk = 36
         // Play requires a UNIQUE versionCode across EVERY track, so each upload
         // takes the next number, and one source is often built twice — once
-        // per paywall setting. History: 5, 7, 8, then 10 went to Internal
-        // Testing (paywall=true); 6, 9, then 12 to Closed Testing
+        // per paywall setting. History: 5, 7, 8, 10, then 13 went to Internal
+        // Testing (paywall=true); 6, 9, 12, then 14 to Closed Testing
         // (paywall=false) — 11 was skipped; it was never sent for review, but
         // Play still burns a versionCode the moment a bundle carrying it
         // finishes upload processing on ANY draft, and deleting the draft
-        // does not give it back. 13 (Internal) and 14 (Closed) are this
-        // source, both a full release behind where Internal was sitting (it
-        // had been stuck on 8 / 1.1.0 since the widget/status-line/paywall
-        // work went out to Closed alone).
+        // does not give it back. 15 (Internal) and 16 (Closed) are this
+        // source.
         //
-        // 13/14, on top of everything already in 1.1.1 (status notification
-        // restore + next-zman filter fix, the שומר לערבית widget button, the
-        // redesigned paywall): the math dismiss-challenge could silently stop
-        // gating אישור — a second alarm firing while the first was still
-        // ringing re-fronted the same ringing screen (by design) but left the
-        // question behind, so it dismissed instantly with none asked. And the
-        // Friday-candle-lighting alarm's screen is now an actual candle scene
-        // (holders, warm glow, a slow flicker) instead of two small floating
-        // shapes — the ring itself stays plain 100% immediate, same as every
-        // other alarm, by the owner's own call: candle-lighting has a real
-        // deadline, so only the screen carries the "special" its own picker
-        // already promised.
+        // 15/16 add Sefirat HaOmer: a nightly tzeit alert for the 49 nights of
+        // the count, managed entirely from Settings (a wheat-gold card there
+        // toggles it; a first-night prompt offers it once a season) rather
+        // than hand-built like an ordinary alarm. Skips any night that would
+        // ring on Shabbat or Yom Tov — checked on the night being ENTERED, not
+        // the fire date — and retires itself after the 49th count, which is
+        // what flips the Settings switch back off and re-arms next year's
+        // prompt. The ring screen carries its own drawn wheat-sheaf scene and
+        // the day number in the huge digits slot that used to show an
+        // unrelated wall-clock reading there.
         //
-        // versionName moves to 1.1.1 so Settings → Apps visibly changes when
-        // an update lands. versionCode alone is invisible there, and "did the
-        // phone actually take the new build" has been the recurring question.
-        versionCode = 14
-        versionName = "1.1.1"
+        // versionName moves to 1.2.0 — a real feature, not another fix pass.
+        versionCode = 16
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
