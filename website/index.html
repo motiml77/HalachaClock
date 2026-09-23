@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Halacha Clock — שעון מעורר וזמנים הלכתיים</title>
 <meta name="description" content="אפליקציית זמנים הלכתיים ושעון מעורר לפי זמן: הנץ, שקיעה, צאת הכוכבים, כניסת שבת ועוד — לפי לוח אור החיים / חזון יוסף. חינם, בעברית, לאנדרואיד ול-Windows.">
-<meta name="keywords" content="זמנים הלכתיים, שעון מעורר הלכתי, אפליקציית זמני היום, לוח אור החיים, חזון יוסף, זמני שבת, צאת שבת, הדלקת נרות, הנץ החמה, שקיעה, זמני תפילה, לוח שנה עברי, שעון מעורר לפי זמן">
+<meta name="keywords" content="זמנים הלכתיים, שעון מעורר הלכתי, אפליקציית זמני היום, לוח אור החיים, חזון יוסף, זמני שבת, צאת שבת, הדלקת נרות, הנץ החמה, שקיעה, זמני תפילה, לוח שנה עברי, שעון מעורר לפי זמן, ספירת העומר, התראת ספירת העומר, היום יום לעומר">
 <meta name="author" content="Moti Levi">
 <link rel="canonical" href="https://halacha-clock.web.app/">
 <link rel="icon" type="image/png" href="img/brand-mark.png">
@@ -54,6 +54,8 @@
      "acceptedAnswer": {"@type": "Answer", "text": "כן. כל הזמנים והשעונים המעוררים מחושבים ונקבעים על המכשיר עצמו. החיבור היחיד לרשת הוא שליפת טבלת ההנץ הנראה, שנשמרת במכשיר."}},
     {"@type": "Question", "name": "אפשר לשנות את זמן צאת השבת?",
      "acceptedAnswer": {"@type": "Answer", "text": "כן, בהגדרות. אפשר לבחור בין כ״ה, ל׳, ל״ה, מ׳, מ״ב, נ׳ וע״ב דקות אחרי השקיעה. ברירת המחדל היא מ׳ דקות."}},
+    {"@type": "Question", "name": "איך עובדת ההתראה לספירת העומר?",
+     "acceptedAnswer": {"@type": "Answer", "text": "כפתור אחד בהגדרות. היא מנהלת את עצמה: מופיעה בכל לילה מהספירה בצאת הכוכבים לחומרא עם הנוסח המלא מהסידור, שותקת בכניסת שבת ויום טוב, ונכבית לגמרי לבד אחרי הספירה המ״ט."}},
     {"@type": "Question", "name": "האפליקציה אוספת מידע עליי?",
      "acceptedAnswer": {"@type": "Answer", "text": "לא. אין הרשמה, אין חשבון משתמש, אין פרסומות, ואין שרת שלנו. ההגדרות נשמרות במכשיר בלבד, והסרת ההתקנה מוחקת אותן לחלוטין."}},
     {"@type": "Question", "name": "יש גרסה למחשב?",
@@ -827,6 +829,63 @@ footer{
   </div>
 </section>
 
+<!-- ═══════════════════════ OMER COUNT ═══════════════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="luach-head">
+      <h2>ספירת העומר</h2>
+      <span class="leader"></span>
+      <span class="mark">לילה אחר לילה</span>
+    </div>
+
+    <div class="split narrow-media">
+      <div class="shots">
+        <figure class="shot">
+          <div class="phone"><img src="img/omer_ring.png" alt="מסך ספירת העומר: שיבולת מוארת על רקע ליל, היום יום אחד לעומר, והספרה 1"></div>
+        </figure>
+      </div>
+
+      <div>
+        <h3>לא צריך לבנות שעון בעצמך</h3>
+        <p>
+          ספירת העומר היא מצווה שתלויה בלילה — מליל ט״ז בניסן ועד ערב שבועות, כל לילה בזמנו,
+          בלי לדלג. שעון רגיל שנקבע פעם אחת לא מספיק כאן: הוא לא יודע להפסיק אחרי הספירה
+          המ״ט, ולא יודע לשתוק בכניסת שבת או יום טוב.
+        </p>
+        <p>
+          לכן ההתראה הזו אינה שעון שבונים — היא כפתור אחד בהגדרות. בהדלקה היא מנהלת את עצמה:
+          מופיעה בכל לילה בצאת הכוכבים לחומרא עם הנוסח המלא מהסידור, "היום ... לעומר" עם
+          פירוט השבועות והימים כשיש, שותקת בערבי שבת ויום טוב, וכשהספירה המ״ט מגיעה — נכבית
+          לגמרי מעצמה, מוכנה להידלק שוב בשנה הבאה.
+        </p>
+        <div class="ticks">
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>מתחילה ונגמרת מעצמה — 49 לילות בדיוק, בלי לזכור לכבות</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>הנוסח המלא מהסידור — לא רק מספר, עם שבועות וימים</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>שותקת בכניסת שבת ויום טוב, וממשיכה כרגיל בצאת</span>
+          </div>
+          <div class="tick">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>מוצעת אוטומטית בהתחלת הספירה, ותמיד זמינה בהגדרות</span>
+          </div>
+        </div>
+
+        <div class="surface" style="margin-top: 20px;">
+          <img src="img/omer_card_off.png" alt="כרטיס ספירת העומר בהגדרות, עם מתג הפעלה">
+          <p class="cap">כרטיס ספירת העומר בהגדרות — כפתור אחד, וזהו</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ════════════════════ WIDGET + STATUS LINE ════════════════════ -->
 <section>
   <div class="wrap">
@@ -923,6 +982,15 @@ footer{
         <div class="answer">
           התראה חד-פעמית לערב הזה בלבד, שנדרכת בלחיצה אחת ממסך הזמנים או מהוידג׳ט,
           בסמוך לצאת הכוכבים. היא לא חוזרת מחר ולא נשארת ברשימה — אחרי שצלצלה היא נמחקת.
+        </div>
+      </details>
+
+      <details>
+        <summary>איך עובדת ההתראה לספירת העומר?</summary>
+        <div class="answer">
+          כפתור אחד בהגדרות. מרגע ההפעלה היא מנהלת את עצמה: מופיעה מעצמה בכל לילה מהספירה,
+          בצאת הכוכבים לחומרא, עם הנוסח המלא מהסידור ("היום ... לעומר", כולל שבועות וימים),
+          שותקת בכניסת שבת ויום טוב, ונכבית לגמרי לבד אחרי הספירה המ״ט.
         </div>
       </details>
 
