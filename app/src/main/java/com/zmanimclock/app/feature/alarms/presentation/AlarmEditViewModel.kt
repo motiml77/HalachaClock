@@ -9,6 +9,7 @@ import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
+import com.zmanimclock.app.feature.zmanim.model.OmerCount
 import com.zmanimclock.app.scheduling.AlarmScheduler
 import com.zmanimclock.app.scheduling.AlarmSoundService
 import com.zmanimclock.app.scheduling.RescheduleWorker
@@ -148,6 +149,21 @@ class AlarmEditViewModel @Inject constructor(
     fun previewAlarm() {
         val a = _alarm.value
         val title = a.label.ifBlank { defaultAlarmLabel(a) }
+        // Resolved once, here, exactly like `title` — not recomputed inside
+        // the service. Today's real day when the preview genuinely happens to
+        // land inside the omer (a nice bonus); day 1 the rest of the year, so
+        // the preview demonstrates the screen on any date rather than
+        // silently falling back to the generic skin outside the season —
+        // which is exactly the bug this replaced: previewing an omer alarm
+        // used to carry no omer extra at all, so it always rang as a plain
+        // alarm no matter what.
+        val omerDay = if (a.omerMode) {
+            val zone = ZoneId.systemDefault()
+            OmerCount.dayOfOmerAtTzeit(LocalDate.now(zone), zone) ?: 1
+        } else {
+            null
+        }
+        val omerText = omerDay?.let(OmerCount::countText)
 
         // 1) The sound/vibration/ramp via the real service (preview path).
         val svc = android.content.Intent(context, AlarmSoundService::class.java).apply {
@@ -158,6 +174,10 @@ class AlarmEditViewModel @Inject constructor(
             putExtra(AlarmSoundService.EXTRA_PREVIEW_GRADUAL, a.gradualVolume)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_VIBRATE, a.vibrate)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_SHABBAT, a.shabbatMode)
+            // The service derives omerText itself from this (see
+            // AlarmSoundService.previewOmerDay) — no need to also carry the
+            // already-resolved string across.
+            putExtra(AlarmSoundService.EXTRA_PREVIEW_OMER_DAY, omerDay ?: -1)
             putExtra(AlarmSoundService.EXTRA_PREVIEW_TITLE, title)
         }
         androidx.core.content.ContextCompat.startForegroundService(context, svc)
@@ -174,8 +194,11 @@ class AlarmEditViewModel @Inject constructor(
                 android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(AlarmSoundService.EXTRA_ALARM_ID, AlarmSoundService.PREVIEW_ID)
             putExtra(AlarmSoundService.EXTRA_TITLE, title)
-            putExtra(AlarmSoundService.EXTRA_TIME_TEXT, "")
+            // Same big-digits slot the real ring repurposes for the day
+            // number (see AlarmSoundService.ring) — empty for every other kind.
+            putExtra(AlarmSoundService.EXTRA_TIME_TEXT, omerDay?.toString().orEmpty())
             putExtra(AlarmSoundService.EXTRA_SHABBAT, a.shabbatMode)
+            putExtra(AlarmSoundService.EXTRA_OMER_TEXT, omerText)
             putExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, 0)
             putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 0)
         }

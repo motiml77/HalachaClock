@@ -183,6 +183,20 @@ class AlarmSoundService : Service() {
 
     private var previewMode = false
     /**
+     * Set only in [startPreview], read only by [ring] while [previewMode] is
+     * true. The transient preview [AlarmEntity] never carries `omerMode`
+     * (previews are never persisted, and the field only ever means anything
+     * on a saved row), so [ring] cannot derive an omer day from the alarm the
+     * way it does for a real ring — it would just see omerMode=false and
+     * silently drop back to the generic skin no matter what the alarm being
+     * PREVIEWED actually is. AlarmEditViewModel.previewAlarm() resolves the
+     * day once (today's real count if this preview happens to land inside an
+     * actual omer season, day 1 as a demo otherwise) and this field is just
+     * where [ring] picks that up instead of recomputing from the (blank)
+     * transient entity.
+     */
+    private var previewOmerDay: Int? = null
+    /**
      * True when THIS ring is a wake-check's own re-ring (armed by
      * [WakeCheckReceiver] after a previous dismissal). Read by
      * [performDismiss] so dismissing it does not arm YET ANOTHER wake-check —
@@ -234,15 +248,13 @@ class AlarmSoundService : Service() {
             maxSnoozes = 0,
             label = intent.getStringExtra(EXTRA_PREVIEW_TITLE) ?: "תצוגה מקדימה",
         )
+        // See previewOmerDay's own doc — ring() reads this instead of trying
+        // to derive it from the transient entity above, which never carries
+        // omerMode.
+        previewOmerDay = intent.getIntExtra(EXTRA_PREVIEW_OMER_DAY, -1).takeIf { it > 0 }
         alarm = transient
-        goForeground(
-            notificationHelper.buildAlarmNotification(
-                alertId = PREVIEW_ID, title = titleOf(transient), timeText = "",
-                snoozeMinutes = 0, shabbatMode = transient.shabbatMode, snoozesLeft = 0,
-            )
-        )
         acquireWakeLock()
-        ring(transient)
+        ring(transient) // posts the real (correct) notification itself
     }
 
     private fun start(alarmId: Long, isWakeCheckRering: Boolean = false) {
@@ -345,17 +357,23 @@ class AlarmSoundService : Service() {
         // actually ringing, never stored on the entity. See OmerCount's own
         // doc for why it is the FIRE date's civil day, not the fire date
         // itself, that maps to the Jewish day being entered.
-        val omerDay = if (alarm.omerMode) {
-            com.zmanimclock.app.feature.zmanim.model.OmerCount
+        //
+        // previewMode branches to previewOmerDay instead of alarm.omerMode:
+        // the transient preview entity never carries omerMode (see
+        // previewOmerDay's doc) — checking alarm.omerMode here for a preview
+        // would always read false and silently drop back to the generic skin
+        // no matter what alarm was actually being previewed.
+        val omerDay = when {
+            previewMode -> previewOmerDay
+            alarm.omerMode -> com.zmanimclock.app.feature.zmanim.model.OmerCount
                 .dayOfOmerAtTzeit(java.time.LocalDate.now(ZoneId.systemDefault()), ZoneId.systemDefault())
-        } else {
-            null
+            else -> null
         }
         val omerText = omerDay?.let(com.zmanimclock.app.feature.zmanim.model.OmerCount::countText)
         // The generic huge-digits slot normally carries a wall-clock/zman
         // reading, which means nothing on an omer ring — replaced with the
         // day number itself, the one thing worth reading at a glance.
-        val bigText = if (alarm.omerMode) omerDay?.toString().orEmpty() else timeTextOf(alarm)
+        val bigText = if (omerDay != null) omerDay.toString() else timeTextOf(alarm)
 
         // Replace the placeholder posted in start() with the real content
         goForeground(
@@ -820,6 +838,8 @@ class AlarmSoundService : Service() {
         const val EXTRA_PREVIEW_GRADUAL = "preview_gradual"
         const val EXTRA_PREVIEW_VIBRATE = "preview_vibrate"
         const val EXTRA_PREVIEW_SHABBAT = "preview_shabbat"
+        /** The day (1..49) to preview as if it were tonight's count; -1/absent = not an omer preview. */
+        const val EXTRA_PREVIEW_OMER_DAY = "preview_omer_day"
         const val EXTRA_PREVIEW_TITLE = "preview_title"
 
         const val EXTRA_ALARM_ID = "alarm_id"
