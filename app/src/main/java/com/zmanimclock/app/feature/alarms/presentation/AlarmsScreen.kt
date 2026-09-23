@@ -53,12 +53,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
-import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.ui.WheatEar
 import com.zmanimclock.app.ui.theme.AppIcons
 import com.zmanimclock.app.ui.theme.Ext
 import com.zmanimclock.app.ui.theme.ZmanListTimeStyle
 
 private val DAY_LETTERS = listOf("א", "ב", "ג", "ד", "ה", "ו", "ש")
+
+/**
+ * Sefirat HaOmer's own accent — matches [com.zmanimclock.app.ui.OmerGold],
+ * the wheat-gold used everywhere else this feature appears (Settings, the
+ * ring screen). Deliberately its own hue, distinct from Shabbat's brighter
+ * gold and the ordinary zman amber.
+ */
+private val OmerAccent = com.zmanimclock.app.ui.OmerGold
 
 /**
  * טאב המעורר — style 1D (§6.6, §7.2–7.4): AlarmCards on the app canvas,
@@ -218,6 +226,7 @@ private fun AlarmCard(
     // one muddy family instead of three you can tell apart across a room.
     val accent = when {
         alarm.shabbatMode -> Ext.colors.accentGold
+        alarm.omerMode -> OmerAccent
         isZman -> Ext.colors.zmanAccent
         else -> cs.primary
     }
@@ -268,13 +277,17 @@ private fun AlarmCard(
                 // Time, large — zman alarms show the computed next fire time
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isZman) {
-                        Icon(
-                            imageVector = if (alarm.shabbatMode) AppIcons.Candle
-                            else Icons.Filled.WbTwilight,
-                            contentDescription = null,
-                            tint = stripeColor,
-                            modifier = Modifier.size(18.dp),
-                        )
+                        if (alarm.omerMode) {
+                            WheatEar(modifier = Modifier.size(18.dp), tint = stripeColor)
+                        } else {
+                            Icon(
+                                imageVector = if (alarm.shabbatMode) AppIcons.Candle
+                                else Icons.Filled.WbTwilight,
+                                contentDescription = null,
+                                tint = stripeColor,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                         Spacer(Modifier.width(6.dp))
                     }
                     Text(
@@ -339,12 +352,16 @@ private fun AlarmCard(
 }
 
 private fun daysText(alarm: AlarmEntity): String {
-    val base = when (alarm.daysOfWeek) {
-        0 -> "חד-פעמי"
-        AlarmEntity.ALL_DAYS -> "כל יום"
-        AlarmEntity.SUNDAY_TO_FRIDAY -> "א'-ו'"
-        AlarmEntity.SUNDAY_TO_THURSDAY -> "א'-ה'"
-        AlarmEntity.FRIDAY_ONLY -> "כל שישי"
+    val base = when {
+        // Not really "every day" — AlarmTimeCalculator.isDayAllowed only
+        // lets 49 of them through, and daysOfWeek staying ALL_DAYS is what
+        // makes that possible rather than something to describe literally.
+        alarm.omerMode -> "ימי הספירה"
+        alarm.daysOfWeek == 0 -> "חד-פעמי"
+        alarm.daysOfWeek == AlarmEntity.ALL_DAYS -> "כל יום"
+        alarm.daysOfWeek == AlarmEntity.SUNDAY_TO_FRIDAY -> "א'-ו'"
+        alarm.daysOfWeek == AlarmEntity.SUNDAY_TO_THURSDAY -> "א'-ה'"
+        alarm.daysOfWeek == AlarmEntity.FRIDAY_ONLY -> "כל שישי"
         else -> DAY_LETTERS.filterIndexed { i, _ -> (alarm.daysOfWeek shr i) and 1 == 1 }
             .joinToString(" ")
     }
@@ -406,6 +423,10 @@ private fun AlarmTypeChooserSheet(
                 subtitle = "כל שישי, $SHABBAT_ENTRY_OFFSET_MINUTES דק' לפני השקיעה — מסך נרות וצליל מיוחד",
                 onClick = onChooseShabbat,
             )
+            // Sefirat HaOmer is NOT offered here: it is a season-only alert
+            // controlled from Settings (and offered once by the first-night
+            // prompt), not something hand-built like a wake-up. An existing
+            // omer alarm still renders in the list with its own wheat styling.
         }
     }
 }

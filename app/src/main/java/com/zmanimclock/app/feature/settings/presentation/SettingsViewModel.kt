@@ -27,6 +27,7 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefsRepository: UserPreferencesRepository,
     private val alarmDao: AlarmDao,
+    private val omerAlerts: com.zmanimclock.app.feature.omer.OmerAlertManager,
     billingRepository: com.zmanimclock.app.feature.subscription.BillingRepository,
 ) : ViewModel() {
 
@@ -35,6 +36,14 @@ class SettingsViewModel @Inject constructor(
 
     val preferences: StateFlow<UserPreferences> = prefsRepository.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserPreferences())
+
+    /** Whether the Sefirat HaOmer nightly alert is currently on. */
+    val omerAlertEnabled: StateFlow<Boolean> = omerAlerts.enabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setOmerAlert(enabled: Boolean) {
+        viewModelScope.launch { omerAlerts.setEnabled(enabled) }
+    }
 
     fun setTzeitShabbatMinutes(minutes: Int) {
         viewModelScope.launch { prefsRepository.setTzeitShabbatMinutes(minutes) }

@@ -273,6 +273,7 @@ class AlarmEditViewModel @Inject constructor(
  */
 fun defaultAlarmLabel(a: AlarmEntity): String = when {
     a.shabbatMode -> "כניסת שבת"
+    a.omerMode -> "ספירת העומר"
     a.type == AlarmType.ZMAN -> {
         val name = com.zmanimclock.app.feature.zmanim.model.ZmanKind
             .fromNameOrNull(a.zmanId)?.hebrewName ?: a.zmanId

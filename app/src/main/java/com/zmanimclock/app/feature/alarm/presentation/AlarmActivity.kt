@@ -58,6 +58,7 @@ import com.zmanimclock.app.feature.alarm.MathChallenge
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import com.zmanimclock.app.scheduling.AlarmRingBus
 import com.zmanimclock.app.scheduling.AlarmSoundService
+import com.zmanimclock.app.ui.OmerNightScene
 
 /** Everything the ringing screen renders, captured from one intent. */
 private data class AlarmUiArgs(
@@ -66,6 +67,8 @@ private data class AlarmUiArgs(
     val timeText: String,
     val snoozeMinutes: Int,
     val shabbatMode: Boolean,
+    /** Null unless this ring is an omer count — the fixed nightly text, already resolved. */
+    val omerText: String?,
     val snoozesLeft: Int,
     val challenge: DismissChallenge,
 ) {
@@ -76,6 +79,7 @@ private data class AlarmUiArgs(
             timeText = intent.getStringExtra(AlarmSoundService.EXTRA_TIME_TEXT) ?: "",
             snoozeMinutes = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, 5),
             shabbatMode = intent.getBooleanExtra(AlarmSoundService.EXTRA_SHABBAT, false),
+            omerText = intent.getStringExtra(AlarmSoundService.EXTRA_OMER_TEXT),
             snoozesLeft = intent.getIntExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, -1),
             challenge = intent.getStringExtra(AlarmSoundService.EXTRA_CHALLENGE)
                 ?.let { runCatching { DismissChallenge.valueOf(it) }.getOrNull() }
@@ -88,9 +92,10 @@ private data class AlarmUiArgs(
  * Full-screen ringing UI over the lock screen — night-friendly designed
  * screen with a big אישור button.
  *
- * Two skins:
+ * Three skins:
  *  - Regular: deep-night gradient, huge time, zman name.
  *  - Shabbat entry: warm sunset gradient + drawn candles — "שבת נכנסת!".
+ *  - Omer count: olive-gold gradient, tonight's fixed "היום ... לעומר" text.
  * A math dismiss-challenge (when set) gates אישור only; snooze never.
  *
  * launchMode="singleInstance" (AndroidManifest.xml) means a SECOND alarm
@@ -150,6 +155,7 @@ class AlarmActivity : ComponentActivity() {
                     snoozesLeft = args.snoozesLeft,
                     challenge = args.challenge,
                     shabbatMode = args.shabbatMode,
+                    omerText = args.omerText,
                     onDismiss = { sendCommand(AlarmSoundService.ACTION_DISMISS, args.alarmId); finish() },
                     onSnooze = { sendCommand(AlarmSoundService.ACTION_SNOOZE, args.alarmId); finish() },
                 )
@@ -193,6 +199,12 @@ private val ShabbatTop = Color(0xFF2A1233)
 private val ShabbatBottom = Color(0xFF7A3B2E)
 private val WarmGold = Color(0xFFF5C518)
 private val SoftWhite = Color(0xFFE6EAF4)
+private val OmerTop = Color(0xFF1B2410)
+private val OmerBottom = Color(0xFF4C5A22)
+// The same warm gold as the sheaf's own lit grain (OmerNightScene's
+// grainLight) — not a separate yellow-green — so the title text reads as
+// part of the same wheat, not a clashing accent next to it.
+private val OmerAccent = Color(0xFFE9D170)
 
 @Composable
 private fun AlarmScreen(
@@ -204,6 +216,8 @@ private fun AlarmScreen(
     snoozesLeft: Int,
     challenge: DismissChallenge,
     shabbatMode: Boolean,
+    /** Null unless this ring is an omer count — the fixed nightly text, already resolved. */
+    omerText: String?,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
 ) {
@@ -267,12 +281,16 @@ private fun AlarmScreen(
     // path as אישור so a deliberately-set math challenge still applies.
     BackHandler(enabled = true) { tryDismiss() }
 
-    val gradient = if (shabbatMode) {
-        Brush.verticalGradient(listOf(ShabbatTop, ShabbatBottom))
-    } else {
-        Brush.verticalGradient(listOf(NightTop, NightBottom))
+    val gradient = when {
+        shabbatMode -> Brush.verticalGradient(listOf(ShabbatTop, ShabbatBottom))
+        omerText != null -> Brush.verticalGradient(listOf(OmerTop, OmerBottom))
+        else -> Brush.verticalGradient(listOf(NightTop, NightBottom))
     }
-    val accent = if (shabbatMode) WarmGold else SoftWhite
+    val accent = when {
+        shabbatMode -> WarmGold
+        omerText != null -> OmerAccent
+        else -> SoftWhite
+    }
 
     Box(
         modifier = Modifier
@@ -301,6 +319,31 @@ private fun AlarmScreen(
                     "עוד מעט שקיעה — זמן להדליק נרות",
                     style = MaterialTheme.typography.titleMedium,
                     color = SoftWhite.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center,
+                )
+            } else if (omerText != null) {
+                // The drawn sheaf-under-stars scene IS the special thing about
+                // this ring, exactly as the candles are for Shabbat entry.
+                OmerNightScene(modifier = Modifier.size(width = 210.dp, height = 200.dp))
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(12.dp))
+                // The fixed nightly count — the whole point of this screen.
+                // headlineSmall rather than shabbatMode's displaySmall title:
+                // the longer lines (day 43+ carry a "שהם X שבועות ו-Y ימים"
+                // clause) need to wrap onto two lines without either
+                // overflowing or looking like an afterthought.
+                Text(
+                    text = omerText,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = SoftWhite,
                     textAlign = TextAlign.Center,
                 )
             } else {

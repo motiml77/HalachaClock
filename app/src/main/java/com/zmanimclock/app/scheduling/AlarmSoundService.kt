@@ -291,7 +291,7 @@ class AlarmSoundService : Service() {
                 stopSelf(); return@launch
             }
             alarm = loaded
-            ring(loaded)
+            val omerDay = ring(loaded)
             // Everything past this point is bookkeeping — it must never be
             // able to take the ringing alarm down with it.
             runCatching {
@@ -307,6 +307,15 @@ class AlarmSoundService : Service() {
                     // the database, and these alarms carry maxSnoozes = 0, so
                     // nothing downstream needs the row to still exist.
                     loaded.deleteAfterFiring -> alarmDao.deleteById(loaded.id)
+                    // The omer alarm is managed, not a thing the user hand-
+                    // builds (see OmerAlertManager) — so once the count is
+                    // OVER for the season, it removes itself the same way
+                    // turning the Settings switch off does: this is what
+                    // flips that switch back to OFF and re-arms next year's
+                    // first-night prompt, rather than sitting there silently
+                    // "on" (but never firing) until the user notices.
+                    loaded.omerMode && omerDay == com.zmanimclock.app.feature.zmanim.model.OmerCount.LAST_DAY ->
+                        alarmDao.deleteById(loaded.id)
                     loaded.isOneTime -> alarmDao.setActive(loaded.id, false)
                 }
             }.onFailure { Log.e(TAG, "Failed to retire one-time alarm", it) }
@@ -330,16 +339,34 @@ class AlarmSoundService : Service() {
         }
     }
 
-    private fun ring(alarm: AlarmEntity) {
+    /** Rings [alarm]; returns tonight's omer day (1..49), or null if this is not an omer ring. */
+    private fun ring(alarm: AlarmEntity): Int? {
+        // The count for TONIGHT — computed here, at the moment the alarm is
+        // actually ringing, never stored on the entity. See OmerCount's own
+        // doc for why it is the FIRE date's civil day, not the fire date
+        // itself, that maps to the Jewish day being entered.
+        val omerDay = if (alarm.omerMode) {
+            com.zmanimclock.app.feature.zmanim.model.OmerCount
+                .dayOfOmerAtTzeit(java.time.LocalDate.now(ZoneId.systemDefault()), ZoneId.systemDefault())
+        } else {
+            null
+        }
+        val omerText = omerDay?.let(com.zmanimclock.app.feature.zmanim.model.OmerCount::countText)
+        // The generic huge-digits slot normally carries a wall-clock/zman
+        // reading, which means nothing on an omer ring — replaced with the
+        // day number itself, the one thing worth reading at a glance.
+        val bigText = if (alarm.omerMode) omerDay?.toString().orEmpty() else timeTextOf(alarm)
+
         // Replace the placeholder posted in start() with the real content
         goForeground(
             notificationHelper.buildAlarmNotification(
                 alertId = alarm.id,
                 title = titleOf(alarm),
-                timeText = timeTextOf(alarm),
+                timeText = bigText,
                 snoozeMinutes = alarm.snoozeMinutes,
                 challenge = alarm.dismissChallenge.name,
                 shabbatMode = alarm.shabbatMode,
+                omerText = omerText,
                 snoozesLeft = snoozesLeft(alarm),
             )
         )
@@ -356,10 +383,11 @@ class AlarmSoundService : Service() {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra(EXTRA_ALARM_ID, alarm.id)
                     putExtra(EXTRA_TITLE, titleOf(alarm))
-                    putExtra(EXTRA_TIME_TEXT, timeTextOf(alarm))
+                    putExtra(EXTRA_TIME_TEXT, bigText)
                     putExtra(EXTRA_SNOOZE_MINUTES, alarm.snoozeMinutes)
                     putExtra(EXTRA_CHALLENGE, alarm.dismissChallenge.name)
                     putExtra(EXTRA_SHABBAT, alarm.shabbatMode)
+                    putExtra(EXTRA_OMER_TEXT, omerText)
                     putExtra(EXTRA_SNOOZES_LEFT, snoozesLeft(alarm))
                 }
             )
@@ -385,6 +413,7 @@ class AlarmSoundService : Service() {
         handler.removeCallbacks(autoSilence)
         handler.postDelayed(autoSilence, alarm.ringDurationSeconds.coerceIn(10, 180) * 1_000L)
         Log.i(TAG, "Ringing alarm ${alarm.id} ('${titleOf(alarm)}')")
+        return omerDay
     }
 
     private fun startSound(alarm: AlarmEntity) {
@@ -800,6 +829,8 @@ class AlarmSoundService : Service() {
         const val EXTRA_SNOOZE_MINUTES = "snooze_minutes"
         const val EXTRA_CHALLENGE = "challenge"
         const val EXTRA_SHABBAT = "shabbat_mode"
+        /** Null unless this ring is an omer count — the fixed nightly text, already resolved. */
+        const val EXTRA_OMER_TEXT = "omer_text"
         const val EXTRA_SNOOZES_LEFT = "snoozes_left"
 
         // Ramp 0.2 → 1.0 in ~20s (ring durations are now 10s–3min, so the old

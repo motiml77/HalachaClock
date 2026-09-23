@@ -4,6 +4,7 @@ import com.zmanimclock.app.feature.alarm.MathChallenge
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -28,9 +29,11 @@ class AlarmTimeCalculatorTest {
         days: Int = AlarmEntity.ALL_DAYS,
         skipShabbat: Boolean = false,
         skipYomTov: Boolean = false,
+        omerMode: Boolean = false,
     ) = AlarmEntity(
         hour = hour, minute = minute, daysOfWeek = days,
         skipShabbat = skipShabbat, skipYomTov = skipYomTov,
+        omerMode = omerMode,
     )
 
     @Test
@@ -88,6 +91,56 @@ class AlarmTimeCalculatorTest {
         )
         // 12/9 and 13/9 are Yom Tov (and 12/9 is also Shabbat) → next is 14/9
         assertEquals(LocalDate.of(2026, 9, 14), fire!!.atZone(zone).toLocalDate())
+    }
+
+    @Test
+    fun `omerMode allows only the 49 nights of the omer, other alarms are unaffected`() {
+        // 15 Nissan 5786 (Pesach I) = Thu 2026-04-02 (Hebcal), so the first
+        // Sefirah night — the alert firing at tzeit that evening, opening 16
+        // Nissan — is fireDate 2026-04-02; the evening before is still 15
+        // Nissan / Pesach I, not yet the omer.
+        val firstOmerNight = LocalDate.of(2026, 4, 2)
+        val dayBeforeOmerBegins = LocalDate.of(2026, 4, 1)
+        val deepSummer = LocalDate.of(2026, 7, 15) // wednesdayMorning's date
+
+        assertTrue(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), firstOmerNight, zone))
+        assertFalse(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), dayBeforeOmerBegins, zone))
+        assertFalse(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), deepSummer, zone))
+
+        // A plain (non-omer) alarm never consults OmerCount at all.
+        assertTrue(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = false), dayBeforeOmerBegins, zone))
+        assertTrue(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = false), deepSummer, zone))
+    }
+
+    @Test
+    fun `omerMode never rings on a Friday night, that is already Shabbat`() {
+        // 2026-04-03 is a Friday inside the omer window (omer day 2). Firing
+        // at tzeit that evening enters Shabbat, so it is skipped — even
+        // though it IS a real omer night.
+        val fridayInOmer = LocalDate.of(2026, 4, 3)
+        assertEquals(DayOfWeek.FRIDAY, fridayInOmer.dayOfWeek)
+        assertFalse(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), fridayInOmer, zone))
+
+        // Saturday tzeit is motzaei-Shabbat — an omer night that IS allowed.
+        val saturdayInOmer = LocalDate.of(2026, 4, 4)
+        assertEquals(DayOfWeek.SATURDAY, saturdayInOmer.dayOfWeek)
+        assertTrue(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), saturdayInOmer, zone))
+    }
+
+    @Test
+    fun `omerMode skips Pesach VII eve but still rings the final count on erev Shavuot`() {
+        // Omer day 6 fires 2026-04-07 (Tue) at tzeit, entering 21 Nissan =
+        // Pesach VII, a Yom Tov in Israel → skipped though it is a real
+        // omer night. This is the ONE Yom-Tov collision inside the count.
+        val erevPesachVii = LocalDate.of(2026, 4, 7)
+        assertFalse(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), erevPesachVii, zone))
+
+        // The final count, omer day 49, fires 2026-05-20 at tzeit, entering
+        // 5 Sivan = EREV Shavuot — a weekday. Shavuot itself (6 Sivan) only
+        // begins the FOLLOWING night, so this count is NOT on Yom Tov and DOES
+        // ring: the culminating count keeps its alert.
+        val erevShavuot = LocalDate.of(2026, 5, 20)
+        assertTrue(AlarmTimeCalculator.isDayAllowed(alarm(omerMode = true), erevShavuot, zone))
     }
 
     @Test

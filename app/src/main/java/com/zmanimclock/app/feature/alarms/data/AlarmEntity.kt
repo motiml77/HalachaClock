@@ -2,6 +2,7 @@ package com.zmanimclock.app.feature.alarms.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 
 /** What anchors the alarm's fire time. */
 enum class AlarmType {
@@ -77,6 +78,14 @@ data class AlarmEntity(
      */
     val shabbatMode: Boolean = false,
 
+    /**
+     * Sefirat HaOmer count mode: nightly, TZEIT_LECHUMRA-anchored, only
+     * during the 49 nights of the omer (AlarmTimeCalculator.isDayAllowed
+     * skips every other night). The count text itself is computed fresh at
+     * ring time from the fire instant, never stored — see OmerCount.kt.
+     */
+    val omerMode: Boolean = false,
+
     // Dismissal
     val dismissChallenge: DismissChallenge = DismissChallenge.NONE,
     val snoozeMinutes: Int = 5,
@@ -130,6 +139,30 @@ data class AlarmEntity(
         /** Sunday-first bit for a java.time.DayOfWeek (SUNDAY=bit0 … SATURDAY=bit6). */
         fun bitFor(dayOfWeek: java.time.DayOfWeek): Int =
             1 shl (dayOfWeek.value % 7) // MONDAY(1)->bit1 … SATURDAY(6)->bit6, SUNDAY(7)->bit0
+
+        /**
+         * The one canonical Sefirat HaOmer alarm: nightly at צאת הכוכבים
+         * לחומרא, self-limited to the 49 nights of the omer — and skipping the
+         * nights on which it would ring on Shabbat or Yom Tov — by
+         * [com.zmanimclock.app.scheduling.AlarmTimeCalculator.isDayAllowed].
+         * daysOfWeek stays at [ALL_DAYS] on purpose: "only 49 nights" is not a
+         * day-of-week question. [omerMode] is set ONLY here (no edit-form field
+         * writes it), so it cannot be toggled on by accident; the whole alarm
+         * is created and removed as a unit by OmerAlertManager — the Settings
+         * switch and the first-night prompt — never hand-built in the editor.
+         * The count text is never stored: it depends on the date the alarm
+         * actually fires, so AlarmSoundService resolves it fresh at ring time.
+         */
+        fun omerPreset(): AlarmEntity = AlarmEntity(
+            type = AlarmType.ZMAN,
+            zmanId = ZmanKind.TZEIT_LECHUMRA.name,
+            offsetMinutes = 0,
+            offsetBefore = true,
+            daysOfWeek = ALL_DAYS,
+            omerMode = true,
+            label = "ספירת העומר",
+            ringDurationSeconds = 60,
+        )
     }
 
     fun isEnabledOn(dayOfWeek: java.time.DayOfWeek): Boolean =

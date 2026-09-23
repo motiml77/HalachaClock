@@ -46,4 +46,12 @@ class AlarmDefaultsTest {
     fun `a new alarm has no dismissal challenge`() {
         assertEquals(DismissChallenge.NONE, fresh.dismissChallenge)
     }
+
+    @Test
+    fun `a new alarm is not a shabbat or omer preset`() {
+        // Both are reached only through their dedicated preset constructors —
+        // never as something the generic edit form can turn on by accident.
+        assertFalse(fresh.shabbatMode)
+        assertFalse(fresh.omerMode)
+    }
 }

@@ -11,6 +11,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,6 +24,8 @@ import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.alarms.presentation.AlarmEditScreen
 import com.zmanimclock.app.feature.alarms.presentation.AlarmsScreen
 import com.zmanimclock.app.feature.calendar.presentation.CalendarScreen
+import com.zmanimclock.app.feature.omer.OmerPromptDialog
+import com.zmanimclock.app.feature.omer.OmerPromptViewModel
 import com.zmanimclock.app.feature.onboarding.OnboardingScreen
 import com.zmanimclock.app.feature.settings.presentation.CityPickerScreen
 import com.zmanimclock.app.feature.settings.presentation.SettingsScreen
@@ -136,6 +140,16 @@ fun AppNavigation() {
                     onBack = { navController.popBackStack() },
                 )
             }
+        }
+
+        // The once-a-season omer offer floats above whatever tab is showing.
+        val omerPrompt: OmerPromptViewModel = hiltViewModel()
+        val showOmerPrompt by omerPrompt.showPrompt.collectAsStateWithLifecycle()
+        if (showOmerPrompt) {
+            OmerPromptDialog(
+                onEnable = { omerPrompt.enable() },
+                onDismiss = { omerPrompt.dismiss() },
+            )
         }
     }
 }

@@ -303,6 +303,7 @@ class NotificationHelper @Inject constructor(
         snoozeMinutes: Int,
         challenge: String = "NONE",
         shabbatMode: Boolean = false,
+        omerText: String? = null,
         snoozesLeft: Int = -1,
         /** CHANNEL_ALARM_FALLBACK when AlarmSoundService could not be started. */
         channelId: String = CHANNEL_ALARM,
@@ -315,6 +316,7 @@ class NotificationHelper @Inject constructor(
             putExtra(AlarmSoundService.EXTRA_SNOOZE_MINUTES, snoozeMinutes)
             putExtra(AlarmSoundService.EXTRA_CHALLENGE, challenge)
             putExtra(AlarmSoundService.EXTRA_SHABBAT, shabbatMode)
+            putExtra(AlarmSoundService.EXTRA_OMER_TEXT, omerText)
             putExtra(AlarmSoundService.EXTRA_SNOOZES_LEFT, snoozesLeft)
         }
         val fullScreenPi = PendingIntent.getActivity(
@@ -339,6 +341,7 @@ class NotificationHelper @Inject constructor(
             .setContentText(
                 when {
                     shabbatMode -> "השקיעה בעוד דקות ספורות — שבת שלום!"
+                    omerText != null -> omerText
                     timeText.isNotEmpty() -> "בשעה $timeText"
                     else -> "עכשיו"
                 }

@@ -23,6 +23,13 @@ interface AlarmDao {
     @Query("SELECT * FROM alarms WHERE id = :id")
     suspend fun getAlarmById(id: Long): AlarmEntity?
 
+    /** Every Sefirat HaOmer alarm (there should be at most one). */
+    @Query("SELECT * FROM alarms WHERE omerMode = 1")
+    fun getOmerAlarms(): Flow<List<AlarmEntity>>
+
+    @Query("SELECT * FROM alarms WHERE omerMode = 1")
+    suspend fun getOmerAlarmsList(): List<AlarmEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAlarm(alarm: AlarmEntity): Long
 

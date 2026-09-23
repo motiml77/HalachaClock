@@ -9,8 +9,11 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -58,8 +61,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.zmanimclock.app.ui.WheatEar
 import androidx.core.content.getSystemService
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,6 +87,7 @@ fun SettingsScreen(
 ) {
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
     val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
+    val omerEnabled by viewModel.omerAlertEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Enabling the persistent status line is pointless without notification
@@ -154,6 +160,8 @@ fun SettingsScreen(
         onTzeitShabbatMinutesChange = viewModel::setTzeitShabbatMinutes,
         onNextZmanFilterChange = viewModel::setNextZmanFilter,
         onPersistentNotificationChange = ::onPersistentToggle,
+        omerAlertEnabled = omerEnabled,
+        onOmerAlertChange = viewModel::setOmerAlert,
         onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -218,6 +226,8 @@ fun SettingsContent(
     onTzeitShabbatMinutesChange: (Int) -> Unit = {},
     onNextZmanFilterChange: (Set<String>) -> Unit = {},
     onPersistentNotificationChange: (Boolean) -> Unit,
+    omerAlertEnabled: Boolean = false,
+    onOmerAlertChange: (Boolean) -> Unit = {},
     onRingTest: () -> Unit = {},
     onRequestExactAlarms: () -> Unit,
     onRequestFullScreen: () -> Unit = {},
@@ -412,6 +422,12 @@ fun SettingsContent(
         )
 
         SectionHeader("התראות")
+
+        // Sefirat HaOmer — a season-only alert, given its own warm wheat card
+        // (not the plain white one) so it reads at a glance as the special,
+        // time-bound thing it is. It leads this section during the omer and
+        // sits quietly the rest of the year.
+        OmerAlertCard(enabled = omerAlertEnabled, onToggle = onOmerAlertChange)
 
         // Persistent status notification
         SettingsCard {
@@ -620,6 +636,62 @@ private fun SubscriptionCard(status: SubscriptionStatus, onManage: () -> Unit) {
                     Text("ניהול מנוי ב-Google Play")
                 }
             }
+        }
+    }
+}
+
+/**
+ * The Sefirat HaOmer switch — deliberately NOT a [SettingsCard]. Its own warm
+ * wheat colouring and the drawn ear icon mark it as the one seasonal alert on
+ * this screen, so it never reads as just another notification row. Colours are
+ * chosen for both themes (a soft wheat in light, a deep olive-gold in dark).
+ */
+@Composable
+private fun OmerAlertCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val dark = isSystemInDarkTheme()
+    val cardBg = if (dark) Color(0xFF33301A) else Color(0xFFF7EEC9)
+    val tileBg = if (dark) Color(0xFF48411E) else Color(0xFFE7D699)
+    val iconTint = if (dark) Color(0xFFD8BE63) else Color(0xFF9C7A24)
+    val titleColor = if (dark) Color(0xFFEDE3B6) else Color(0xFF5B4E1E)
+    val subColor = if (dark) Color(0xFFC3B583) else Color(0xFF7A6A34)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(tileBg, RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                WheatEar(modifier = Modifier.size(30.dp), tint = iconTint)
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
+                Text(
+                    "ספירת העומר",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = titleColor,
+                )
+                Text(
+                    "כל לילה בצאת הכוכבים — \"היום ... לעומר\". רק בימי הספירה, " +
+                        "ולא בכניסת שבת או יום טוב.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = subColor,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
         }
     }
 }

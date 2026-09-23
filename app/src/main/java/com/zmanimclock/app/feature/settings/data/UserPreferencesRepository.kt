@@ -49,6 +49,14 @@ data class UserPreferences(
     val use24HourFormat: Boolean = true,
     val isFirstLaunch: Boolean = true,
     val persistentNotification: Boolean = true,
+    /**
+     * The civil year of the omer season the first-night prompt was last shown
+     * for (0 = never). Guards the prompt so it appears once per season: once
+     * the user has answered it — enable OR "not now" — this is stamped with
+     * that year and the prompt stays quiet until next year's omer. The switch
+     * in Settings is always available regardless. See OmerPromptViewModel.
+     */
+    val omerPromptedYear: Int = 0,
 )
 
 @Singleton
@@ -82,6 +90,7 @@ class UserPreferencesRepository @Inject constructor(
         val USE_24H = booleanPreferencesKey("use_24h")
         val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
         val PERSISTENT_NOTIFICATION = booleanPreferencesKey("persistent_notification")
+        val OMER_PROMPTED_YEAR = intPreferencesKey("omer_prompted_year")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
@@ -109,6 +118,7 @@ class UserPreferencesRepository @Inject constructor(
             use24HourFormat = prefs[Keys.USE_24H] ?: true,
             isFirstLaunch = prefs[Keys.FIRST_LAUNCH] ?: true,
             persistentNotification = prefs[Keys.PERSISTENT_NOTIFICATION] ?: true,
+            omerPromptedYear = prefs[Keys.OMER_PROMPTED_YEAR] ?: 0,
         ).also(::mirrorToDps)
     }
 
@@ -213,6 +223,10 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setPersistentNotification(enabled: Boolean) {
         context.dataStore.edit { it[Keys.PERSISTENT_NOTIFICATION] = enabled }
+    }
+
+    suspend fun setOmerPromptedYear(year: Int) {
+        context.dataStore.edit { it[Keys.OMER_PROMPTED_YEAR] = year }
     }
 
     fun prefsToGeoLocation(prefs: UserPreferences): AppGeoLocation {

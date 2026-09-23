@@ -104,7 +104,9 @@ fun AlarmEditScreen(
     onBack: () -> Unit,
     viewModel: AlarmEditViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(Unit) { viewModel.initialize(type, alarmId, preselectedZman, shabbatPreset) }
+    LaunchedEffect(Unit) {
+        viewModel.initialize(type, alarmId, preselectedZman, shabbatPreset)
+    }
     val alarm by viewModel.alarm.collectAsStateWithLifecycle()
     val zmanPreview by viewModel.zmanPreview.collectAsStateWithLifecycle()
     val context = LocalContext.current
