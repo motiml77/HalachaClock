@@ -85,23 +85,18 @@ android {
         // (paywall=false) — 11 was skipped; it was never sent for review, but
         // Play still burns a versionCode the moment a bundle carrying it
         // finishes upload processing on ANY draft, and deleting the draft
-        // does not give it back. 15 (Internal) and 16 (Closed) are this
-        // source.
+        // does not give it back. 15/16 added Sefirat HaOmer. 17 (Internal)
+        // and 18 (Closed) are this source.
         //
-        // 15/16 add Sefirat HaOmer: a nightly tzeit alert for the 49 nights of
-        // the count, managed entirely from Settings (a wheat-gold card there
-        // toggles it; a first-night prompt offers it once a season) rather
-        // than hand-built like an ordinary alarm. Skips any night that would
-        // ring on Shabbat or Yom Tov — checked on the night being ENTERED, not
-        // the fire date — and retires itself after the 49th count, which is
-        // what flips the Settings switch back off and re-arms next year's
-        // prompt. The ring screen carries its own drawn wheat-sheaf scene and
-        // the day number in the huge digits slot that used to show an
-        // unrelated wall-clock reading there.
+        // 17/18: new logo (gold clock, sun and open book) across every icon
+        // surface; the zmanim hero's next-zman block redrawn as one card with
+        // a sun or a moon beside the time, matching the desktop app; the
+        // Settings entry point moved off the bottom nav into that same
+        // card's own top-left corner.
         //
-        // versionName moves to 1.2.0 — a real feature, not another fix pass.
-        versionCode = 16
-        versionName = "1.2.0"
+        // versionName moves to 1.3.0 — a real, visible change, not a fix pass.
+        versionCode = 18
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
