@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NoFood
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,6 +67,7 @@ import java.time.Instant
 @Composable
 fun HomeScreen(
     onCreateZmanAlarm: (String) -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: ZmanimViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +92,7 @@ fun HomeScreen(
         onBellClick = { kind -> onCreateZmanAlarm(kind.name) },
         onGuardClick = { row -> guardDialogFor = row },
         onNextReached = viewModel::refresh,
+        onOpenSettings = onOpenSettings,
     )
 
     guardDialogFor?.let { row ->
@@ -110,6 +114,7 @@ fun ZmanimContent(
     onBellClick: (ZmanKind) -> Unit,
     onGuardClick: (ZmanimViewModel.ZmanRow) -> Unit = {},
     onNextReached: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     if (state.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -119,7 +124,7 @@ fun ZmanimContent(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        NextHero(state, onNextReached)
+        NextHero(state, onNextReached, onOpenSettings)
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(state.rows, key = { it.kind.name }) { row ->
                 ZmanRow(
@@ -174,7 +179,7 @@ private fun FastBannerCard(banner: ZmanimViewModel.FastBanner) {
 
 /** §6.2 — the primary hero header: the date, then the next-zman card. */
 @Composable
-private fun NextHero(state: ZmanimViewModel.UiState, onNextReached: () -> Unit) {
+private fun NextHero(state: ZmanimViewModel.UiState, onNextReached: () -> Unit, onOpenSettings: () -> Unit) {
     val ext = Ext.colors
     Column(
         modifier = Modifier
@@ -186,7 +191,7 @@ private fun NextHero(state: ZmanimViewModel.UiState, onNextReached: () -> Unit) 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -198,6 +203,16 @@ private fun NextHero(state: ZmanimViewModel.UiState, onNextReached: () -> Unit) 
                     text = "${state.gregorianDate} · ${state.locationName}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.85f),
+                )
+            }
+            // Settings lives here — this screen's own top-left corner, level
+            // with the top of the Hebrew date — rather than as a bar or a
+            // floating overlay repeated on every tab.
+            IconButton(onClick = onOpenSettings, modifier = Modifier.offset(y = (-10).dp)) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = "הגדרות",
+                    tint = Color.White,
                 )
             }
         }

@@ -18,10 +18,10 @@ sealed class Screen(val route: String, val labelHebrew: String, val icon: ImageV
 
     companion object {
         // RTL lays these out right-to-left, so the user reads:
-        // זמנים · לוח שנה · מעורר · הגדרות — the two information
-        // surfaces adjacent, then the two control surfaces. WomensArea is
-        // inserted conditionally (between Alarms and Settings) at the call
-        // site, not listed here — this is the fixed, always-present set.
-        val bottomBarScreens = listOf(Zmanim, Calendar, Alarms, Settings)
+        // זמנים · לוח שנה · מעורר — the tab surfaces. Settings lives as its
+        // own icon button at the top of the app (see AppNavigation), not a
+        // bottom tab. WomensArea is appended conditionally at the call site,
+        // not listed here — this is the fixed, always-present set.
+        val bottomBarScreens = listOf(Zmanim, Calendar, Alarms)
     }
 }
