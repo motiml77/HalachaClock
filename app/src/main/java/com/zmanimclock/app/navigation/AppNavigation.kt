@@ -10,6 +10,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,6 +30,9 @@ import com.zmanimclock.app.feature.omer.OmerPromptViewModel
 import com.zmanimclock.app.feature.onboarding.OnboardingScreen
 import com.zmanimclock.app.feature.settings.presentation.CityPickerScreen
 import com.zmanimclock.app.feature.settings.presentation.SettingsScreen
+import com.zmanimclock.app.feature.womensarea.presentation.WomensAreaGateViewModel
+import com.zmanimclock.app.feature.womensarea.presentation.WomensAreaHistoryScreen
+import com.zmanimclock.app.feature.womensarea.presentation.WomensAreaHostScreen
 import com.zmanimclock.app.feature.zmanim.presentation.HomeScreen
 
 @Composable
@@ -37,10 +41,26 @@ fun AppNavigation() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
 
+    // "מצב נשי" — the tab only appears once enabled in Settings (and its own
+    // PIN/biometric setup completed); the route itself is always registered
+    // below regardless, since WomensAreaHostScreen's own gate is the real
+    // access control every time it's entered, not this tab's visibility.
+    val womensAreaSecurity: WomensAreaGateViewModel = hiltViewModel()
+    val womensAreaEnabled by womensAreaSecurity.security.collectAsStateWithLifecycle()
+    val bottomBarScreens = remember(womensAreaEnabled.enabled) {
+        if (womensAreaEnabled.enabled) {
+            // [Zmanim, Calendar, Alarms, Settings] -> insert at index 3, after
+            // Alarms and before Settings.
+            Screen.bottomBarScreens.toMutableList().apply { add(3, Screen.WomensArea) }
+        } else {
+            Screen.bottomBarScreens
+        }
+    }
+
     Scaffold(
         bottomBar = {
             NavigationBar {
-                Screen.bottomBarScreens.forEach { screen ->
+                bottomBarScreens.forEach { screen ->
                     val selected = currentDestination?.hierarchy
                         ?.any { it.route == screen.route } == true
                     NavigationBarItem(
@@ -102,7 +122,17 @@ fun AppNavigation() {
                 SettingsScreen(
                     onOpenCityPicker = { navController.navigate("city_picker") },
                     onOpenPermissions = { navController.navigate("permissions") },
+                    // WomensAreaHostScreen shows its own setup step first
+                    // whenever setupComplete is false — same route the tab
+                    // itself uses, no separate setup route needed.
+                    onOpenWomensAreaSetup = { navController.navigate(Screen.WomensArea.route) },
                 )
+            }
+            composable(Screen.WomensArea.route) {
+                WomensAreaHostScreen(onOpenHistory = { navController.navigate("womens_area_history") })
+            }
+            composable("womens_area_history") {
+                WomensAreaHistoryScreen(onBack = { navController.popBackStack() })
             }
             composable("permissions") {
                 // The same wizard the first launch shows. Reachable forever,

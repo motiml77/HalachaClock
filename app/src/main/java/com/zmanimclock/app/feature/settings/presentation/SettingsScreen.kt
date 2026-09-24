@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AlarmOn
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -83,11 +84,13 @@ import com.zmanimclock.app.ui.components.ZmanGroupedChecklist
 fun SettingsScreen(
     onOpenCityPicker: () -> Unit,
     onOpenPermissions: () -> Unit = {},
+    onOpenWomensAreaSetup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
     val entitlement by viewModel.entitlement.collectAsStateWithLifecycle()
     val omerEnabled by viewModel.omerAlertEnabled.collectAsStateWithLifecycle()
+    val womensArea by viewModel.womensArea.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Enabling the persistent status line is pointless without notification
@@ -162,6 +165,8 @@ fun SettingsScreen(
         onPersistentNotificationChange = ::onPersistentToggle,
         omerAlertEnabled = omerEnabled,
         onOmerAlertChange = viewModel::setOmerAlert,
+        womensAreaEnabled = womensArea.enabled,
+        onWomensAreaToggle = { enabled -> viewModel.setWomensAreaEnabled(enabled, onNeedsSetup = onOpenWomensAreaSetup) },
         onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -228,6 +233,8 @@ fun SettingsContent(
     onPersistentNotificationChange: (Boolean) -> Unit,
     omerAlertEnabled: Boolean = false,
     onOmerAlertChange: (Boolean) -> Unit = {},
+    womensAreaEnabled: Boolean = false,
+    onWomensAreaToggle: (Boolean) -> Unit = {},
     onRingTest: () -> Unit = {},
     onRequestExactAlarms: () -> Unit,
     onRequestFullScreen: () -> Unit = {},
@@ -459,6 +466,9 @@ fun SettingsContent(
             onChange = onNextZmanFilterChange,
         )
 
+        SectionHeader("איזור נשי")
+        WomensAreaSettingsCard(enabled = womensAreaEnabled, onToggle = onWomensAreaToggle)
+
         SectionHeader("מערכת")
 
         subscription?.let { SubscriptionCard(it, onManageSubscription) }
@@ -687,6 +697,65 @@ private fun OmerAlertCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
                 Text(
                     "כל לילה בצאת הכוכבים — \"היום ... לעומר\". רק בימי הספירה, " +
                         "ולא בכניסת שבת או יום טוב.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = subColor,
+                )
+            }
+            Switch(checked = enabled, onCheckedChange = onToggle)
+        }
+    }
+}
+
+/**
+ * "מצב נשי" — deliberately NOT a [SettingsCard], same reasoning as
+ * [OmerAlertCard]: its own lilac colouring marks it as the one protected,
+ * gated area of the app rather than just another switch. Turning it on
+ * without a PIN set up yet routes to setup instead (see
+ * SettingsViewModel.setWomensAreaEnabled) — [onToggle] is called either way,
+ * the routing decision lives one layer up.
+ */
+@Composable
+private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    val dark = isSystemInDarkTheme()
+    val cardBg = if (dark) Color(0xFF2E2333) else Color(0xFFF3E5F9)
+    val tileBg = if (dark) Color(0xFF453249) else Color(0xFFE3C9EF)
+    val iconTint = if (dark) Color(0xFFD3A8E8) else Color(0xFF7C4A94)
+    val titleColor = if (dark) Color(0xFFEADCF0) else Color(0xFF3A2145)
+    val subColor = if (dark) Color(0xFFC7AFCF) else Color(0xFF6B4C78)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(tileBg, RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
+                Text("מצב נשי", style = MaterialTheme.typography.titleMedium, color = titleColor)
+                Text(
+                    "לוח שנה אישי לחישוב ימי פרישה וספירת שבעה נקיים. מוגן " +
+                        "בטביעת אצבע או קוד נפרד.",
                     style = MaterialTheme.typography.bodySmall,
                     color = subColor,
                 )

@@ -10,6 +10,8 @@ import com.zmanimclock.app.feature.alarms.data.AlarmEntity
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.settings.data.UserPreferences
 import com.zmanimclock.app.feature.settings.data.UserPreferencesRepository
+import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurity
+import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurityRepository
 import com.zmanimclock.app.scheduling.RescheduleWorker
 import com.zmanimclock.app.scheduling.StatusNotificationReceiver
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     private val prefsRepository: UserPreferencesRepository,
     private val alarmDao: AlarmDao,
     private val omerAlerts: com.zmanimclock.app.feature.omer.OmerAlertManager,
+    private val womensAreaSecurity: WomensAreaSecurityRepository,
     billingRepository: com.zmanimclock.app.feature.subscription.BillingRepository,
 ) : ViewModel() {
 
@@ -43,6 +46,27 @@ class SettingsViewModel @Inject constructor(
 
     fun setOmerAlert(enabled: Boolean) {
         viewModelScope.launch { omerAlerts.setEnabled(enabled) }
+    }
+
+    /** "מצב נשי" — the toggle's own state (setupComplete decides whether turning it on needs setup first). */
+    val womensArea: StateFlow<WomensAreaSecurity> = womensAreaSecurity.state
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WomensAreaSecurity())
+
+    /**
+     * Turning ON without a PIN yet routes to setup instead ([onNeedsSetup]) —
+     * setup itself flips [WomensAreaSecurityRepository.setEnabled] once a PIN
+     * is saved. Turning OFF just hides the tab; her data and PIN are left
+     * alone (matches how disabling the Omer alert doesn't delete history) —
+     * the toggle protects nothing by itself, the gate on the data does.
+     */
+    fun setWomensAreaEnabled(enabled: Boolean, onNeedsSetup: () -> Unit) {
+        viewModelScope.launch {
+            if (enabled && !womensAreaSecurity.state.first().setupComplete) {
+                onNeedsSetup()
+                return@launch
+            }
+            womensAreaSecurity.setEnabled(enabled)
+        }
     }
 
     fun setTzeitShabbatMinutes(minutes: Int) {
