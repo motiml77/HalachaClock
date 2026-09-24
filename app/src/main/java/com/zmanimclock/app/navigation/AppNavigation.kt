@@ -76,6 +76,13 @@ fun AppNavigation() {
                     onCreateZmanAlarm = { zman ->
                         navController.navigate("alarm_edit?type=ZMAN&zman=$zman")
                     },
+                    onOpenSettings = {
+                        navController.navigate(Screen.Settings.route) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
             composable(Screen.Calendar.route) {

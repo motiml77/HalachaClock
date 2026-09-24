@@ -15,8 +15,9 @@ sealed class Screen(val route: String, val labelHebrew: String, val icon: ImageV
 
     companion object {
         // RTL lays these out right-to-left, so the user reads:
-        // זמנים · לוח שנה · מעורר · הגדרות — the two information
-        // surfaces adjacent, then the two control surfaces.
-        val bottomBarScreens = listOf(Zmanim, Calendar, Alarms, Settings)
+        // זמנים · לוח שנה · מעורר — the tab surfaces. Settings lives as its
+        // own icon button inside the Zmanim tab's hero (see HomeScreen), not
+        // a bottom tab.
+        val bottomBarScreens = listOf(Zmanim, Calendar, Alarms)
     }
 }
