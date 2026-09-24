@@ -25,8 +25,9 @@ import javax.inject.Singleton
  * - The words never say what it is about: "התראה אישית · יום 3" (see
  *   WomensAreaNotificationText, whose test forbids the telling words).
  * - The lock screen shows only the public version: "התראה אישית", no text.
- * - The small icon and the colour are the app's ordinary ones, not the
- *   area's spring and lilac, so even the status bar gives nothing away.
+ * - The small icon is the area's spring (ic_stat_womens_area — water, no
+ *   words) in its lilac, as the owner chose; the app's own ic_stat_zman is
+ *   left as it is.
  * - The channel's name in the system settings is the neutral "התראות אישיות".
  */
 @Singleton
@@ -45,13 +46,13 @@ class WomensAreaNotifier @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val publicVersion = NotificationCompat.Builder(context, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_zman)
-            .setColor(APP_ACCENT)
+            .setSmallIcon(R.drawable.ic_stat_womens_area)
+            .setColor(LILAC)
             .setContentTitle(WomensAreaNotificationText.TITLE)
             .build()
         val notification = NotificationCompat.Builder(context, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_zman)
-            .setColor(APP_ACCENT)
+            .setSmallIcon(R.drawable.ic_stat_womens_area)
+            .setColor(LILAC)
             .setContentTitle(content.title)
             .setContentText(content.text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -75,11 +76,7 @@ class WomensAreaNotifier @Inject constructor(
 
     private companion object {
         const val CHANNEL = "womens_area_private"
-        /**
-         * The app's own navy (NotificationHelper's ACCENT), not the area's
-         * lilac: the notification should look like any other reminder from
-         * this app.
-         */
-        const val APP_ACCENT = 0xFF123A8B.toInt()
+        /** WomensAreaLilac (0xFF9C7AB8) — the area's own colour, at the owner's request. */
+        const val LILAC = 0xFF9C7AB8.toInt()
     }
 }

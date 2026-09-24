@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome status-bar icon for the Women's Area notifications only: the
+     area's own spring (a drop over two waves), the same shape as
+     WomensAreaSpringIcon. The app's own ic_stat_zman is untouched. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Status-bar icons are tinted by the system from the alpha channel
+         alone, so fixed white, like ic_stat_zman. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2.5C10,5.5 7.5,8 7.5,11C7.5,13.5 9.5,15 12,15C14.5,15 16.5,13.5 16.5,11C16.5,8 14,5.5 12,2.5Z"/>
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M2.5,18.3q2.375,-1.8 4.75,0t4.75,0t4.75,0t4.75,0M2.5,21.6q2.375,-1.8 4.75,0t4.75,0t4.75,0t4.75,0"/>
+</vector>

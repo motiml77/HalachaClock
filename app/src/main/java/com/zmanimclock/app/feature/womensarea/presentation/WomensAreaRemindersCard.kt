@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -55,7 +54,9 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaNotificationText
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaReminderTimes
 import com.zmanimclock.app.feature.womensarea.security.WomensAreaReminders
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
+import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
+import com.zmanimclock.app.ui.WomensAreaSpringIcon
 import java.time.LocalTime
 
 /**
@@ -217,8 +218,8 @@ private fun ReminderToggle(
 }
 
 /**
- * A drawn copy of the notification as the system will show it — the app's
- * ordinary clock icon and name, then exactly the words the notifier posts.
+ * A drawn copy of the notification as the system will show it — the area's
+ * spring in lilac, the app's name, then exactly the words the notifier posts.
  */
 @Composable
 private fun NotificationPreview(content: NotificationText) {
@@ -236,10 +237,10 @@ private fun NotificationPreview(content: NotificationText) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Box(
-                        modifier = Modifier.size(18.dp).clip(CircleShape).background(APP_NAVY),
+                        modifier = Modifier.size(18.dp).clip(CircleShape).background(WomensAreaLilac),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.Schedule, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Icon(WomensAreaSpringIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                     }
                     Text(
                         "Halacha Clock · עכשיו",
@@ -253,9 +254,6 @@ private fun NotificationPreview(content: NotificationText) {
         }
     }
 }
-
-/** The app's own navy — the colour the real notification carries (see WomensAreaNotifier). */
-private val APP_NAVY = Color(0xFF123A8B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
