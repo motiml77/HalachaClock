@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.zmanimclock.app.data.local.ZmanimDatabase
 import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.chaitables.data.local.ChaiTablesDao
+import com.zmanimclock.app.feature.womensarea.data.WomensAreaDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,7 +42,7 @@ object AppModule {
             // the user's existing alarms by converting minutes×60 in place.
             .addMigrations(
                 MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                MIGRATION_9_10,
+                MIGRATION_9_10, MIGRATION_10_11,
             )
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
@@ -70,6 +71,34 @@ object AppModule {
      * behaviour rather than silently keep a fade the user never chose.
      * Anyone who actually wants it can switch it back on per alarm.
      */
+    /**
+     * v10→v11: the Women's Area feature's own table. FIRST create-table
+     * migration in this project — every migration above is ALTER TABLE/DELETE
+     * FROM on tables that predate the migration system entirely. No DEFAULT
+     * clause is needed here (unlike every ALTER TABLE above, which needs one
+     * because SQLite requires it for a NOT NULL column added to a table that
+     * may already hold rows) — a fresh CREATE TABLE has no existing rows, and
+     * every INSERT supplies every column explicitly regardless of the
+     * entity's Kotlin-side defaults. The column list/PRIMARY KEY/index shape
+     * below must match Room's own generation rules for WomensAreaEntryEntity
+     * exactly (no schemas/ JSON exists in this project to diff against —
+     * exportSchema = false — so this was hand-derived from Room 2.6.x's
+     * documented conventions).
+     */
+    private val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `womens_area_entries` (" +
+                    "`id` INTEGER NOT NULL, `type` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
+                    "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_womens_area_entries_type_epochDay` " +
+                    "ON `womens_area_entries` (`type`, `epochDay`)"
+            )
+        }
+    }
+
     /**
      * v9→v10: the Sefirat HaOmer count flag. DEFAULT 0, same reasoning as
      * every flag before it — every alarm that already exists keeps ringing
@@ -138,6 +167,10 @@ object AppModule {
     @Provides
     fun provideAlarmDao(database: ZmanimDatabase): AlarmDao =
         database.alarmDao()
+
+    @Provides
+    fun provideWomensAreaDao(database: ZmanimDatabase): WomensAreaDao =
+        database.womensAreaDao()
 
     @Provides
     @Singleton
