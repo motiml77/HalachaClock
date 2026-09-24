@@ -3,6 +3,7 @@ package com.zmanimclock.app.feature.womensarea.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,10 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zmanimclock.app.feature.calendar.model.CalendarDayMeta
 import com.zmanimclock.app.feature.calendar.model.MonthGrid
+import com.zmanimclock.app.feature.womensarea.model.Onah
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
@@ -44,11 +50,12 @@ import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
 // Taller than the Calendar tab's 58dp: a cell here carries the day count, the
-// Hebrew and civil numerals, AND a separation day's name plus its onah.
+// Hebrew and civil numerals, a separation day's name and its יום/לילה, and
+// the clean-day number at the bottom.
 // Still a fixed 6 rows, for the same reason as the Calendar tab: a Hebrew
 // month is 29 or 30 days on any weekday, and a constant height keeps the grid
 // from resizing under a swipe.
-private val CELL_HEIGHT = 80.dp
+private val CELL_HEIGHT = 88.dp
 
 /**
  * The swipeable Hebrew-month grid for the Women's Area, over the REAL
@@ -142,15 +149,14 @@ private fun WomensAreaDayCell(
             modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Top line: the count from the veset (start side), the clean-day
-            // number (end side). Fixed height so the numerals never shift.
+            // Top line: the count from the veset (start side) and the tevila
+            // star (end side). Fixed height so the numerals never shift.
             Row(Modifier.fillMaxWidth().height(15.dp), verticalAlignment = Alignment.CenterVertically) {
                 marker?.countDayNumber?.let { CountChip(it, WomensAreaCountBlue, RoundedCornerShape(5.dp)) }
                 Spacer(Modifier.weight(1f))
                 if (isTevila) {
                     Text("★", fontSize = 12.sp, lineHeight = 13.sp, color = WomensAreaTevilaBlue)
                 }
-                cleanDayNumber?.let { CountChip(it, WomensAreaCleanGreen, CircleShape) }
             }
             // Hebrew and Gregorian numerals in SEPARATE Text composables —
             // interpolated into one string, bidi reorders them inconsistently
@@ -164,11 +170,26 @@ private fun WomensAreaDayCell(
             )
             Text(text = meta.gregorianDayLabel, fontSize = 9.sp, lineHeight = 10.sp, color = cs.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
+            // Bottom: what the day is, then the clean-day number — kept apart
+            // from the blue count at the top so the two never read as one.
             when {
-                isPrisha -> PrishaLabel(prisha)
-                isVesetDay -> CellCaption(title = "ראייה", onah = marker?.vesetOnah?.hebrewName, color = cs.onSurface)
-                isTevila -> CellCaption(title = "טבילה", onah = "אחר צאה״כ בלבד", color = WomensAreaTevilaBlue)
-                isHefsek -> CellCaption(title = "הפסק טהרה", onah = null, color = WomensAreaCleanGreen)
+                isPrisha -> {
+                    CellTitle(prishaName(prisha), WomensAreaPrishaRed, maxLines = if (cleanDayNumber != null) 1 else 2)
+                    OnahPill(prisha.first().onah, WomensAreaPrishaRed)
+                }
+                isVesetDay -> {
+                    CellTitle("ראייה", cs.onSurface)
+                    OnahPill(marker?.vesetOnah, cs.onSurface)
+                }
+                isTevila -> {
+                    CellTitle("טבילה", WomensAreaTevilaBlue)
+                    CellTitle("אחר צאה״כ", WomensAreaTevilaBlue, bold = false)
+                }
+                isHefsek -> CellTitle("הפסק טהרה", WomensAreaCleanGreen, maxLines = 2)
+            }
+            cleanDayNumber?.let {
+                Spacer(Modifier.height(2.dp))
+                CountChip(it, WomensAreaCleanGreen, CircleShape)
             }
         }
     }
@@ -195,39 +216,59 @@ private fun CountChip(number: Int, color: Color, shape: Shape) {
 }
 
 /**
- * The separation day's name and its onah. A single kind gets its full name
+ * The separation day's name in the cell. A single kind gets its full name
  * (wrapping to two lines if needed); two kinds on one day — e.g. day 30 that
  * is also the same date next month — get short forms side by side. The card
  * under the calendar spells every one out in full.
  */
+private fun prishaName(prisha: List<PrishaDay>): String =
+    if (prisha.size == 1) prisha.single().kind.hebrewName else prisha.joinToString(" + ") { it.kind.shortName }
+
 @Composable
-private fun PrishaLabel(prisha: List<PrishaDay>) {
-    val title = if (prisha.size == 1) {
-        prisha.single().kind.hebrewName
-    } else {
-        prisha.joinToString(" + ") { it.kind.shortName }
-    }
-    CellCaption(
-        title = title,
-        onah = prisha.first().onah?.hebrewName ?: "?",
-        color = WomensAreaPrishaRed,
+private fun CellTitle(text: String, color: Color, maxLines: Int = 1, bold: Boolean = true) {
+    Text(
+        text = text,
+        fontSize = 8.sp,
+        lineHeight = 9.sp,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
+/**
+ * "☀ יום" / "☾ לילה" — the onah the veset was entered with, on the veset day
+ * and on every separation day it produces. Outlined and with its own icon so
+ * it reads at a glance, not as one more line of 8sp text.
+ */
 @Composable
-private fun CellCaption(title: String, onah: String?, color: Color) {
-    Text(
-        text = title,
-        fontSize = 8.sp,
-        lineHeight = 9.sp,
-        fontWeight = FontWeight.Bold,
-        color = color,
-        textAlign = TextAlign.Center,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
-    if (onah != null) {
-        Text(text = onah, fontSize = 8.sp, lineHeight = 9.sp, color = color, textAlign = TextAlign.Center)
+private fun OnahPill(onah: Onah?, color: Color) {
+    Row(
+        modifier = Modifier
+            .padding(top = 1.dp)
+            .border(1.dp, color, RoundedCornerShape(6.dp))
+            .padding(horizontal = 3.dp, vertical = 0.5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        when (onah) {
+            Onah.DAY -> Icon(Icons.Filled.WbSunny, contentDescription = null, tint = color, modifier = Modifier.size(8.dp))
+            Onah.NIGHT -> Icon(Icons.Filled.NightsStay, contentDescription = null, tint = color, modifier = Modifier.size(8.dp))
+            null -> Unit
+        }
+        Text(
+            text = when (onah) {
+                Onah.DAY -> "יום"
+                Onah.NIGHT -> "לילה"
+                null -> "לא צוין"
+            },
+            fontSize = 8.5.sp,
+            lineHeight = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
     }
 }
 
