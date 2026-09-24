@@ -93,6 +93,20 @@ object WomensAreaLabels {
             "ליל ${weekdayName(night)} ${hebrewDayAndMonth(night)}"
     }
 
+    /**
+     * The heading of one separation day, each by what actually defines it:
+     *   עונה בינונית · יום 30       — a count, so the day's number
+     *   הפלגה (29 יום)              — the gap between the two vesets
+     *   יום החודש · ט״ו אייר        — a DATE, not a count: no day number,
+     *                                 which would read as "31 days" whenever
+     *                                 the month in between has 30.
+     */
+    fun prishaTitle(day: PrishaDay): String = when (day.kind) {
+        VesetKind.ONAH_BEINONIT -> "${day.kind.hebrewName} · יום ${day.dayNumber}"
+        VesetKind.HAFLAGA -> "${day.kind.hebrewName} (${day.dayNumber} יום)"
+        VesetKind.YOM_HACHODESH -> "${day.kind.hebrewName} · ${hebrewDayAndMonth(day.date)}"
+    }
+
     /** "יום רביעי" / "שבת" — "יום שבת" reads wrongly. */
     private fun eveningDay(date: LocalDate): String =
         if (date.dayOfWeek == DayOfWeek.SATURDAY) "שבת" else "יום ${weekdayName(date)}"

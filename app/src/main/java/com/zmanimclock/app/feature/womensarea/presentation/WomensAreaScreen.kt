@@ -52,10 +52,8 @@ import com.zmanimclock.app.feature.calendar.presentation.MonthHeader
 import com.zmanimclock.app.feature.calendar.presentation.WeekdayRow
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
-import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
-import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
 import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
@@ -288,7 +286,7 @@ private fun PrishaSummaryCard(prediction: VesetPrediction) {
                 color = cs.onSurfaceVariant,
             )
 
-            prediction.prishaDays.forEach { PrishaRow(it, prediction) }
+            prediction.prishaDays.forEach { PrishaRow(it) }
 
             if (prediction.haflaga == null) {
                 MissingRow("הפלגה", "אין ראייה קודמת רשומה לחשב ממנה הפלגה")
@@ -307,14 +305,10 @@ private fun PrishaSummaryCard(prediction: VesetPrediction) {
 }
 
 @Composable
-private fun PrishaRow(day: PrishaDay, prediction: VesetPrediction) {
-    val title = when (day.kind) {
-        VesetKind.HAFLAGA -> "${day.kind.hebrewName} (${prediction.haflagaInterval} יום)"
-        else -> day.kind.hebrewName
-    }
+private fun PrishaRow(day: PrishaDay) {
     FramedBlock(WomensAreaPrishaRed) {
         Text(
-            text = "$title — יום ${day.dayNumber} לספירה",
+            text = WomensAreaLabels.prishaTitle(day),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = WomensAreaPrishaRed,

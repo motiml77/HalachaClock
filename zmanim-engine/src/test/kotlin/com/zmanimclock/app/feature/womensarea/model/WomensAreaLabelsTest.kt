@@ -45,6 +45,17 @@ class WomensAreaLabelsTest {
     }
 
     @Test
+    fun `yom hachodesh is headed by its date, the others by their count`() {
+        // Veset ליל ט״ו ניסן 5786, previous 29 days earlier: haflaga 29,
+        // onah beinonit day 30, yom hachodesh ט״ו אייר (day 31 — Nissan has 30).
+        val p = WomensAreaCalculator.predict(fifteenNissan, Onah.NIGHT, LocalDate.of(2026, 3, 5))
+        assertEquals(
+            listOf("הפלגה (29 יום)", "עונה בינונית · יום 30", "יום החודש · ט״ו אייר"),
+            p.prishaDays.map { WomensAreaLabels.prishaTitle(it) },
+        )
+    }
+
+    @Test
     fun `names`() {
         assertEquals("עונה בינונית", VesetKind.ONAH_BEINONIT.hebrewName)
         assertEquals("בלילה", Onah.NIGHT.hebrewName)

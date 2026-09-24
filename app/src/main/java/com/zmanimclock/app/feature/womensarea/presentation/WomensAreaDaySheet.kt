@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.Onah
-import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
@@ -343,13 +342,8 @@ private fun PrishaPreview(date: LocalDate, onah: Onah, previousVeset: LocalDate?
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("ימי הפרישה שיסומנו בלוח:", style = MaterialTheme.typography.labelLarge)
         prediction.prishaDays.forEach { day ->
-            val title = if (day.kind == VesetKind.HAFLAGA) {
-                "${day.kind.hebrewName} (${prediction.haflagaInterval} יום)"
-            } else {
-                day.kind.hebrewName
-            }
             FramedBlock(WomensAreaPrishaRed) {
-                Text("$title · יום ${day.dayNumber}", fontWeight = FontWeight.Bold, color = WomensAreaPrishaRed)
+                Text(WomensAreaLabels.prishaTitle(day), fontWeight = FontWeight.Bold, color = WomensAreaPrishaRed)
                 Text(WomensAreaLabels.onahTiming(day.date, onah), style = MaterialTheme.typography.bodySmall)
             }
         }
