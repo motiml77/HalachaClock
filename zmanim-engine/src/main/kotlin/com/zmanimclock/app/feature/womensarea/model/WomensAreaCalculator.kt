@@ -157,6 +157,28 @@ object WomensAreaCalculator {
     )
 
     /**
+     * The earliest day of the count (the veset day = 1) a הפסק טהרה is
+     * normally made on — the 5th, as the Rema counts it: a veset on Sunday,
+     * a hefsek on Thursday at the earliest. The app only WARNS before it
+     * (see [isEarlyHefsek]); whether an earlier one is valid is a question
+     * for a rabbi, and she can always carry on.
+     */
+    const val MIN_HEFSEK_DAY = 5
+
+    /**
+     * Which day of the count a hefsek on [hefsek] falls on, counting from
+     * [veset] as day 1 — or null with no veset on or before it.
+     */
+    fun hefsekDayNumber(veset: LocalDate?, hefsek: LocalDate): Int? {
+        val start = veset?.takeIf { it <= hefsek } ?: return null
+        return (ChronoUnit.DAYS.between(start, hefsek) + 1).toInt()
+    }
+
+    /** True when a hefsek on [hefsek] would be before the [MIN_HEFSEK_DAY]th day of [veset]'s count. */
+    fun isEarlyHefsek(veset: LocalDate?, hefsek: LocalDate): Boolean =
+        hefsekDayNumber(veset, hefsek)?.let { it < MIN_HEFSEK_DAY } ?: false
+
+    /**
      * שבעה נקיים after a הפסק טהרה made on [hefsek] before shkia: they begin
      * with the NEXT Hebrew day — the one that starts at that evening's tzeit —
      * and run 7 Hebrew days. A hefsek on Tuesday before shkia makes Wednesday

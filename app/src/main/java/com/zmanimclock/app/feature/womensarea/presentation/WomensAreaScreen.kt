@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.calendar.model.HebrewMonthSequence
 import com.zmanimclock.app.feature.calendar.presentation.MonthHeader
 import com.zmanimclock.app.feature.calendar.presentation.WeekdayRow
+import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
@@ -166,6 +167,7 @@ fun WomensAreaScreen(
                 .filter { it.type == WomensAreaEntryType.PERIOD_START && it.epochDay < date.toEpochDay() }
                 .maxOfOrNull { it.epochDay }
                 ?.let(LocalDate::ofEpochDay),
+            vesetOnOrBefore = entries.latestVesetOnOrBefore(date),
             savedReminders = reminders,
             onSaveVeset = { onah ->
                 viewModel.addPeriodStart(date, onah)
@@ -329,3 +331,9 @@ private fun MissingRow(title: String, reason: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
+
+/** The latest veset recorded on or before [date] — the one a hefsek on [date] ends. */
+internal fun List<WomensAreaEntryEntity>.latestVesetOnOrBefore(date: LocalDate): LocalDate? =
+    filter { it.type == WomensAreaEntryType.PERIOD_START && it.epochDay <= date.toEpochDay() }
+        .maxOfOrNull { it.epochDay }
+        ?.let(LocalDate::ofEpochDay)

@@ -127,4 +127,27 @@ class WomensAreaCalculatorTest {
         assertEquals(LocalDate.of(2026, 4, 14), WomensAreaCalculator.tevilaDay(hefsek))
         assertEquals(LocalDate.of(2026, 4, 15), WomensAreaCalculator.tevilaNight(hefsek))
     }
+
+    @Test
+    fun `a hefsek before the 5th day of the count is early, from the 5th on it is not`() {
+        // Veset Sunday 5.4.2026 (day 1): Thursday 9.4 is day 5, the earliest.
+        val veset = LocalDate.of(2026, 4, 5)
+        assertEquals(java.time.DayOfWeek.SUNDAY, veset.dayOfWeek)
+        assertEquals(1, WomensAreaCalculator.hefsekDayNumber(veset, veset))
+        assertTrue(WomensAreaCalculator.isEarlyHefsek(veset, veset))
+        assertEquals(4, WomensAreaCalculator.hefsekDayNumber(veset, LocalDate.of(2026, 4, 8)))
+        assertTrue(WomensAreaCalculator.isEarlyHefsek(veset, LocalDate.of(2026, 4, 8))) // Wednesday
+        assertEquals(5, WomensAreaCalculator.hefsekDayNumber(veset, LocalDate.of(2026, 4, 9)))
+        assertFalse(WomensAreaCalculator.isEarlyHefsek(veset, LocalDate.of(2026, 4, 9))) // Thursday
+        assertFalse(WomensAreaCalculator.isEarlyHefsek(veset, LocalDate.of(2026, 4, 20)))
+    }
+
+    @Test
+    fun `no veset on or before the hefsek means nothing to warn about`() {
+        val hefsek = LocalDate.of(2026, 4, 9)
+        assertNull(WomensAreaCalculator.hefsekDayNumber(null, hefsek))
+        assertFalse(WomensAreaCalculator.isEarlyHefsek(null, hefsek))
+        assertNull(WomensAreaCalculator.hefsekDayNumber(hefsek.plusDays(1), hefsek))
+        assertFalse(WomensAreaCalculator.isEarlyHefsek(hefsek.plusDays(1), hefsek))
+    }
 }

@@ -72,7 +72,9 @@ private enum class Step { CHOOSE, VESET, HEFSEK }
  *                the ⓘ note on the Hebrew day, and a preview of the separation
  *                days that will be marked.
  *   2b. HEFSEK — the 7 clean days and the tevila it gives, and the reminder
- *                choices, each off until she turns it on.
+ *                choices, each off until she turns it on. Before the 5th day
+ *                of the count, a notice comes first (WomensAreaEarlyHefsekDialog)
+ *                — "אישור" carries straight on.
  *
  * WHICH DAYS CAN TAKE WHICH ENTRY
  * A veset can be recorded up to tomorrow's Hebrew date: tonight after shkia
@@ -87,6 +89,8 @@ fun WomensAreaDaySheet(
     entriesOnDay: List<WomensAreaEntryEntity>,
     /** The latest veset before [date], for the haflaga in the preview. */
     previousVeset: LocalDate?,
+    /** The latest veset on or before [date], for the early-hefsek notice. */
+    vesetOnOrBefore: LocalDate?,
     savedReminders: WomensAreaReminders,
     onSaveVeset: (Onah) -> Unit,
     onSaveHefsek: (WomensAreaReminders) -> Unit,
@@ -96,6 +100,8 @@ fun WomensAreaDaySheet(
     var step by remember { mutableStateOf(Step.CHOOSE) }
     var onah by remember { mutableStateOf<Onah?>(null) }
     var reminders by remember { mutableStateOf(savedReminders) }
+    var earlyHefsekNotice by remember { mutableStateOf(false) }
+    val hefsekDay = WomensAreaCalculator.hefsekDayNumber(vesetOnOrBefore, date)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -118,7 +124,14 @@ fun WomensAreaDaySheet(
                     today = today,
                     entriesOnDay = entriesOnDay,
                     onVeset = { step = Step.VESET },
-                    onHefsek = { step = Step.HEFSEK },
+                    onHefsek = {
+                        // Before the 5th day: say so once, then carry on as usual.
+                        if (WomensAreaCalculator.isEarlyHefsek(vesetOnOrBefore, date)) {
+                            earlyHefsekNotice = true
+                        } else {
+                            step = Step.HEFSEK
+                        }
+                    },
                     onDelete = onDelete,
                 )
                 Step.VESET -> VesetStep(
@@ -136,6 +149,17 @@ fun WomensAreaDaySheet(
                 )
             }
         }
+    }
+
+    if (earlyHefsekNotice && hefsekDay != null) {
+        WomensAreaEarlyHefsekDialog(
+            dayNumber = hefsekDay,
+            onConfirm = {
+                earlyHefsekNotice = false
+                step = Step.HEFSEK
+            },
+            onDismiss = { earlyHefsekNotice = false },
+        )
     }
 }
 

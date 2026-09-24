@@ -38,6 +38,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import java.time.LocalDate
 
@@ -50,6 +51,8 @@ fun WomensAreaHistoryScreen(
 ) {
     val entries by viewModel.allEntries.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WomensAreaEntryEntity?>(null) }
+    // A hefsek edit waiting on the early-hefsek notice: the entry, its new date, its day in the count.
+    var earlyEdit by remember { mutableStateOf<Triple<WomensAreaEntryEntity, LocalDate, Int>?>(null) }
 
     Scaffold(
         topBar = {
@@ -94,10 +97,27 @@ fun WomensAreaHistoryScreen(
             today = LocalDate.now(),
             gridAt = viewModel::monthGrid,
             onConfirm = { date, onah ->
-                viewModel.updateEntry(entry, date, onah)
+                val veset = entries.latestVesetOnOrBefore(date)
+                if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA && WomensAreaCalculator.isEarlyHefsek(veset, date)) {
+                    // Same notice as when recording one: shown, then saved as usual.
+                    earlyEdit = Triple(entry, date, WomensAreaCalculator.hefsekDayNumber(veset, date) ?: 1)
+                } else {
+                    viewModel.updateEntry(entry, date, onah)
+                }
                 editing = null
             },
             onDismiss = { editing = null },
+        )
+    }
+
+    earlyEdit?.let { (entry, date, dayNumber) ->
+        WomensAreaEarlyHefsekDialog(
+            dayNumber = dayNumber,
+            onConfirm = {
+                viewModel.updateEntry(entry, date, onah = null)
+                earlyEdit = null
+            },
+            onDismiss = { earlyEdit = null },
         )
     }
 }
