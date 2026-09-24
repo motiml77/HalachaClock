@@ -57,6 +57,15 @@ object WomensAreaLabels {
         DayOfWeek.SATURDAY -> "שבת"
     }
 
+    /**
+     * "2/11" — the civil date in a calendar cell: day on the LEFT of the
+     * slash, month on the right. Drawn left-to-right (see the cells), so the
+     * app's RTL layout can never swap the two. Every cell carries its own
+     * month, so a Hebrew month that starts in October and ends in November
+     * reads 30/10, 31/10, 1/11 … with no separate header to keep in step.
+     */
+    fun gregorianDayMonth(date: LocalDate): String = "${date.dayOfMonth}/${date.monthValue}"
+
     /** "2.4" — the civil date, secondary everywhere. */
     fun gregorianShort(date: LocalDate): String = "${date.dayOfMonth}.${date.monthValue}"
 

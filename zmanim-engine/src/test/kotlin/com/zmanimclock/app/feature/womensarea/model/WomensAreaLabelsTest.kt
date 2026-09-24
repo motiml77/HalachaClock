@@ -56,6 +56,14 @@ class WomensAreaLabelsTest {
     }
 
     @Test
+    fun `a cell's civil date is day slash month, and the month turns over mid Hebrew month`() {
+        // Cheshvan 5787 runs from 12.10.2026 into November.
+        assertEquals("31/10", WomensAreaLabels.gregorianDayMonth(LocalDate.of(2026, 10, 31)))
+        assertEquals("1/11", WomensAreaLabels.gregorianDayMonth(LocalDate.of(2026, 11, 1)))
+        assertEquals("2/11", WomensAreaLabels.gregorianDayMonth(LocalDate.of(2026, 11, 2)))
+    }
+
+    @Test
     fun `names`() {
         assertEquals("עונה בינונית", VesetKind.ONAH_BEINONIT.hebrewName)
         assertEquals("בלילה", Onah.NIGHT.hebrewName)

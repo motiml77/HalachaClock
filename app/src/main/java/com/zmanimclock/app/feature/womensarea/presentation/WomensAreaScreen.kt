@@ -64,6 +64,7 @@ import com.zmanimclock.app.ui.WomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
 import com.zmanimclock.app.ui.WomensAreaSpringIcon
 import com.zmanimclock.app.ui.WomensAreaTevilaBlue
+import com.zmanimclock.app.ui.WomensAreaTodayYellow
 import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
@@ -190,7 +191,6 @@ fun WomensAreaScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CalendarLegend() {
-    val cs = MaterialTheme.colorScheme
     FlowRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
@@ -205,7 +205,7 @@ private fun CalendarLegend() {
         LegendItem("פרישה") { Box(Modifier.size(14.dp).border(2.dp, WomensAreaPrishaRed, RoundedCornerShape(4.dp))) }
         LegendItem("נקיים") { Box(Modifier.size(14.dp).border(2.dp, WomensAreaCleanGreen, RoundedCornerShape(4.dp))) }
         LegendItem("טבילה") { Text("★", color = WomensAreaTevilaBlue, fontSize = 13.sp, lineHeight = 14.sp) }
-        LegendItem("היום") { Box(Modifier.size(14.dp).border(2.dp, cs.primary, RoundedCornerShape(4.dp))) }
+        LegendItem("יום נוכחי") { Box(Modifier.size(14.dp).border(3.dp, WomensAreaTodayYellow, RoundedCornerShape(4.dp))) }
     }
 }
 

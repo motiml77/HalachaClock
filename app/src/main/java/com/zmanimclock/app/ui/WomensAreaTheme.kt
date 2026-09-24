@@ -35,3 +35,6 @@ val WomensAreaCleanGreen = Color(0xFF2E7D32)
 
 /** ליל הטבילה — water blue, the מעיין icon's own colour on the calendar. */
 val WomensAreaTevilaBlue = Color(0xFF0277BD)
+
+/** יום נוכחי — a thick yellow frame, on the calendar, in the legend and in the date picker. */
+val WomensAreaTodayYellow = Color(0xFFF9B800)

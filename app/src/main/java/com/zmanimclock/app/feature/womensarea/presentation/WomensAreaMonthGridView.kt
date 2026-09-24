@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -41,12 +43,14 @@ import com.zmanimclock.app.feature.calendar.model.MonthGrid
 import com.zmanimclock.app.feature.womensarea.model.Onah
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetKind
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
 import com.zmanimclock.app.ui.WomensAreaCountBlue
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
 import com.zmanimclock.app.ui.WomensAreaTevilaBlue
+import com.zmanimclock.app.ui.WomensAreaTodayYellow
 import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
@@ -127,13 +131,13 @@ private fun WomensAreaDayCell(
         cleanDayNumber != null -> WomensAreaCleanGreen.copy(alpha = 0.08f)
         else -> Color.Transparent
     }
-    // One frame per cell, in priority order: a separation day's red frame
-    // outranks everything; then the clean days' green (the 7th, the tevila
-    // day, keeps its green frame and gets a star), and last today's.
+    // The day's own frame: a separation day's red outranks the clean days'
+    // green (the 7th, the tevila day, keeps its green and gets a star).
+    // Today's thick yellow frame goes OUTSIDE it, so a day that is both
+    // today and a clean/separation day shows both.
     val frame: Color? = when {
         isPrisha -> WomensAreaPrishaRed
         cleanDayNumber != null -> WomensAreaCleanGreen
-        isToday -> cs.primary
         else -> null
     }
 
@@ -143,7 +147,8 @@ private fun WomensAreaDayCell(
             .padding(1.dp)
             .clip(shape)
             .background(background)
-            .then(frame?.let { Modifier.border(2.dp, it, shape) } ?: Modifier)
+            .then(if (isToday) Modifier.border(3.dp, WomensAreaTodayYellow, shape).padding(3.dp) else Modifier)
+            .then(frame?.let { Modifier.border(2.dp, it, if (isToday) INNER_SHAPE else shape) } ?: Modifier)
             .clickable(onClick = onClick),
     ) {
         Column(
@@ -171,9 +176,9 @@ private fun WomensAreaDayCell(
                 fontSize = 16.sp,
                 lineHeight = 18.sp,
                 fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
-                color = if (isToday) cs.primary else cs.onSurface,
+                color = cs.onSurface,
             )
-            Text(text = meta.gregorianDayLabel, fontSize = 9.sp, lineHeight = 10.sp, color = cs.onSurfaceVariant)
+            GregorianDayMonth(meta.date, cs.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             // Bottom: what the day is, then the clean-day number — kept apart
             // from the blue count at the top so the two never read as one.
@@ -198,6 +203,25 @@ private fun WomensAreaDayCell(
             }
         }
     }
+}
+
+/** Inside today's yellow frame, the day's own frame follows its curve. */
+private val INNER_SHAPE = RoundedCornerShape(7.dp)
+
+/**
+ * "2/11" — day left of the slash, month right of it. Forced LTR: under the
+ * app's RTL a digit run is usually kept together anyway, but this makes the
+ * order a guarantee rather than a bidi outcome.
+ */
+@Composable
+internal fun GregorianDayMonth(date: LocalDate, color: Color) {
+    Text(
+        text = WomensAreaLabels.gregorianDayMonth(date),
+        fontSize = 9.sp,
+        lineHeight = 10.sp,
+        color = color,
+        style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+    )
 }
 
 @Composable

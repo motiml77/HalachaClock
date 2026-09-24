@@ -48,6 +48,7 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
+import com.zmanimclock.app.ui.WomensAreaTodayYellow
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import java.time.LocalDate
 
@@ -245,7 +246,7 @@ private fun PickerCell(
             .padding(1.dp)
             .clip(shape)
             .background(if (isSelected) WomensAreaLilac else Color.Transparent)
-            .then(if (isToday && !isSelected) Modifier.border(2.dp, cs.primary, shape) else Modifier)
+            .then(if (isToday) Modifier.border(3.dp, WomensAreaTodayYellow, shape) else Modifier)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -253,7 +254,7 @@ private fun PickerCell(
             // Hebrew and Gregorian numerals in separate Text composables, for
             // the same bidi reason as the Calendar tab's own cell.
             Text(meta.hebrewDayLabel, fontSize = 15.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, color = textColor)
-            Text(meta.gregorianDayLabel, fontSize = 9.sp, lineHeight = 10.sp, color = textColor.copy(alpha = 0.7f))
+            GregorianDayMonth(meta.date, textColor.copy(alpha = 0.7f))
         }
     }
 }
