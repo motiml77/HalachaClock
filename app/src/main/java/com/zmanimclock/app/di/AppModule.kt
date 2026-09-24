@@ -42,7 +42,7 @@ object AppModule {
             // the user's existing alarms by converting minutes×60 in place.
             .addMigrations(
                 MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
             )
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
@@ -71,6 +71,21 @@ object AppModule {
      * behaviour rather than silently keep a fade the user never chose.
      * Anyone who actually wants it can switch it back on per alarm.
      */
+    /**
+     * v12→v13: the Women's Area records the הפסק טהרה itself instead of the
+     * first clean day. The first clean day is always the Hebrew day after the
+     * hefsek, so each old row converts exactly: one day earlier, new type.
+     * Their already-scheduled reminders keep their dates and work names.
+     */
+    private val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "UPDATE womens_area_entries SET type = 'HEFSEK_TAHARA', epochDay = epochDay - 1 " +
+                    "WHERE type = 'FIRST_CLEAN_DAY'"
+            )
+        }
+    }
+
     /**
      * v11→v12: the Women's Area veset's onah (ביום / בלילה). Nullable with no
      * DEFAULT — an existing row simply has no onah recorded (the entity

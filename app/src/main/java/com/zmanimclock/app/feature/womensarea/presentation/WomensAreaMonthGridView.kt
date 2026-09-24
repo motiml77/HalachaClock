@@ -36,10 +36,10 @@ import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
-import com.zmanimclock.app.ui.WomensAreaCleanDayMarker
+import com.zmanimclock.app.ui.WomensAreaCleanGreen
 import com.zmanimclock.app.ui.WomensAreaCountBlue
-import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
+import com.zmanimclock.app.ui.WomensAreaTevilaBlue
 import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
@@ -65,8 +65,7 @@ fun WomensAreaMonthPager(
     gridAt: (Int) -> MonthGrid,
     markersAt: (LocalDate) -> WomensAreaMarker?,
     today: LocalDate,
-    selected: LocalDate,
-    onSelect: (LocalDate) -> Unit,
+    onDayClick: (LocalDate) -> Unit,
 ) {
     HorizontalPager(
         state = pagerState,
@@ -84,8 +83,7 @@ fun WomensAreaMonthPager(
                                 meta = meta,
                                 marker = markersAt(meta.date),
                                 isToday = meta.date == today,
-                                isSelected = meta.date == selected,
-                                onClick = { onSelect(meta.date) },
+                                onClick = { onDayClick(meta.date) },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -101,7 +99,6 @@ private fun WomensAreaDayCell(
     meta: CalendarDayMeta,
     marker: WomensAreaMarker?,
     isToday: Boolean,
-    isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -110,21 +107,25 @@ private fun WomensAreaDayCell(
     val prisha = marker?.prisha.orEmpty()
     val isPrisha = prisha.isNotEmpty()
     val isVesetDay = marker?.isVesetDay == true
+    val isHefsek = marker?.isHefsekDay == true
+    val isTevila = marker?.isTevilaNight == true
     val cleanDayNumber = marker?.cleanDayNumber
 
     val background = when {
         isPrisha -> WomensAreaPrishaRed.copy(alpha = 0.10f)
         isVesetDay -> WomensAreaVesetMarker.copy(alpha = 0.28f)
-        cleanDayNumber != null -> WomensAreaCleanDayMarker.copy(alpha = 0.16f)
-        isSelected -> WomensAreaLilac.copy(alpha = 0.12f)
+        isTevila -> WomensAreaTevilaBlue.copy(alpha = 0.14f)
+        cleanDayNumber != null -> WomensAreaCleanGreen.copy(alpha = 0.08f)
         else -> Color.Transparent
     }
     // One frame per cell, in priority order: a separation day's red frame
-    // outranks today's, and the selection outline only shows on a plain day.
-    val frame: Pair<Color, Int>? = when {
-        isPrisha -> WomensAreaPrishaRed to 2
-        isToday -> cs.primary to 2
-        isSelected -> WomensAreaLilac to 2
+    // outranks everything; then the clean days' green, the tevila night's
+    // blue, and last today's.
+    val frame: Color? = when {
+        isPrisha -> WomensAreaPrishaRed
+        cleanDayNumber != null -> WomensAreaCleanGreen
+        isTevila -> WomensAreaTevilaBlue
+        isToday -> cs.primary
         else -> null
     }
 
@@ -134,7 +135,7 @@ private fun WomensAreaDayCell(
             .padding(1.dp)
             .clip(shape)
             .background(background)
-            .then(frame?.let { (color, width) -> Modifier.border(width.dp, color, shape) } ?: Modifier)
+            .then(frame?.let { Modifier.border(2.dp, it, shape) } ?: Modifier)
             .clickable(onClick = onClick),
     ) {
         Column(
@@ -146,7 +147,7 @@ private fun WomensAreaDayCell(
             Row(Modifier.fillMaxWidth().height(15.dp), verticalAlignment = Alignment.CenterVertically) {
                 marker?.countDayNumber?.let { CountChip(it, WomensAreaCountBlue, RoundedCornerShape(5.dp)) }
                 Spacer(Modifier.weight(1f))
-                cleanDayNumber?.let { CountChip(it, WomensAreaCleanDayMarker, CircleShape) }
+                cleanDayNumber?.let { CountChip(it, WomensAreaCleanGreen, CircleShape) }
             }
             // Hebrew and Gregorian numerals in SEPARATE Text composables —
             // interpolated into one string, bidi reorders them inconsistently
@@ -162,11 +163,9 @@ private fun WomensAreaDayCell(
             Spacer(Modifier.weight(1f))
             when {
                 isPrisha -> PrishaLabel(prisha)
-                isVesetDay -> CellCaption(
-                    title = "ראייה",
-                    onah = marker?.vesetOnah?.hebrewName,
-                    color = cs.onSurface,
-                )
+                isVesetDay -> CellCaption(title = "ראייה", onah = marker?.vesetOnah?.hebrewName, color = cs.onSurface)
+                isTevila -> CellCaption(title = "טבילה", onah = "בלילה", color = WomensAreaTevilaBlue)
+                isHefsek -> CellCaption(title = "הפסק טהרה", onah = null, color = WomensAreaCleanGreen)
             }
         }
     }

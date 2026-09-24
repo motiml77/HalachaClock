@@ -34,7 +34,6 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AlarmOn
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -66,6 +65,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.ui.WheatEar
+import com.zmanimclock.app.ui.WomensAreaSpringIcon
+import com.zmanimclock.app.feature.womensarea.presentation.rememberWomensAreaToggle
 import androidx.core.content.getSystemService
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -84,7 +85,6 @@ import com.zmanimclock.app.ui.components.ZmanGroupedChecklist
 fun SettingsScreen(
     onOpenCityPicker: () -> Unit,
     onOpenPermissions: () -> Unit = {},
-    onOpenWomensAreaSetup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
@@ -166,7 +166,7 @@ fun SettingsScreen(
         omerAlertEnabled = omerEnabled,
         onOmerAlertChange = viewModel::setOmerAlert,
         womensAreaEnabled = womensArea.enabled,
-        onWomensAreaToggle = { enabled -> viewModel.setWomensAreaEnabled(enabled, onNeedsSetup = onOpenWomensAreaSetup) },
+        onWomensAreaToggle = rememberWomensAreaToggle(viewModel::setWomensAreaEnabled),
         onRingTest = viewModel::ringInAMinute,
         onRequestExactAlarms = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -707,12 +707,10 @@ private fun OmerAlertCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
 }
 
 /**
- * "מצב נשי" — deliberately NOT a [SettingsCard], same reasoning as
+ * "איזור נשי" — deliberately NOT a [SettingsCard], same reasoning as
  * [OmerAlertCard]: its own lilac colouring marks it as the one protected,
- * gated area of the app rather than just another switch. Turning it on
- * without a PIN set up yet routes to setup instead (see
- * SettingsViewModel.setWomensAreaEnabled) — [onToggle] is called either way,
- * the routing decision lives one layer up.
+ * gated area of the app rather than just another switch. Turning it on asks
+ * for the device lock first (see rememberWomensAreaToggle).
  */
 @Composable
 private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit) {
@@ -741,7 +739,7 @@ private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Filled.Lock,
+                    WomensAreaSpringIcon,
                     contentDescription = null,
                     tint = iconTint,
                     modifier = Modifier.size(24.dp),
@@ -752,10 +750,10 @@ private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit
                     .weight(1f)
                     .padding(horizontal = 12.dp),
             ) {
-                Text("מצב נשי", style = MaterialTheme.typography.titleMedium, color = titleColor)
+                Text("איזור נשי", style = MaterialTheme.typography.titleMedium, color = titleColor)
                 Text(
-                    "לוח שנה אישי לחישוב ימי פרישה וספירת שבעה נקיים. מוגן " +
-                        "בטביעת אצבע או קוד נפרד.",
+                    "לוח שנה עברי אישי לחישוב ימי פרישה, שבעה נקיים וליל הטבילה. " +
+                        "ההפעלה והכניסה בטביעת אצבע או בקוד המכשיר.",
                     style = MaterialTheme.typography.bodySmall,
                     color = subColor,
                 )

@@ -48,25 +48,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { omerAlerts.setEnabled(enabled) }
     }
 
-    /** "מצב נשי" — the toggle's own state (setupComplete decides whether turning it on needs setup first). */
+    /** "איזור נשי" — whether its tab is shown. */
     val womensArea: StateFlow<WomensAreaSecurity> = womensAreaSecurity.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WomensAreaSecurity())
 
     /**
-     * Turning ON without a PIN yet routes to setup instead ([onNeedsSetup]) —
-     * setup itself flips [WomensAreaSecurityRepository.setEnabled] once a PIN
-     * is saved. Turning OFF just hides the tab; her data and PIN are left
-     * alone (matches how disabling the Omer alert doesn't delete history) —
-     * the toggle protects nothing by itself, the gate on the data does.
+     * Called only AFTER the device lock was passed, for ON (see
+     * rememberWomensAreaToggle). Turning OFF just hides the tab; her entries
+     * are left alone (matches how disabling the Omer alert doesn't delete
+     * history) — the device lock on the area itself protects them.
      */
-    fun setWomensAreaEnabled(enabled: Boolean, onNeedsSetup: () -> Unit) {
-        viewModelScope.launch {
-            if (enabled && !womensAreaSecurity.state.first().setupComplete) {
-                onNeedsSetup()
-                return@launch
-            }
-            womensAreaSecurity.setEnabled(enabled)
-        }
+    fun setWomensAreaEnabled(enabled: Boolean) {
+        viewModelScope.launch { womensAreaSecurity.setEnabled(enabled) }
     }
 
     fun setTzeitShabbatMinutes(minutes: Int) {

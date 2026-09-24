@@ -31,6 +31,16 @@ class WomensAreaLabelsTest {
     }
 
     @Test
+    fun `the tevila night is the evening before its Hebrew day, after tzeit`() {
+        // Hefsek Tuesday 7.4 -> tevila on the Hebrew day of Wednesday 15.4 (כ״ח ניסן).
+        assertEquals(
+            "ליל רביעי כ״ח ניסן — הערב של יום שלישי 14.4, אחרי צאת הכוכבים",
+            WomensAreaLabels.tevilaTiming(LocalDate.of(2026, 4, 15)),
+        )
+        assertEquals("יום שלישי כ׳ ניסן (7.4), לפני השקיעה", WomensAreaLabels.hefsekTiming(LocalDate.of(2026, 4, 7)))
+    }
+
+    @Test
     fun `names`() {
         assertEquals("עונה בינונית", VesetKind.ONAH_BEINONIT.hebrewName)
         assertEquals("בלילה", Onah.NIGHT.hebrewName)

@@ -107,17 +107,23 @@ class WomensAreaCalculatorTest {
     }
 
     @Test
-    fun `the clean-day count is exactly 7 consecutive days, 1-indexed`() {
-        val firstCleanDay = LocalDate.of(2026, 4, 10)
-        val dates = WomensAreaCalculator.cleanDayDates(firstCleanDay)
+    fun `a hefsek on Tuesday starts the clean days on Wednesday, and the tevila is the next Tuesday night`() {
+        // Tuesday 2026-04-07 (20 Nissan), hefsek before shkia.
+        val hefsek = LocalDate.of(2026, 4, 7)
+        val dates = WomensAreaCalculator.cleanDayDates(hefsek)
 
         assertEquals(7, dates.size)
-        assertEquals(firstCleanDay, dates.first())
-        assertEquals(LocalDate.of(2026, 4, 16), dates.last())
+        assertEquals(LocalDate.of(2026, 4, 8), dates.first()) // Wednesday = day 1
+        assertEquals(LocalDate.of(2026, 4, 14), dates.last()) // the next Tuesday = day 7
+        assertEquals(java.time.DayOfWeek.WEDNESDAY, dates.first().dayOfWeek)
+        assertEquals(java.time.DayOfWeek.TUESDAY, dates.last().dayOfWeek)
 
-        assertEquals(1, WomensAreaCalculator.cleanDayNumber(firstCleanDay, firstCleanDay))
-        assertEquals(7, WomensAreaCalculator.cleanDayNumber(firstCleanDay, LocalDate.of(2026, 4, 16)))
-        assertNull(WomensAreaCalculator.cleanDayNumber(firstCleanDay, firstCleanDay.minusDays(1)))
-        assertNull(WomensAreaCalculator.cleanDayNumber(firstCleanDay, LocalDate.of(2026, 4, 17)))
+        assertNull(WomensAreaCalculator.cleanDayNumber(hefsek, hefsek))
+        assertEquals(1, WomensAreaCalculator.cleanDayNumber(hefsek, LocalDate.of(2026, 4, 8)))
+        assertEquals(7, WomensAreaCalculator.cleanDayNumber(hefsek, LocalDate.of(2026, 4, 14)))
+        assertNull(WomensAreaCalculator.cleanDayNumber(hefsek, LocalDate.of(2026, 4, 15)))
+
+        // Tuesday night after tzeit = ליל רביעי = the Hebrew day of Wednesday 15.4.
+        assertEquals(LocalDate.of(2026, 4, 15), WomensAreaCalculator.tevilaNight(hefsek))
     }
 }

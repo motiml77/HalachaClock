@@ -134,10 +134,10 @@ private fun HistoryRow(entry: WomensAreaEntryEntity, onEdit: () -> Unit, onDelet
 private val WomensAreaEntryType.label: String
     get() = when (this) {
         WomensAreaEntryType.PERIOD_START -> "התחלת ווסת"
-        WomensAreaEntryType.FIRST_CLEAN_DAY -> "יום ראשון לנקיים"
+        WomensAreaEntryType.HEFSEK_TAHARA -> "הפסק טהרה"
     }
 
-/** "ליל חמישי ט״ו ניסן — הערב של …" for a veset with its onah; the Hebrew date (and civil date) otherwise. */
+/** "ליל חמישי ט״ו ניסן — הערב של …" for a veset with its onah; "יום … לפני השקיעה" for a hefsek. */
 private val WomensAreaEntryEntity.dateLabel: String
     get() {
         val date = LocalDate.ofEpochDay(epochDay)
@@ -147,7 +147,6 @@ private val WomensAreaEntryEntity.dateLabel: String
             type == WomensAreaEntryType.PERIOD_START ->
                 "${WomensAreaLabels.hebrewDate(date)} (${WomensAreaLabels.gregorianShort(date)}) — " +
                     "לא צוין ביום או בלילה, לחצי על העריכה"
-            else -> "יום ${WomensAreaLabels.weekdayName(date)} ${WomensAreaLabels.hebrewDate(date)} " +
-                "(${WomensAreaLabels.gregorianShort(date)})"
+            else -> WomensAreaLabels.hefsekTiming(date)
         }
     }

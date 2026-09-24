@@ -156,11 +156,25 @@ object WomensAreaCalculator {
         yomHachodeshMissing = isYomHachodeshMissing(start),
     )
 
-    /** The 7 dates of the count, day 1 = [firstCleanDay] itself. */
-    fun cleanDayDates(firstCleanDay: LocalDate): List<LocalDate> =
-        (0 until CLEAN_DAYS_COUNT).map { firstCleanDay.plusDays(it.toLong()) }
+    /**
+     * שבעה נקיים after a הפסק טהרה made on [hefsek] before shkia: they begin
+     * with the NEXT Hebrew day — the one that starts at that evening's tzeit —
+     * and run 7 Hebrew days. A hefsek on Tuesday before shkia makes Wednesday
+     * day 1 and the following Tuesday day 7.
+     */
+    fun cleanDayDates(hefsek: LocalDate): List<LocalDate> =
+        (1..CLEAN_DAYS_COUNT).map { hefsek.plusDays(it.toLong()) }
 
-    /** Which day (1..7) of the count [date] is, or null when it falls outside the window. */
-    fun cleanDayNumber(firstCleanDay: LocalDate, date: LocalDate): Int? =
-        (ChronoUnit.DAYS.between(firstCleanDay, date) + 1).toInt().takeIf { it in 1..CLEAN_DAYS_COUNT }
+    /** Which clean day (1..7) [date] is after a hefsek on [hefsek], or null outside them. */
+    fun cleanDayNumber(hefsek: LocalDate, date: LocalDate): Int? =
+        ChronoUnit.DAYS.between(hefsek, date).toInt().takeIf { it in 1..CLEAN_DAYS_COUNT }
+
+    /**
+     * ליל הטבילה: after tzeit at the end of the 7th clean day — the NIGHT of
+     * the Hebrew day after it, i.e. the same weekday as the hefsek, one week
+     * on, but after tzeit (so on the luach, the day after). Hefsek on Tuesday
+     * → the 7th day is the next Tuesday → tevila on Tuesday night after tzeit,
+     * which is ליל רביעי.
+     */
+    fun tevilaNight(hefsek: LocalDate): LocalDate = hefsek.plusDays((CLEAN_DAYS_COUNT + 1).toLong())
 }

@@ -41,8 +41,8 @@ fun AppNavigation() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
 
-    // "מצב נשי" — the tab only appears once enabled in Settings (and its own
-    // PIN/biometric setup completed); the route itself is always registered
+    // "איזור נשי" — the tab only appears once turned on in Settings, which
+    // itself requires passing the device lock; the route itself is always registered
     // below regardless, since WomensAreaHostScreen's own gate is the real
     // access control every time it's entered, not this tab's visibility.
     val womensAreaSecurity: WomensAreaGateViewModel = hiltViewModel()
@@ -124,10 +124,6 @@ fun AppNavigation() {
                 SettingsScreen(
                     onOpenCityPicker = { navController.navigate("city_picker") },
                     onOpenPermissions = { navController.navigate("permissions") },
-                    // WomensAreaHostScreen shows its own setup step first
-                    // whenever setupComplete is false — same route the tab
-                    // itself uses, no separate setup route needed.
-                    onOpenWomensAreaSetup = { navController.navigate(Screen.WomensArea.route) },
                 )
             }
             composable(Screen.WomensArea.route) {

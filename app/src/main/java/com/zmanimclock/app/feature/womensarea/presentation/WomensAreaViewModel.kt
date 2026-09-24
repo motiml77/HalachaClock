@@ -34,7 +34,7 @@ class WomensAreaViewModel @Inject constructor(
 
     /**
      * The latest veset, the one before it (for the haflaga), and the latest
-     * first-clean-day — only the LATEST of each kind drives the calendar.
+     * הפסק טהרה — only the LATEST of each kind drives the calendar.
      * "Latest" is by date, never by insert order: a backfilled entry must not
      * displace a later one.
      */
@@ -45,11 +45,16 @@ class WomensAreaViewModel @Inject constructor(
             LatestEntries(
                 veset = vesets.getOrNull(0),
                 previousVeset = vesets.getOrNull(1),
-                firstCleanDay = entries.filter { it.type == WomensAreaEntryType.FIRST_CLEAN_DAY }
+                hefsek = entries.filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
                     .maxByOrNull { it.epochDay },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LatestEntries())
+
+    /** The latest הפסק טהרה's date, for the tevila line of the card under the calendar. */
+    val latestHefsek: StateFlow<LocalDate?> = latestEntries
+        .map { it.hefsek?.date }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The latest veset's full prediction, for the separation-days card under the calendar. */
     val latestPrediction: StateFlow<VesetPrediction?> = latestEntries
@@ -71,7 +76,7 @@ class WomensAreaViewModel @Inject constructor(
                 latestVeset = latest.veset?.date,
                 latestVesetOnah = latest.veset?.onah,
                 previousVeset = latest.previousVeset?.date,
-                latestFirstCleanDay = latest.firstCleanDay?.date,
+                latestHefsek = latest.hefsek?.date,
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -97,18 +102,19 @@ class WomensAreaViewModel @Inject constructor(
         )
     }
 
-    fun addFirstCleanDay(date: LocalDate) = viewModelScope.launch {
+    /** [date] is the day the הפסק טהרה was made, before its shkia. */
+    fun addHefsekTahara(date: LocalDate) = viewModelScope.launch {
         val id = dao.insert(
-            WomensAreaEntryEntity(type = WomensAreaEntryType.FIRST_CLEAN_DAY, epochDay = date.toEpochDay())
+            WomensAreaEntryEntity(type = WomensAreaEntryType.HEFSEK_TAHARA, epochDay = date.toEpochDay())
         )
         reminderScheduler.scheduleSevenDayCount(id, date)
     }
 
-    /** [onah] is ignored for a FIRST_CLEAN_DAY, which has none. */
+    /** [onah] is ignored for a HEFSEK_TAHARA, which has none. */
     fun updateEntry(entry: WomensAreaEntryEntity, newDate: LocalDate, onah: Onah?) = viewModelScope.launch {
         val isVeset = entry.type == WomensAreaEntryType.PERIOD_START
         dao.update(entry.copy(epochDay = newDate.toEpochDay(), onah = if (isVeset) onah else null))
-        if (entry.type == WomensAreaEntryType.FIRST_CLEAN_DAY) {
+        if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) {
             reminderScheduler.cancel(entry.id)
             reminderScheduler.scheduleSevenDayCount(entry.id, newDate)
         }
@@ -116,14 +122,14 @@ class WomensAreaViewModel @Inject constructor(
 
     fun deleteEntry(entry: WomensAreaEntryEntity) = viewModelScope.launch {
         dao.delete(entry)
-        if (entry.type == WomensAreaEntryType.FIRST_CLEAN_DAY) reminderScheduler.cancel(entry.id)
+        if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) reminderScheduler.cancel(entry.id)
     }
 }
 
 private data class LatestEntries(
     val veset: WomensAreaEntryEntity? = null,
     val previousVeset: WomensAreaEntryEntity? = null,
-    val firstCleanDay: WomensAreaEntryEntity? = null,
+    val hefsek: WomensAreaEntryEntity? = null,
 )
 
 private val WomensAreaEntryEntity.date: LocalDate get() = LocalDate.ofEpochDay(epochDay)

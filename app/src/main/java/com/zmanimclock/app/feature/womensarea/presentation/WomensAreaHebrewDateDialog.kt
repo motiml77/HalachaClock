@@ -62,8 +62,8 @@ import java.time.LocalDate
  * Hebrew date itself (ליל ט״ו is on the ט״ו cell), and the ⓘ note says so
  * where she makes the choice.
  *
- * Days more than one civil day ahead are not selectable: tonight after shkia
- * is already tomorrow's Hebrew date, but nothing later can have happened yet.
+ * Used to edit an entry from the history screen; new entries are made by
+ * tapping a day on the calendar (WomensAreaDayActionDialog).
  */
 @Composable
 fun WomensAreaHebrewDateDialog(
@@ -76,7 +76,9 @@ fun WomensAreaHebrewDateDialog(
     onConfirm: (date: LocalDate, onah: Onah?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val latestSelectable = today.plusDays(1)
+    // A veset can be up to tomorrow's Hebrew date (tonight after shkia is
+    // already ליל of tomorrow); a hefsek is made before shkia, so today at most.
+    val latestSelectable = if (askOnah) today.plusDays(1) else today
     // Not coerceAtMost: LocalDate is Comparable<ChronoLocalDate>, so that would
     // widen the state's type to ChronoLocalDate.
     var selected by remember { mutableStateOf(if (initialDate > latestSelectable) latestSelectable else initialDate) }
@@ -159,7 +161,7 @@ fun WomensAreaHebrewDateDialog(
  * choice is made rather than in a help screen.
  */
 @Composable
-private fun HebrewDayInfoNote() {
+internal fun HebrewDayInfoNote() {
     Row(
         modifier = Modifier
             .fillMaxWidth()

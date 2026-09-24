@@ -77,6 +77,20 @@ object WomensAreaLabels {
         }
     }
 
+    /** "יום שלישי ט״ו ניסן (2.4), לפני השקיעה" — when the הפסק טהרה was made. */
+    fun hefsekTiming(date: LocalDate): String =
+        "יום ${weekdayName(date)} ${hebrewDayAndMonth(date)} (${gregorianShort(date)}), לפני השקיעה"
+
+    /**
+     * "ליל רביעי כ״ג ניסן — הערב של יום שלישי 9.4, אחרי צאת הכוכבים" — the
+     * tevila night is the evening before the Hebrew day [date], after tzeit.
+     */
+    fun tevilaTiming(date: LocalDate): String {
+        val evening = date.minusDays(1)
+        return "ליל ${weekdayName(date)} ${hebrewDayAndMonth(date)} — " +
+            "הערב של ${eveningDay(evening)} ${gregorianShort(evening)}, אחרי צאת הכוכבים"
+    }
+
     /** "יום רביעי" / "שבת" — "יום שבת" reads wrongly. */
     private fun eveningDay(date: LocalDate): String =
         if (date.dayOfWeek == DayOfWeek.SATURDAY) "שבת" else "יום ${weekdayName(date)}"

@@ -1,16 +1,24 @@
 package com.zmanimclock.app.feature.womensarea.presentation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
- * Routes between: PIN not yet set up / locked / unlocked content. This is
+ * Routes between: switched off / locked / unlocked content. This is
  * the real access control for the feature — the bottom-nav tab's visibility
  * is only cosmetic (see AppNavigation), every entry into this route goes
  * through here again.
@@ -38,14 +46,16 @@ fun WomensAreaHostScreen(onOpenHistory: () -> Unit) {
     }
 
     when {
-        // Setting a PIN for the first time already proves she knows it —
-        // unlock() here rather than making her immediately re-enter it on
-        // the gate screen she'd otherwise fall straight into.
-        !security.setupComplete -> {
-            WomensAreaSetupScreen(onDone = { gateViewModel.unlock() })
+        // The route is registered regardless of the Settings switch; with the
+        // switch off there is no tab leading here, but say so rather than
+        // show the area anyway.
+        !security.enabled -> {
+            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Text("האיזור הנשי כבוי. אפשר להפעיל אותו בהגדרות.", textAlign = TextAlign.Center)
+            }
         }
         !unlocked -> {
-            WomensAreaGateScreen(onUnlocked = {})
+            WomensAreaGateScreen(onUnlocked = gateViewModel::unlock)
         }
         else -> {
             WomensAreaScreen(onOpenHistory = onOpenHistory)

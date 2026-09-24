@@ -5,8 +5,17 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.zmanimclock.app.feature.womensarea.model.Onah
 
-/** Which of the two independent, self-reported date sequences an entry belongs to. */
-enum class WomensAreaEntryType { PERIOD_START, FIRST_CLEAN_DAY }
+/**
+ * Which of the two self-reported kinds an entry is. Stored by NAME (Room's
+ * enum handling), so a constant here must never be renamed without a
+ * migration — see v12→v13, which retired FIRST_CLEAN_DAY.
+ */
+enum class WomensAreaEntryType {
+    /** התחלת ווסת — with its [WomensAreaEntryEntity.onah]. */
+    PERIOD_START,
+    /** הפסק טהרה, made before shkia; שבעה נקיים start on the next Hebrew day. */
+    HEFSEK_TAHARA,
+}
 
 /**
  * One self-reported date in either sequence. [epochDay] is
@@ -30,7 +39,7 @@ data class WomensAreaEntryEntity(
     val type: WomensAreaEntryType = WomensAreaEntryType.PERIOD_START,
     val epochDay: Long,
     /**
-     * ביום / בלילה, for a PERIOD_START. Null for a FIRST_CLEAN_DAY, and for a
+     * ביום / בלילה, for a PERIOD_START. Null for a HEFSEK_TAHARA, and for a
      * period start saved before the question was asked (v11 rows).
      */
     val onah: Onah? = null,

@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -29,10 +28,7 @@ class WomensAreaGateViewModel @Inject constructor(
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
 
-    private val _pinError = MutableStateFlow<String?>(null)
-    val pinError: StateFlow<String?> = _pinError.asStateFlow()
-
-    /** Marks the session unlocked — after a successful biometric prompt, PIN check, or fresh PIN setup. */
+    /** Marks the session unlocked — after the device lock (fingerprint or phone PIN) was passed. */
     fun unlock() {
         _unlocked.value = true
     }
@@ -40,13 +36,5 @@ class WomensAreaGateViewModel @Inject constructor(
     /** Called on ON_STOP (app backgrounded) — see WomensAreaHostScreen. */
     fun lock() {
         _unlocked.value = false
-    }
-
-    fun tryPin(pin: String) {
-        viewModelScope.launch {
-            val ok = securityRepository.verifyPin(pin)
-            _pinError.value = if (ok) null else "קוד שגוי"
-            if (ok) unlock()
-        }
     }
 }

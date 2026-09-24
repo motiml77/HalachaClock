@@ -13,9 +13,8 @@ val WomensAreaLilac = Color(0xFF9C7AB8)
 val WomensAreaLilacContainer = Color(0xFFF3E5F9)
 val OnWomensAreaLilacContainer = Color(0xFF3A2145)
 
-/** The two calendar-marker colors — distinguishable from each other and from the lilac accent above. */
+/** The veset day's own fill on the calendar — distinguishable from the lilac accent above. */
 val WomensAreaVesetMarker = Color(0xFFC77DA6)
-val WomensAreaCleanDayMarker = Color(0xFF8E6FB5)
 
 /**
  * The separation days' frame. A true red, not a lilac shade: these are the
@@ -30,3 +29,9 @@ val WomensAreaPrishaRed = Color(0xFFD32F2F)
  * chip and the red frame, so the three never blur together.
  */
 val WomensAreaCountBlue = Color(0xFF2962C8)
+
+/** שבעה נקיים — a green frame and a green day chip (1…7), as the owner specified. */
+val WomensAreaCleanGreen = Color(0xFF2E7D32)
+
+/** ליל הטבילה — water blue, the מעיין icon's own colour on the calendar. */
+val WomensAreaTevilaBlue = Color(0xFF0277BD)

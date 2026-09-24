@@ -12,13 +12,17 @@ data class WomensAreaMarker(
     val vesetOnah: Onah? = null,
     /** The separation days that fall here — more than one when two kinds coincide. */
     val prisha: List<PrishaDay> = emptyList(),
-    /** Which day (1..7) of the clean count this is, if any. */
+    /** True on the day a הפסק טהרה was made (before its shkia). */
+    val isHefsekDay: Boolean = false,
+    /** Which day (1..7) of שבעה נקיים this is, if any. */
     val cleanDayNumber: Int? = null,
+    /** True on the Hebrew day whose NIGHT is ליל הטבילה. */
+    val isTevilaNight: Boolean = false,
 )
 
 /**
  * date -> marker, from the latest veset (and the one before it, for the
- * haflaga) and the latest first-clean-day. Only the latest entry of each kind
+ * haflaga) and the latest הפסק טהרה. Only the latest entry of each kind
  * drives the calendar, so older cycles do not accumulate markers.
  */
 object WomensAreaMarkers {
@@ -27,7 +31,7 @@ object WomensAreaMarkers {
         latestVeset: LocalDate?,
         latestVesetOnah: Onah?,
         previousVeset: LocalDate?,
-        latestFirstCleanDay: LocalDate?,
+        latestHefsek: LocalDate?,
     ): Map<LocalDate, WomensAreaMarker> {
         val markers = mutableMapOf<LocalDate, WomensAreaMarker>()
         fun edit(date: LocalDate, change: (WomensAreaMarker) -> WomensAreaMarker) {
@@ -42,11 +46,23 @@ object WomensAreaMarkers {
             edit(start) { it.copy(isVesetDay = true, vesetOnah = latestVesetOnah) }
             prediction.prishaDays.forEach { day -> edit(day.date) { it.copy(prisha = it.prisha + day) } }
         }
-        latestFirstCleanDay?.let { firstCleanDay ->
-            WomensAreaCalculator.cleanDayDates(firstCleanDay).forEachIndexed { i, date ->
+        latestHefsek?.let { hefsek ->
+            edit(hefsek) { it.copy(isHefsekDay = true) }
+            WomensAreaCalculator.cleanDayDates(hefsek).forEachIndexed { i, date ->
                 edit(date) { it.copy(cleanDayNumber = i + 1) }
             }
+            edit(WomensAreaCalculator.tevilaNight(hefsek)) { it.copy(isTevilaNight = true) }
         }
         return markers
     }
+}
+
+/**
+ * True when ליל הטבילה after [hefsek] falls on a separation day whose onah is
+ * the night (or unknown) — a clash to ask a rabbi about, not something the
+ * app should resolve.
+ */
+fun VesetPrediction.clashesWithTevila(hefsek: LocalDate): Boolean {
+    val tevila = WomensAreaCalculator.tevilaNight(hefsek)
+    return prishaDays.any { it.date == tevila && it.onah != Onah.DAY }
 }

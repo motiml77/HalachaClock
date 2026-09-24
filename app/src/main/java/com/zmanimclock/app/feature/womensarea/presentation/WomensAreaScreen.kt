@@ -14,8 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -41,10 +39,13 @@ import com.zmanimclock.app.feature.calendar.presentation.WeekdayRow
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
+import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
-import com.zmanimclock.app.ui.WomensAreaLilac
+import com.zmanimclock.app.ui.WomensAreaCleanGreen
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
+import com.zmanimclock.app.ui.WomensAreaTevilaBlue
 import java.time.LocalDate
 
 /**
@@ -76,10 +77,10 @@ fun WomensAreaScreen(
         if (pagerState.currentPage != visibleMonthIndex) pagerState.animateScrollToPage(visibleMonthIndex)
     }
 
-    // The day a new entry starts from — tap any cell to change it.
-    var selected by remember { mutableStateOf(today) }
-    var showVesetDialog by remember { mutableStateOf(false) }
-    var showFirstCleanDayDialog by remember { mutableStateOf(false) }
+    val entries by viewModel.allEntries.collectAsStateWithLifecycle()
+    val hefsek by viewModel.latestHefsek.collectAsStateWithLifecycle()
+    // The tapped day — its action dialog is open while this is non-null.
+    var tapped by remember { mutableStateOf<LocalDate?>(null) }
 
     Column(
         modifier = Modifier
@@ -102,35 +103,20 @@ fun WomensAreaScreen(
             gridAt = viewModel::monthGrid,
             markersAt = { markersByDate[it] },
             today = today,
-            selected = selected,
-            onSelect = { selected = it },
+            onDayClick = { tapped = it },
         )
 
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            prediction?.let { PrishaSummaryCard(it) }
-
             Text(
-                text = "יום נבחר: ${WomensAreaLabels.weekdayName(selected)}, " +
-                    "${WomensAreaLabels.hebrewDate(selected)} — הקישי על יום בלוח כדי לבחור אחר",
-                style = MaterialTheme.typography.bodySmall,
+                text = "הקישי על יום בלוח כדי לרשום התחלת ווסת או הפסק טהרה.",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(
-                onClick = { showVesetDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = WomensAreaLilac),
-            ) {
-                Text("התחלת ווסת")
-            }
-            OutlinedButton(
-                onClick = { showFirstCleanDayDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("יום ראשון לנקיים")
-            }
+            prediction?.let { PrishaSummaryCard(it) }
+            hefsek?.let { TaharaSummaryCard(it, prediction) }
             OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("  היסטוריית רשומות", style = MaterialTheme.typography.bodyMedium)
@@ -138,35 +124,79 @@ fun WomensAreaScreen(
         }
     }
 
-    if (showVesetDialog) {
-        WomensAreaHebrewDateDialog(
-            title = "התחלת ווסת",
-            initialDate = selected,
-            askOnah = true,
-            initialOnah = null,
+    tapped?.let { date ->
+        WomensAreaDayActionDialog(
+            date = date,
             today = today,
-            gridAt = viewModel::monthGrid,
-            onConfirm = { date, onah ->
-                if (onah != null) viewModel.addPeriodStart(date, onah)
-                showVesetDialog = false
+            entriesOnDay = entries.filter { it.epochDay == date.toEpochDay() },
+            onVeset = { onah ->
+                viewModel.addPeriodStart(date, onah)
+                tapped = null
             },
-            onDismiss = { showVesetDialog = false },
+            onHefsek = {
+                viewModel.addHefsekTahara(date)
+                tapped = null
+            },
+            onDelete = { entry ->
+                viewModel.deleteEntry(entry)
+                tapped = null
+            },
+            onDismiss = { tapped = null },
         )
     }
-    if (showFirstCleanDayDialog) {
-        WomensAreaHebrewDateDialog(
-            title = "יום ראשון לנקיים",
-            initialDate = selected,
-            askOnah = false,
-            initialOnah = null,
-            today = today,
-            gridAt = viewModel::monthGrid,
-            onConfirm = { date, _ ->
-                viewModel.addFirstCleanDay(date)
-                showFirstCleanDayDialog = false
-            },
-            onDismiss = { showFirstCleanDayDialog = false },
-        )
+}
+
+/** The latest הפסק טהרה, its 7 clean days and the tevila night — and a warning if that night is a separation night. */
+@Composable
+private fun TaharaSummaryCard(hefsek: LocalDate, prediction: VesetPrediction?) {
+    val cs = MaterialTheme.colorScheme
+    val clean = WomensAreaCalculator.cleanDayDates(hefsek)
+    val tevila = WomensAreaCalculator.tevilaNight(hefsek)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = cs.surface),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("שבעה נקיים וטבילה", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "הפסק טהרה: ${WomensAreaLabels.hefsekTiming(hefsek)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant,
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(2.dp, WomensAreaCleanGreen, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text("שבעה נקיים", fontWeight = FontWeight.Bold, color = WomensAreaCleanGreen)
+                Text(
+                    "מיום ${WomensAreaLabels.weekdayName(clean.first())} ${WomensAreaLabels.hebrewDayAndMonth(clean.first())} " +
+                        "(${WomensAreaLabels.gregorianShort(clean.first())}) עד יום " +
+                        "${WomensAreaLabels.weekdayName(clean.last())} ${WomensAreaLabels.hebrewDayAndMonth(clean.last())} " +
+                        "(${WomensAreaLabels.gregorianShort(clean.last())})",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(2.dp, WomensAreaTevilaBlue, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text("טבילה", fontWeight = FontWeight.Bold, color = WomensAreaTevilaBlue)
+                Text(WomensAreaLabels.tevilaTiming(tevila), style = MaterialTheme.typography.bodySmall)
+            }
+            if (prediction?.clashesWithTevila(hefsek) == true) {
+                Text(
+                    "ליל הטבילה חל ביום פרישה — יש לשאול רב.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WomensAreaPrishaRed,
+                )
+            }
+        }
     }
 }
 

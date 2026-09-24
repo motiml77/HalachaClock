@@ -5,6 +5,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Duration
 import java.time.LocalDate
@@ -13,7 +14,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
- * Schedules the 7 reminders for one "first clean day" entry.
+ * Schedules the 7 reminders for one הפסק טהרה entry — one per clean day,
+ * which start on the Hebrew day AFTER the hefsek.
  *
  * WorkManager, not AlarmManager: these are explicitly non-urgent, dismissible
  * reminders, so `setInitialDelay`'s deferred-execution model (a minimum
@@ -27,14 +29,15 @@ import javax.inject.Inject
 class WomensAreaReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    fun scheduleSevenDayCount(entryId: Long, firstCleanDay: LocalDate) {
+    fun scheduleSevenDayCount(entryId: Long, hefsek: LocalDate) {
         val now = LocalDateTime.now()
-        for (day in 1..7) {
-            val fireAt = firstCleanDay.plusDays((day - 1).toLong()).atTime(REMINDER_HOUR, REMINDER_MINUTE)
+        WomensAreaCalculator.cleanDayDates(hefsek).forEachIndexed { index, date ->
+            val day = index + 1
+            val fireAt = date.atTime(REMINDER_HOUR, REMINDER_MINUTE)
             val delayMs = Duration.between(now, fireAt).toMillis()
             // A day already past (a backfilled entry) simply gets no
             // reminder — "up to 7", not always exactly 7.
-            if (delayMs < 0) continue
+            if (delayMs < 0) return@forEachIndexed
             val notificationId = notificationId(entryId, day)
             val request = OneTimeWorkRequestBuilder<WomensAreaReminderWorker>()
                 .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
