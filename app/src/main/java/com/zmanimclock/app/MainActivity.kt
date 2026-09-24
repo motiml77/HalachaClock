@@ -4,11 +4,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.onboarding.OnboardingScreen
 import com.zmanimclock.app.feature.subscription.AppAccess
@@ -18,8 +18,15 @@ import com.zmanimclock.app.navigation.AppNavigation
 import com.zmanimclock.app.ui.theme.ZmanimTheme
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * FragmentActivity, not ComponentActivity (which a FragmentActivity also is —
+ * every API used below is inherited unchanged): BiometricPrompt, used by the
+ * Women's Area gate, attaches a headless Fragment to the host's
+ * FragmentManager to survive configuration changes, which a plain
+ * ComponentActivity does not have.
+ */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 

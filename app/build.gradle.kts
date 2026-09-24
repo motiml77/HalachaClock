@@ -222,6 +222,10 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Women's Area security gate (biometric + PIN)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment.ktx)
+
     // KosherJava Zmanim (astronomical substrate only)
     // The halachic engine + the luach verification tests. KosherJava comes in
     // transitively (declared `api` there), so it is not repeated here — one
