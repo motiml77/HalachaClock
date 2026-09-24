@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -34,7 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
@@ -143,7 +147,7 @@ fun WomensAreaHebrewDateDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    HebrewDayInfoNote()
+                    if (onah == Onah.NIGHT) NightOnahNote() else HebrewDayInfoNote()
                 }
             }
         },
@@ -184,6 +188,43 @@ internal fun HebrewDayInfoNote() {
                 "ימי הפרישה (עונה בינונית, הפלגה, יום החודש) נספרים לפי התאריכים " +
                 "העבריים שבלוח, ובאותה עונה — ביום או בלילה — שבה התחילה הראייה.",
             style = MaterialTheme.typography.bodySmall,
+            color = OnWomensAreaLilacContainer,
+        )
+    }
+}
+
+/**
+ * Shown the moment she picks "בלילה" — the point where the date most easily
+ * goes wrong: a veset on Tuesday evening belongs to Wednesday's Hebrew date,
+ * so the Wednesday cell is the one to pick. Framed and bolder than the
+ * general ⓘ note, which it replaces while "בלילה" is chosen.
+ */
+@Composable
+internal fun NightOnahNote() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(WomensAreaLilacContainer)
+            .border(2.dp, WomensAreaLilac, RoundedCornerShape(14.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.NightsStay,
+            contentDescription = null,
+            tint = WomensAreaLilac,
+            modifier = Modifier.size(24.dp),
+        )
+        Text(
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("שימי לב: ") }
+                append(
+                    "היום מתחיל מן הלילה, לכן ווסת שהופיעה ביום שלישי אחר צאה״כ — זהו כבר יום רביעי. " +
+                        "נא לבחור את היום בלוח־השנה בהתאם.",
+                )
+            },
+            style = MaterialTheme.typography.bodyMedium,
             color = OnWomensAreaLilacContainer,
         )
     }

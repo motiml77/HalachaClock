@@ -318,6 +318,8 @@ private fun VesetStep(
         OnahTile(Icons.Filled.WbSunny, "ביום", "עד השקיעה", onah == Onah.DAY, { onOnahChange(Onah.DAY) }, Modifier.weight(1f))
         OnahTile(Icons.Filled.NightsStay, "בלילה", "אחרי השקיעה", onah == Onah.NIGHT, { onOnahChange(Onah.NIGHT) }, Modifier.weight(1f))
     }
+    // "בלילה" is where the date goes wrong most easily — say so right there.
+    if (onah == Onah.NIGHT) NightOnahNote()
     onah?.let {
         Text(
             WomensAreaLabels.onahTiming(date, it),
@@ -325,7 +327,7 @@ private fun VesetStep(
             fontWeight = FontWeight.SemiBold,
         )
     }
-    HebrewDayInfoNote()
+    if (onah != Onah.NIGHT) HebrewDayInfoNote()
     onah?.let { PrishaPreview(date, it, previousVeset) }
     SaveButton(enabled = onah != null, label = if (onah == null) "יש לבחור ביום או בלילה" else "שמירה", onClick = onSave)
 }
