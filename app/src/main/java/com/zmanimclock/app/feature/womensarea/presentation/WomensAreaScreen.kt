@@ -79,6 +79,7 @@ fun WomensAreaScreen(
 
     val entries by viewModel.allEntries.collectAsStateWithLifecycle()
     val hefsek by viewModel.latestHefsek.collectAsStateWithLifecycle()
+    val reminders by viewModel.reminderSettings.collectAsStateWithLifecycle()
     // The tapped day — its action dialog is open while this is non-null.
     var tapped by remember { mutableStateOf<LocalDate?>(null) }
 
@@ -117,6 +118,13 @@ fun WomensAreaScreen(
             )
             prediction?.let { PrishaSummaryCard(it) }
             hefsek?.let { TaharaSummaryCard(it, prediction) }
+            WomensAreaRemindersCard(
+                enabled = reminders.remindersEnabled,
+                times = reminders.reminderTimes,
+                onEnabledChange = viewModel::setRemindersEnabled,
+                onAddTime = viewModel::addReminderTime,
+                onRemoveTime = viewModel::removeReminderTime,
+            )
             OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("  היסטוריית רשומות", style = MaterialTheme.typography.bodyMedium)
@@ -146,12 +154,12 @@ fun WomensAreaScreen(
     }
 }
 
-/** The latest הפסק טהרה, its 7 clean days and the tevila night — and a warning if that night is a separation night. */
+/** The latest הפסק טהרה, its 7 clean days and the tevila — and a warning if the tevila night is a separation night. */
 @Composable
 private fun TaharaSummaryCard(hefsek: LocalDate, prediction: VesetPrediction?) {
     val cs = MaterialTheme.colorScheme
     val clean = WomensAreaCalculator.cleanDayDates(hefsek)
-    val tevila = WomensAreaCalculator.tevilaNight(hefsek)
+    val tevilaDay = WomensAreaCalculator.tevilaDay(hefsek)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -185,8 +193,13 @@ private fun TaharaSummaryCard(hefsek: LocalDate, prediction: VesetPrediction?) {
                     .border(2.dp, WomensAreaTevilaBlue, RoundedCornerShape(12.dp))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                Text("טבילה", fontWeight = FontWeight.Bold, color = WomensAreaTevilaBlue)
-                Text(WomensAreaLabels.tevilaTiming(tevila), style = MaterialTheme.typography.bodySmall)
+                Text("★ טבילה", fontWeight = FontWeight.Bold, color = WomensAreaTevilaBlue)
+                Text(WomensAreaLabels.tevilaTiming(tevilaDay), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "טובלים רק לאחר צאת הכוכבים — לא לפני.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                )
             }
             if (prediction?.clashesWithTevila(hefsek) == true) {
                 Text(
@@ -214,8 +227,8 @@ private fun PrishaSummaryCard(prediction: VesetPrediction) {
             Text(
                 text = "מהראייה של " + (
                     prediction.onah?.let { WomensAreaLabels.onahTiming(prediction.sourceStart, it) }
-                        ?: "${WomensAreaLabels.hebrewDate(prediction.sourceStart)} — לא צוין ביום או בלילה; " +
-                        "אפשר להשלים בהיסטוריית הרשומות"
+                        ?: "${WomensAreaLabels.hebrewDate(prediction.sourceStart)} — חסר ביום או בלילה. " +
+                        "יש להשלים בהיסטוריית הרשומות (עריכה)"
                     ),
                 style = MaterialTheme.typography.bodySmall,
                 color = cs.onSurfaceVariant,

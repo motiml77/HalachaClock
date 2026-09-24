@@ -82,13 +82,15 @@ object WomensAreaLabels {
         "יום ${weekdayName(date)} ${hebrewDayAndMonth(date)} (${gregorianShort(date)}), לפני השקיעה"
 
     /**
-     * "ליל רביעי כ״ג ניסן — הערב של יום שלישי 9.4, אחרי צאת הכוכבים" — the
-     * tevila night is the evening before the Hebrew day [date], after tzeit.
+     * When the tevila is, from the 7th clean day [seventhDay]:
+     * "ביום ראשון כ״ז ניסן (14.4), לאחר צאת הכוכבים בלבד — ליל שני כ״ח ניסן".
+     * On Shabbat: "במוצאי שבת …".
      */
-    fun tevilaTiming(date: LocalDate): String {
-        val evening = date.minusDays(1)
-        return "ליל ${weekdayName(date)} ${hebrewDayAndMonth(date)} — " +
-            "הערב של ${eveningDay(evening)} ${gregorianShort(evening)}, אחרי צאת הכוכבים"
+    fun tevilaTiming(seventhDay: LocalDate): String {
+        val night = seventhDay.plusDays(1)
+        val day = if (seventhDay.dayOfWeek == DayOfWeek.SATURDAY) "במוצאי שבת" else "ביום ${weekdayName(seventhDay)}"
+        return "$day ${hebrewDayAndMonth(seventhDay)} (${gregorianShort(seventhDay)}), לאחר צאת הכוכבים בלבד — " +
+            "ליל ${weekdayName(night)} ${hebrewDayAndMonth(night)}"
     }
 
     /** "יום רביעי" / "שבת" — "יום שבת" reads wrongly. */

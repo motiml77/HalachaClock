@@ -16,8 +16,11 @@ data class WomensAreaMarker(
     val isHefsekDay: Boolean = false,
     /** Which day (1..7) of שבעה נקיים this is, if any. */
     val cleanDayNumber: Int? = null,
-    /** True on the Hebrew day whose NIGHT is ליל הטבילה. */
-    val isTevilaNight: Boolean = false,
+    /**
+     * True on the 7th clean day: the tevila is after ITS tzeit only (the
+     * night that opens the next Hebrew day).
+     */
+    val isTevilaDay: Boolean = false,
 )
 
 /**
@@ -51,7 +54,7 @@ object WomensAreaMarkers {
             WomensAreaCalculator.cleanDayDates(hefsek).forEachIndexed { i, date ->
                 edit(date) { it.copy(cleanDayNumber = i + 1) }
             }
-            edit(WomensAreaCalculator.tevilaNight(hefsek)) { it.copy(isTevilaNight = true) }
+            edit(WomensAreaCalculator.tevilaDay(hefsek)) { it.copy(isTevilaDay = true) }
         }
         return markers
     }

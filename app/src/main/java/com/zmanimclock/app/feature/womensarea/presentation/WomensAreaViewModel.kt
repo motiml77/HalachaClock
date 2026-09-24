@@ -14,20 +14,29 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarkers
 import com.zmanimclock.app.feature.womensarea.scheduling.WomensAreaReminderScheduler
+import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurity
+import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 
 @HiltViewModel
 class WomensAreaViewModel @Inject constructor(
     private val dao: WomensAreaDao,
     private val reminderScheduler: WomensAreaReminderScheduler,
+    private val settings: WomensAreaSecurityRepository,
 ) : ViewModel() {
+
+    /** Whether the שבעה נקיים reminders are on, and at which times. */
+    val reminderSettings: StateFlow<WomensAreaSecurity> = settings.state
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WomensAreaSecurity())
 
     val allEntries: StateFlow<List<WomensAreaEntryEntity>> = dao.getAllEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -107,22 +116,63 @@ class WomensAreaViewModel @Inject constructor(
         val id = dao.insert(
             WomensAreaEntryEntity(type = WomensAreaEntryType.HEFSEK_TAHARA, epochDay = date.toEpochDay())
         )
-        reminderScheduler.scheduleSevenDayCount(id, date)
+        scheduleIfOn(id, date)
     }
 
-    /** [onah] is ignored for a HEFSEK_TAHARA, which has none. */
+    /**
+     * [onah] is required for a veset — a veset is never saved without ביום /
+     * בלילה (the dialogs cannot confirm without one either) — and ignored for
+     * a HEFSEK_TAHARA, which has none.
+     */
     fun updateEntry(entry: WomensAreaEntryEntity, newDate: LocalDate, onah: Onah?) = viewModelScope.launch {
         val isVeset = entry.type == WomensAreaEntryType.PERIOD_START
+        if (isVeset && onah == null) return@launch
         dao.update(entry.copy(epochDay = newDate.toEpochDay(), onah = if (isVeset) onah else null))
         if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) {
             reminderScheduler.cancel(entry.id)
-            reminderScheduler.scheduleSevenDayCount(entry.id, newDate)
+            scheduleIfOn(entry.id, newDate)
         }
     }
 
     fun deleteEntry(entry: WomensAreaEntryEntity) = viewModelScope.launch {
         dao.delete(entry)
         if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) reminderScheduler.cancel(entry.id)
+    }
+
+    // ------------------------------------------------------- reminders
+
+    fun setRemindersEnabled(enabled: Boolean) = viewModelScope.launch {
+        settings.setRemindersEnabled(enabled)
+        rescheduleLatest()
+    }
+
+    fun addReminderTime(time: LocalTime) = viewModelScope.launch {
+        settings.setReminderTimes(settings.state.first().reminderTimes + time)
+        rescheduleLatest()
+    }
+
+    fun removeReminderTime(time: LocalTime) = viewModelScope.launch {
+        settings.setReminderTimes(settings.state.first().reminderTimes - time)
+        rescheduleLatest()
+    }
+
+    private suspend fun scheduleIfOn(entryId: Long, hefsek: LocalDate) {
+        val current = settings.state.first()
+        if (current.remindersEnabled) reminderScheduler.scheduleSevenDayCount(entryId, hefsek, current.reminderTimes)
+    }
+
+    /**
+     * After a change to the reminder settings: clear everything and re-queue
+     * the latest hefsek's remaining reminders under the new settings. Only
+     * the latest can still have clean days ahead of it.
+     */
+    private suspend fun rescheduleLatest() {
+        reminderScheduler.cancelAll()
+        val latest = dao.getAllEntries().first()
+            .filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
+            .maxByOrNull { it.epochDay } ?: return
+        reminderScheduler.cancel(latest.id) // also clears any queued before tags existed
+        scheduleIfOn(latest.id, latest.date)
     }
 }
 

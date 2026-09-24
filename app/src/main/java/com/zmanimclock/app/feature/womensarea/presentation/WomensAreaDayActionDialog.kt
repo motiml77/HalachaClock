@@ -143,7 +143,7 @@ fun WomensAreaDayActionDialog(
                             color = WomensAreaCleanGreen,
                         )
                         Text(
-                            "טבילה: ${WomensAreaLabels.tevilaTiming(WomensAreaCalculator.tevilaNight(date))}",
+                            "★ טבילה: ${WomensAreaLabels.tevilaTiming(WomensAreaCalculator.tevilaDay(date))}",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(

@@ -28,7 +28,10 @@ class WomensAreaReminderWorker @AssistedInject constructor(
         const val KEY_DAY_NUMBER = "day_number"
         const val KEY_NOTIFICATION_ID = "notification_id"
 
-        /** One unique work name per (entry, day) — lets a single day be cancelled/replaced independently. */
-        fun workName(entryId: Long, dayNumber: Int) = "womens_area_reminder_${entryId}_$dayNumber"
+        /** One unique work name per (entry, day, time slot). */
+        fun workName(entryId: Long, dayNumber: Int, slot: Int) = "womens_area_reminder_${entryId}_${dayNumber}_$slot"
+
+        /** The name used before there could be several times a day — only for cancelling those. */
+        fun legacyWorkName(entryId: Long, dayNumber: Int) = "womens_area_reminder_${entryId}_$dayNumber"
     }
 }

@@ -170,11 +170,14 @@ object WomensAreaCalculator {
         ChronoUnit.DAYS.between(hefsek, date).toInt().takeIf { it in 1..CLEAN_DAYS_COUNT }
 
     /**
-     * ליל הטבילה: after tzeit at the end of the 7th clean day — the NIGHT of
-     * the Hebrew day after it, i.e. the same weekday as the hefsek, one week
-     * on, but after tzeit (so on the luach, the day after). Hefsek on Tuesday
-     * → the 7th day is the next Tuesday → tevila on Tuesday night after tzeit,
-     * which is ליל רביעי.
+     * The day the tevila is made AFTER — the 7th clean day. The tevila is only
+     * once it has ended, after tzeit: a 7th day on Sunday means tevila on
+     * Sunday night after tzeit, which on the luach is already ליל שני. The
+     * calendar marks this day (with a star), since this is the day she lives
+     * through and waits out; [tevilaNight] is the Hebrew day that night opens.
      */
-    fun tevilaNight(hefsek: LocalDate): LocalDate = hefsek.plusDays((CLEAN_DAYS_COUNT + 1).toLong())
+    fun tevilaDay(hefsek: LocalDate): LocalDate = hefsek.plusDays(CLEAN_DAYS_COUNT.toLong())
+
+    /** The Hebrew day whose NIGHT is ליל הטבילה — the day after [tevilaDay]. */
+    fun tevilaNight(hefsek: LocalDate): LocalDate = tevilaDay(hefsek).plusDays(1)
 }

@@ -48,7 +48,7 @@ class WomensAreaMarkersTest {
     }
 
     @Test
-    fun `a hefsek marks itself, the 7 clean days after it, and the tevila night`() {
+    fun `a hefsek marks itself, the 7 clean days after it, and the tevila on the 7th`() {
         val hefsek = veset.plusDays(4) // day 5 of the count
         val markers = WomensAreaMarkers.build(veset, Onah.DAY, null, hefsek)
         assertTrue(markers.getValue(hefsek).isHefsekDay)
@@ -57,7 +57,9 @@ class WomensAreaMarkersTest {
         assertEquals(6, markers.getValue(hefsek.plusDays(1)).countDayNumber)
         assertEquals(7, markers.getValue(hefsek.plusDays(7)).cleanDayNumber)
         assertNull(markers.getValue(hefsek.plusDays(8)).cleanDayNumber)
-        assertTrue(markers.getValue(hefsek.plusDays(8)).isTevilaNight)
+        // The star goes on the 7th clean day itself: tevila after ITS tzeit.
+        assertTrue(markers.getValue(hefsek.plusDays(7)).isTevilaDay)
+        assertNull(markers[hefsek.plusDays(8)]?.takeIf { it.isTevilaDay })
     }
 
     @Test

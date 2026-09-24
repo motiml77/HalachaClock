@@ -31,11 +31,15 @@ class WomensAreaLabelsTest {
     }
 
     @Test
-    fun `the tevila night is the evening before its Hebrew day, after tzeit`() {
-        // Hefsek Tuesday 7.4 -> tevila on the Hebrew day of Wednesday 15.4 (כ״ח ניסן).
+    fun `the tevila is after tzeit of the 7th day, which opens the next Hebrew day`() {
+        // 7th clean day Sunday 12.4 (כ״ה ניסן) -> tevila Sunday after tzeit = ליל שני כ״ו ניסן.
         assertEquals(
-            "ליל רביעי כ״ח ניסן — הערב של יום שלישי 14.4, אחרי צאת הכוכבים",
-            WomensAreaLabels.tevilaTiming(LocalDate.of(2026, 4, 15)),
+            "ביום ראשון כ״ה ניסן (12.4), לאחר צאת הכוכבים בלבד — ליל שני כ״ו ניסן",
+            WomensAreaLabels.tevilaTiming(LocalDate.of(2026, 4, 12)),
+        )
+        assertEquals(
+            "במוצאי שבת כ״ד ניסן (11.4), לאחר צאת הכוכבים בלבד — ליל ראשון כ״ה ניסן",
+            WomensAreaLabels.tevilaTiming(LocalDate.of(2026, 4, 11)),
         )
         assertEquals("יום שלישי כ׳ ניסן (7.4), לפני השקיעה", WomensAreaLabels.hefsekTiming(LocalDate.of(2026, 4, 7)))
     }

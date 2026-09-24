@@ -108,7 +108,8 @@ private fun WomensAreaDayCell(
     val isPrisha = prisha.isNotEmpty()
     val isVesetDay = marker?.isVesetDay == true
     val isHefsek = marker?.isHefsekDay == true
-    val isTevila = marker?.isTevilaNight == true
+    // The 7th clean day: the tevila is after ITS tzeit only.
+    val isTevila = marker?.isTevilaDay == true
     val cleanDayNumber = marker?.cleanDayNumber
 
     val background = when {
@@ -119,12 +120,11 @@ private fun WomensAreaDayCell(
         else -> Color.Transparent
     }
     // One frame per cell, in priority order: a separation day's red frame
-    // outranks everything; then the clean days' green, the tevila night's
-    // blue, and last today's.
+    // outranks everything; then the clean days' green (the 7th, the tevila
+    // day, keeps its green frame and gets a star), and last today's.
     val frame: Color? = when {
         isPrisha -> WomensAreaPrishaRed
         cleanDayNumber != null -> WomensAreaCleanGreen
-        isTevila -> WomensAreaTevilaBlue
         isToday -> cs.primary
         else -> null
     }
@@ -147,6 +147,9 @@ private fun WomensAreaDayCell(
             Row(Modifier.fillMaxWidth().height(15.dp), verticalAlignment = Alignment.CenterVertically) {
                 marker?.countDayNumber?.let { CountChip(it, WomensAreaCountBlue, RoundedCornerShape(5.dp)) }
                 Spacer(Modifier.weight(1f))
+                if (isTevila) {
+                    Text("★", fontSize = 12.sp, lineHeight = 13.sp, color = WomensAreaTevilaBlue)
+                }
                 cleanDayNumber?.let { CountChip(it, WomensAreaCleanGreen, CircleShape) }
             }
             // Hebrew and Gregorian numerals in SEPARATE Text composables —
@@ -164,7 +167,7 @@ private fun WomensAreaDayCell(
             when {
                 isPrisha -> PrishaLabel(prisha)
                 isVesetDay -> CellCaption(title = "ראייה", onah = marker?.vesetOnah?.hebrewName, color = cs.onSurface)
-                isTevila -> CellCaption(title = "טבילה", onah = "בלילה", color = WomensAreaTevilaBlue)
+                isTevila -> CellCaption(title = "טבילה", onah = "אחר צאה״כ בלבד", color = WomensAreaTevilaBlue)
                 isHefsek -> CellCaption(title = "הפסק טהרה", onah = null, color = WomensAreaCleanGreen)
             }
         }

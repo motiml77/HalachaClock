@@ -107,7 +107,7 @@ class WomensAreaCalculatorTest {
     }
 
     @Test
-    fun `a hefsek on Tuesday starts the clean days on Wednesday, and the tevila is the next Tuesday night`() {
+    fun `a hefsek on Tuesday starts the clean days on Wednesday, and the tevila is after tzeit of the next Tuesday`() {
         // Tuesday 2026-04-07 (20 Nissan), hefsek before shkia.
         val hefsek = LocalDate.of(2026, 4, 7)
         val dates = WomensAreaCalculator.cleanDayDates(hefsek)
@@ -123,7 +123,8 @@ class WomensAreaCalculatorTest {
         assertEquals(7, WomensAreaCalculator.cleanDayNumber(hefsek, LocalDate.of(2026, 4, 14)))
         assertNull(WomensAreaCalculator.cleanDayNumber(hefsek, LocalDate.of(2026, 4, 15)))
 
-        // Tuesday night after tzeit = ליל רביעי = the Hebrew day of Wednesday 15.4.
+        // Tevila after tzeit of the 7th day (Tuesday 14.4) = ליל רביעי, the Hebrew day of 15.4.
+        assertEquals(LocalDate.of(2026, 4, 14), WomensAreaCalculator.tevilaDay(hefsek))
         assertEquals(LocalDate.of(2026, 4, 15), WomensAreaCalculator.tevilaNight(hefsek))
     }
 }
