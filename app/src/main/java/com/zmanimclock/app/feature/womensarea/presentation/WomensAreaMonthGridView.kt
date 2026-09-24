@@ -6,11 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,29 +24,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zmanimclock.app.feature.calendar.model.CalendarDayMeta
 import com.zmanimclock.app.feature.calendar.model.MonthGrid
+import com.zmanimclock.app.feature.womensarea.model.PrishaDay
+import com.zmanimclock.app.feature.womensarea.model.VesetKind
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
 import com.zmanimclock.app.ui.WomensAreaCleanDayMarker
+import com.zmanimclock.app.ui.WomensAreaCountBlue
+import com.zmanimclock.app.ui.WomensAreaLilac
+import com.zmanimclock.app.ui.WomensAreaPrishaRed
 import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
-// Same fixed height as the main Calendar tab's grid, for the identical
-// "always 6 rows" reasoning: a Hebrew month is 29 or 30 days and can start on
-// any weekday, so reserving 6 rows stops the grid resizing under a swipe.
-private val CELL_HEIGHT = 58.dp
+// Taller than the Calendar tab's 58dp: a cell here carries the day count, the
+// Hebrew and civil numerals, AND a separation day's name plus its onah.
+// Still a fixed 6 rows, for the same reason as the Calendar tab: a Hebrew
+// month is 29 or 30 days on any weekday, and a constant height keeps the grid
+// from resizing under a swipe.
+private val CELL_HEIGHT = 80.dp
 
 /**
- * The swipeable month grid for the Women's Area — built on the REAL
- * [MonthGrid]/[CalendarDayMeta] from [com.zmanimclock.app.feature.calendar.model.MonthGridBuilder]
- * (same dates/Hebrew labels the main Calendar tab uses, not duplicated), with
- * this feature's own veset/clean-day markers layered on top per cell. The
- * main tab's own [com.zmanimclock.app.feature.calendar.presentation.MonthPager]
- * isn't reusable here — it internally renders its own private, holiday-styled
- * day cell with no seam to substitute different colouring — so this is a
- * parallel pager over the same shared grid data, not a parallel grid.
+ * The swipeable Hebrew-month grid for the Women's Area, over the REAL
+ * [MonthGrid] from MonthGridBuilder — one page per Hebrew month, one cell per
+ * Hebrew day, so counting cells IS counting Hebrew dates.
+ *
+ * Only the displayed month's own days are drawn: the neighbouring months'
+ * filler cells stay blank, so no day appears twice across two pages and the
+ * count reads straight off the grid.
  */
 @Composable
 fun WomensAreaMonthPager(
@@ -52,6 +65,8 @@ fun WomensAreaMonthPager(
     gridAt: (Int) -> MonthGrid,
     markersAt: (LocalDate) -> WomensAreaMarker?,
     today: LocalDate,
+    selected: LocalDate,
+    onSelect: (LocalDate) -> Unit,
 ) {
     HorizontalPager(
         state = pagerState,
@@ -62,12 +77,18 @@ fun WomensAreaMonthPager(
             grid.weeks.forEach { week ->
                 Row(Modifier.fillMaxWidth()) {
                     week.forEach { meta ->
-                        WomensAreaDayCell(
-                            meta = meta,
-                            marker = markersAt(meta.date),
-                            isToday = meta.date == today,
-                            modifier = Modifier.weight(1f),
-                        )
+                        if (!meta.isInDisplayedMonth) {
+                            Spacer(Modifier.weight(1f).height(CELL_HEIGHT))
+                        } else {
+                            WomensAreaDayCell(
+                                meta = meta,
+                                marker = markersAt(meta.date),
+                                isToday = meta.date == today,
+                                isSelected = meta.date == selected,
+                                onClick = { onSelect(meta.date) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
             }
@@ -80,84 +101,137 @@ private fun WomensAreaDayCell(
     meta: CalendarDayMeta,
     marker: WomensAreaMarker?,
     isToday: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cs = MaterialTheme.colorScheme
-    val hasVeset = marker?.vesetKinds?.isNotEmpty() == true
+    val shape = RoundedCornerShape(10.dp)
+    val prisha = marker?.prisha.orEmpty()
+    val isPrisha = prisha.isNotEmpty()
+    val isVesetDay = marker?.isVesetDay == true
     val cleanDayNumber = marker?.cleanDayNumber
 
     val background = when {
-        cleanDayNumber != null -> WomensAreaCleanDayMarker.copy(alpha = 0.18f)
-        hasVeset -> WomensAreaVesetMarker.copy(alpha = 0.16f)
+        isPrisha -> WomensAreaPrishaRed.copy(alpha = 0.10f)
+        isVesetDay -> WomensAreaVesetMarker.copy(alpha = 0.28f)
+        cleanDayNumber != null -> WomensAreaCleanDayMarker.copy(alpha = 0.16f)
+        isSelected -> WomensAreaLilac.copy(alpha = 0.12f)
         else -> Color.Transparent
     }
-    val hebrewColor = when {
-        !meta.isInDisplayedMonth -> cs.onSurfaceVariant.copy(alpha = 0.38f)
-        else -> cs.onSurface
+    // One frame per cell, in priority order: a separation day's red frame
+    // outranks today's, and the selection outline only shows on a plain day.
+    val frame: Pair<Color, Int>? = when {
+        isPrisha -> WomensAreaPrishaRed to 2
+        isToday -> cs.primary to 2
+        isSelected -> WomensAreaLilac to 2
+        else -> null
     }
-    val gregorianColor = cs.onSurfaceVariant.copy(alpha = if (meta.isInDisplayedMonth) 1f else 0.38f)
 
     Box(
         modifier = modifier
-            .heightIn(min = CELL_HEIGHT)
             .height(CELL_HEIGHT)
             .padding(1.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(shape)
             .background(background)
-            .then(
-                if (isToday) Modifier.border(2.dp, cs.primary, RoundedCornerShape(10.dp)) else Modifier,
-            ),
-        contentAlignment = Alignment.Center,
+            .then(frame?.let { (color, width) -> Modifier.border(width.dp, color, shape) } ?: Modifier)
+            .clickable(onClick = onClick),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // Hebrew and Gregorian numerals stay in SEPARATE Text composables
-            // — interpolated into one string, the bidi algorithm reorders
-            // them inconsistently from month to month (same reasoning as the
-            // main Calendar tab's own day cell).
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // Top line: the count from the veset (start side), the clean-day
+            // number (end side). Fixed height so the numerals never shift.
+            Row(Modifier.fillMaxWidth().height(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                marker?.countDayNumber?.let { CountChip(it, WomensAreaCountBlue, RoundedCornerShape(5.dp)) }
+                Spacer(Modifier.weight(1f))
+                cleanDayNumber?.let { CountChip(it, WomensAreaCleanDayMarker, CircleShape) }
+            }
+            // Hebrew and Gregorian numerals in SEPARATE Text composables —
+            // interpolated into one string, bidi reorders them inconsistently
+            // (same reasoning as the Calendar tab's own day cell).
             Text(
                 text = meta.hebrewDayLabel,
                 fontSize = 16.sp,
                 lineHeight = 18.sp,
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.SemiBold,
-                color = hebrewColor,
+                fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
+                color = if (isToday) cs.primary else cs.onSurface,
             )
-            Text(text = meta.gregorianDayLabel, fontSize = 10.sp, lineHeight = 11.sp, color = gregorianColor)
-        }
-        if (cleanDayNumber != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 3.dp)
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(WomensAreaCleanDayMarker),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = cleanDayNumber.toString(),
-                    fontSize = 9.sp,
-                    lineHeight = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
+            Text(text = meta.gregorianDayLabel, fontSize = 9.sp, lineHeight = 10.sp, color = cs.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            when {
+                isPrisha -> PrishaLabel(prisha)
+                isVesetDay -> CellCaption(
+                    title = "ראייה",
+                    onah = marker?.vesetOnah?.hebrewName,
+                    color = cs.onSurface,
                 )
-            }
-        } else if (hasVeset) {
-            // One dot per veset kind that lands on this day (up to 3) — a
-            // shared colour for all three kinds for now; easy to give each
-            // its own colour later if that turns out to read better.
-            Row(
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp),
-            ) {
-                repeat(marker?.vesetKinds?.size ?: 0) {
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 1.dp)
-                            .size(4.dp)
-                            .clip(CircleShape)
-                            .background(WomensAreaVesetMarker),
-                    )
-                }
             }
         }
     }
 }
+
+@Composable
+private fun CountChip(number: Int, color: Color, shape: Shape) {
+    Box(
+        modifier = Modifier
+            .sizeIn(minWidth = 15.dp, minHeight = 15.dp)
+            .clip(shape)
+            .background(color)
+            .padding(horizontal = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = number.toString(),
+            fontSize = 9.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+    }
+}
+
+/**
+ * The separation day's name and its onah. A single kind gets its full name
+ * (wrapping to two lines if needed); two kinds on one day — e.g. day 30 that
+ * is also the same date next month — get short forms side by side. The card
+ * under the calendar spells every one out in full.
+ */
+@Composable
+private fun PrishaLabel(prisha: List<PrishaDay>) {
+    val title = if (prisha.size == 1) {
+        prisha.single().kind.hebrewName
+    } else {
+        prisha.joinToString(" + ") { it.kind.shortName }
+    }
+    CellCaption(
+        title = title,
+        onah = prisha.first().onah?.hebrewName ?: "?",
+        color = WomensAreaPrishaRed,
+    )
+}
+
+@Composable
+private fun CellCaption(title: String, onah: String?, color: Color) {
+    Text(
+        text = title,
+        fontSize = 8.sp,
+        lineHeight = 9.sp,
+        fontWeight = FontWeight.Bold,
+        color = color,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+    if (onah != null) {
+        Text(text = onah, fontSize = 8.sp, lineHeight = 9.sp, color = color, textAlign = TextAlign.Center)
+    }
+}
+
+private val VesetKind.shortName: String
+    get() = when (this) {
+        VesetKind.ONAH_BEINONIT -> "ע״ב"
+        VesetKind.HAFLAGA -> "הפלגה"
+        VesetKind.YOM_HACHODESH -> "יוה״ח"
+    }

@@ -17,7 +17,7 @@ import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
  */
 @Database(
     entities = [ChaiTablesEntity::class, AlarmEntity::class, WomensAreaEntryEntity::class],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 abstract class ZmanimDatabase : RoomDatabase() {

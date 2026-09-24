@@ -8,70 +8,152 @@ import com.zmanimclock.app.feature.calendar.model.toLocalDate
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-/** Which of the three predicted dates a calendar marker represents. */
+/**
+ * עונת יום / עונת לילה — as the user reported it when entering the veset.
+ * Every separation day inherits the onah of the veset it is computed from.
+ */
+enum class Onah { DAY, NIGHT }
+
+/** Which of the three separation days a marker represents. */
 enum class VesetKind { ONAH_BEINONIT, HAFLAGA, YOM_HACHODESH }
 
-/**
- * The three predicted dates from one period-start entry. Pure calculation —
- * carries no halachic weight or interpretation, just the dates themselves.
- */
-data class VesetPrediction(
-    val sourceStart: LocalDate,
-    val onahBeinonit: LocalDate,
-    /** Null when [sourceStart] has no earlier period-start entry to measure a gap against. */
-    val haflaga: LocalDate?,
-    /** Null only past [HebrewMonthSequence]'s supported range — a dead case in practice. */
-    val yomHachodesh: LocalDate?,
+/** One separation day: which kind, on which Hebrew day, in which onah, and its number in the count. */
+data class PrishaDay(
+    val kind: VesetKind,
+    val date: LocalDate,
+    /** Null only for an entry saved before the onah was asked for. */
+    val onah: Onah?,
+    /** Its place in the count that starts at 1 on the veset day itself. */
+    val dayNumber: Int,
 )
 
 /**
- * Sefirat/veset date arithmetic for the Women's Area — deliberately nothing
- * more than that. Every function here is a plain date calculation with no
- * halachic ruling attached: this object answers "what date is 30 days after
- * X" and "what date is 7 days after Y", never "is she permitted" or "does
- * this veset apply". That judgment stays with the user and her own rabbi.
+ * Everything one veset entry produces.
+ *
+ * THE DATE CONVENTION, which every field here follows
+ * Each [LocalDate] stands for ONE HEBREW DAY — the Gregorian date on whose
+ * daytime that Hebrew date falls, exactly the date a cell of the Hebrew
+ * month grid carries (see MonthGridBuilder). The night onah of a Hebrew day
+ * is the evening BEFORE that Gregorian date: a veset seen on Tuesday evening
+ * after shkia is ליל ט״ו, stored as the ט״ו cell with [Onah.NIGHT]. Because a
+ * cell is one Hebrew day, counting cells is counting Hebrew dates, and plain
+ * LocalDate day arithmetic on these values is exactly that count.
+ */
+data class VesetPrediction(
+    val sourceStart: LocalDate,
+    val onah: Onah?,
+    /** Day 30 of the count (the veset day itself is day 1). */
+    val onahBeinonit: LocalDate,
+    /** Null when there is no earlier veset to measure a haflaga from. */
+    val haflaga: LocalDate?,
+    /**
+     * The haflaga length, counted inclusively the way it is counted on the
+     * luach: the previous veset day is 1, and the count runs up to AND
+     * including this veset's own day. Null together with [haflaga].
+     */
+    val haflagaInterval: Int?,
+    /**
+     * The same Hebrew day-of-month in the next Hebrew month. Null when that
+     * month has no such day (a veset on ל׳ followed by a 29-day month) —
+     * see [yomHachodeshMissing] — or past HebrewMonthSequence's range.
+     */
+    val yomHachodesh: LocalDate?,
+    /** True when [yomHachodesh] is null because the next month has no ל׳. */
+    val yomHachodeshMissing: Boolean,
+) {
+    /** The separation days, in date order. */
+    val prishaDays: List<PrishaDay>
+        get() = listOfNotNull(
+            PrishaDay(VesetKind.ONAH_BEINONIT, onahBeinonit, onah, dayNumberOf(onahBeinonit)),
+            haflaga?.let { PrishaDay(VesetKind.HAFLAGA, it, onah, dayNumberOf(it)) },
+            yomHachodesh?.let { PrishaDay(VesetKind.YOM_HACHODESH, it, onah, dayNumberOf(it)) },
+        ).sortedWith(compareBy({ it.date }, { it.kind.ordinal }))
+
+    /** How far the on-calendar count runs: at least to day 30, and on to the latest separation day. */
+    val lastCountedDay: Int
+        get() = prishaDays.maxOf { it.dayNumber }.coerceAtLeast(WomensAreaCalculator.ONAH_BEINONIT_DAY)
+
+    /** [date]'s number in the count (the veset day = 1), or null outside 1..[lastCountedDay]. */
+    fun countDayNumber(date: LocalDate): Int? =
+        dayNumberOf(date).takeIf { it in 1..lastCountedDay }
+
+    private fun dayNumberOf(date: LocalDate): Int =
+        (ChronoUnit.DAYS.between(sourceStart, date) + 1).toInt()
+}
+
+/**
+ * Veset date arithmetic for the Women's Area. Counting only: this object
+ * answers "which Hebrew day is day 30" and "which is the same date next
+ * month", never "is she permitted". That judgment stays with the user and
+ * her own rabbi.
  */
 object WomensAreaCalculator {
 
-    private const val ONAH_BEINONIT_DAYS = 30L
+    /** עונה בינונית is the 30th day, counting the veset day itself as the 1st. */
+    const val ONAH_BEINONIT_DAY = 30
     const val CLEAN_DAYS_COUNT = 7
 
-    /**
-     * עונה בינונית: 30 days after [start]. A day is the same length in both
-     * calendars — the Hebrew/Gregorian mapping is a strictly increasing
-     * bijection — so plain [LocalDate] arithmetic is exact; no Hebrew-calendar
-     * round-trip is needed here.
-     */
-    fun onahBeinonit(start: LocalDate): LocalDate = start.plusDays(ONAH_BEINONIT_DAYS)
+    /** עונה בינונית: day 30 of the count — [start] is day 1, so 29 days after it. */
+    fun onahBeinonit(start: LocalDate): LocalDate = start.plusDays((ONAH_BEINONIT_DAY - 1).toLong())
 
-    /** הפלגה: [start] plus the gap between [start] and [previousStart]. */
+    /**
+     * The haflaga length: the previous veset's day is 1, counting up to and
+     * including [start]'s day. Null with no previous veset, or when
+     * [previousStart] is not actually earlier.
+     */
+    fun haflagaInterval(start: LocalDate, previousStart: LocalDate?): Int? {
+        val previous = previousStart?.takeIf { it < start } ?: return null
+        return (ChronoUnit.DAYS.between(previous, start) + 1).toInt()
+    }
+
+    /**
+     * הפלגה: the same count run forward from [start] — [start] is day 1, and
+     * day [haflagaInterval] is the separation day.
+     */
     fun haflaga(start: LocalDate, previousStart: LocalDate?): LocalDate? {
-        val previous = previousStart ?: return null
-        return start.plusDays(ChronoUnit.DAYS.between(previous, start))
+        val interval = haflagaInterval(start, previousStart) ?: return null
+        return start.plusDays((interval - 1).toLong())
     }
 
     /**
      * יום החודש: the same Hebrew day-of-month as [start], in the Hebrew month
      * immediately after [start]'s — via [HebrewMonthSequence], so leap-year
-     * Adar I/II and the Elul→Tishrei year rollover are handled exactly as the
-     * main Calendar tab already relies on. Clamps to the next month's last day
-     * when it is shorter than [start]'s day-of-month (the same "same day next
-     * month, else month-end" rule an ordinary Gregorian calendar uses).
+     * Adar I/II and the Elul→Tishrei year rollover step exactly as the
+     * Calendar tab steps them.
+     *
+     * A veset on ל׳ followed by a 29-day month has no such day, and this
+     * returns null rather than moving it to כ״ט or to the next ראש חודש:
+     * which day (if any) applies then is a question for a rabbi, not a
+     * default for arithmetic to pick. [isYomHachodeshMissing] tells that case
+     * apart from the out-of-range one.
      */
     fun yomHachodesh(start: LocalDate): LocalDate? {
+        val (jd, next) = nextMonthOf(start) ?: return null
+        if (jd.jewishDayOfMonth > next.daysInMonth) return null
+        return JewishDate(next.year, next.month, jd.jewishDayOfMonth).toLocalDate()
+    }
+
+    /** True when [start] is a ל׳ and the next Hebrew month has only 29 days. */
+    fun isYomHachodeshMissing(start: LocalDate): Boolean {
+        val (jd, next) = nextMonthOf(start) ?: return false
+        return jd.jewishDayOfMonth > next.daysInMonth
+    }
+
+    private fun nextMonthOf(start: LocalDate): Pair<JewishDate, HebrewMonthRef>? {
         val jd = JewishDate(start.toGregorianCalendar())
         val index = HebrewMonthSequence.indexOf(HebrewMonthRef(jd.jewishYear, jd.jewishMonth))
         if (index < 0 || index + 1 >= HebrewMonthSequence.size) return null
-        val next = HebrewMonthSequence.refAt(index + 1)
-        val day = jd.jewishDayOfMonth.coerceAtMost(next.daysInMonth)
-        return JewishDate(next.year, next.month, day).toLocalDate()
+        return jd to HebrewMonthSequence.refAt(index + 1)
     }
 
-    fun predict(start: LocalDate, previousStart: LocalDate?): VesetPrediction = VesetPrediction(
+    fun predict(start: LocalDate, onah: Onah?, previousStart: LocalDate?): VesetPrediction = VesetPrediction(
         sourceStart = start,
+        onah = onah,
         onahBeinonit = onahBeinonit(start),
         haflaga = haflaga(start, previousStart),
+        haflagaInterval = haflagaInterval(start, previousStart),
         yomHachodesh = yomHachodesh(start),
+        yomHachodeshMissing = isYomHachodeshMissing(start),
     )
 
     /** The 7 dates of the count, day 1 = [firstCleanDay] itself. */

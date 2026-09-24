@@ -3,13 +3,19 @@ package com.zmanimclock.app.feature.womensarea.data
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.zmanimclock.app.feature.womensarea.model.Onah
 
 /** Which of the two independent, self-reported date sequences an entry belongs to. */
 enum class WomensAreaEntryType { PERIOD_START, FIRST_CLEAN_DAY }
 
 /**
  * One self-reported date in either sequence. [epochDay] is
- * `LocalDate.toEpochDay()` — a calendar date with no time-of-day, matching
+ * `LocalDate.toEpochDay()` of the HEBREW DAY the entry is for — the date its
+ * cell in the Hebrew month grid carries, i.e. the Gregorian date on whose
+ * daytime that Hebrew date falls. A veset seen after shkia belongs to the
+ * next Hebrew day and is stored on that day with [onah] = NIGHT; see
+ * VesetPrediction for the whole convention. A calendar date with no
+ * time-of-day, matching
  * [com.zmanimclock.app.feature.chaitables.data.local.ChaiTablesEntity]'s own
  * epoch-day convention (epoch-millis would wrongly imply an instant/timezone).
  *
@@ -23,5 +29,10 @@ data class WomensAreaEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: WomensAreaEntryType = WomensAreaEntryType.PERIOD_START,
     val epochDay: Long,
+    /**
+     * ביום / בלילה, for a PERIOD_START. Null for a FIRST_CLEAN_DAY, and for a
+     * period start saved before the question was asked (v11 rows).
+     */
+    val onah: Onah? = null,
     val createdAt: Long = System.currentTimeMillis(),
 )

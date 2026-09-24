@@ -42,7 +42,7 @@ object AppModule {
             // the user's existing alarms by converting minutes×60 in place.
             .addMigrations(
                 MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                MIGRATION_9_10, MIGRATION_10_11,
+                MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
             )
             // Destructive fallback is limited to the PRE-RELEASE versions.
             // It must never apply to v4+, or a future schema bump would
@@ -71,6 +71,18 @@ object AppModule {
      * behaviour rather than silently keep a fade the user never chose.
      * Anyone who actually wants it can switch it back on per alarm.
      */
+    /**
+     * v11→v12: the Women's Area veset's onah (ביום / בלילה). Nullable with no
+     * DEFAULT — an existing row simply has no onah recorded (the entity
+     * declares no defaultValue, so Room expects none), and the screen asks
+     * for it the next time that entry is edited.
+     */
+    private val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE womens_area_entries ADD COLUMN onah TEXT")
+        }
+    }
+
     /**
      * v10→v11: the Women's Area feature's own table. FIRST create-table
      * migration in this project — every migration above is ALTER TABLE/DELETE

@@ -38,10 +38,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-
-private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d.M.yyyy")
 
 /** Every entry, either kind, newest first — with edit/delete, since manually-entered dates will have mistakes. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,11 +86,15 @@ fun WomensAreaHistoryScreen(
     }
 
     editing?.let { entry ->
-        WomensAreaDateEntryDialog(
+        WomensAreaHebrewDateDialog(
             title = entry.type.label,
             initialDate = LocalDate.ofEpochDay(entry.epochDay),
-            onConfirm = { date ->
-                viewModel.updateEntryDate(entry, date)
+            askOnah = entry.type == WomensAreaEntryType.PERIOD_START,
+            initialOnah = entry.onah,
+            today = LocalDate.now(),
+            gridAt = viewModel::monthGrid,
+            onConfirm = { date, onah ->
+                viewModel.updateEntry(entry, date, onah)
                 editing = null
             },
             onDismiss = { editing = null },
@@ -114,7 +116,7 @@ private fun HistoryRow(entry: WomensAreaEntryEntity, onEdit: () -> Unit, onDelet
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.type.label, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    DATE_FORMAT.format(LocalDate.ofEpochDay(entry.epochDay)),
+                    entry.dateLabel,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -131,6 +133,21 @@ private fun HistoryRow(entry: WomensAreaEntryEntity, onEdit: () -> Unit, onDelet
 
 private val WomensAreaEntryType.label: String
     get() = when (this) {
-        WomensAreaEntryType.PERIOD_START -> "תחילת ראייה"
+        WomensAreaEntryType.PERIOD_START -> "התחלת ווסת"
         WomensAreaEntryType.FIRST_CLEAN_DAY -> "יום ראשון לנקיים"
+    }
+
+/** "ליל חמישי ט״ו ניסן — הערב של …" for a veset with its onah; the Hebrew date (and civil date) otherwise. */
+private val WomensAreaEntryEntity.dateLabel: String
+    get() {
+        val date = LocalDate.ofEpochDay(epochDay)
+        val onah = onah
+        return when {
+            type == WomensAreaEntryType.PERIOD_START && onah != null -> WomensAreaLabels.onahTiming(date, onah)
+            type == WomensAreaEntryType.PERIOD_START ->
+                "${WomensAreaLabels.hebrewDate(date)} (${WomensAreaLabels.gregorianShort(date)}) — " +
+                    "לא צוין ביום או בלילה, לחצי על העריכה"
+            else -> "יום ${WomensAreaLabels.weekdayName(date)} ${WomensAreaLabels.hebrewDate(date)} " +
+                "(${WomensAreaLabels.gregorianShort(date)})"
+        }
     }

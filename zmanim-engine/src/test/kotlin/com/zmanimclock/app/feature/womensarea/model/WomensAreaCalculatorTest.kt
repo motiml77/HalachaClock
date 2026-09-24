@@ -2,79 +2,108 @@ package com.zmanimclock.app.feature.womensarea.model
 
 import com.zmanimclock.app.feature.calendar.model.HebrewMonthSequence
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
 /**
- * Pure date arithmetic — no halachic content is asserted here, only that the
- * three formulas and the 7-day count compute the dates they claim to.
+ * Counting only — no halachic ruling is asserted here, only that each day
+ * lands where the count on the luach puts it.
  *
- * yomHachodesh anchors reuse facts already verified elsewhere in this project
- * against Hebcal, rather than hand-deriving fresh ones: 15 Nissan 5786 =
- * Wed 2026-04-02 (see OmerCountTest), and Rosh Hashana 5787 = 12-13/9/2026
- * (see AlarmTimeCalculatorTest).
+ * Every LocalDate is a Hebrew day (see VesetPrediction). Anchors reuse facts
+ * already verified elsewhere in this project against Hebcal: 15 Nissan 5786 =
+ * Thu 2026-04-02 (OmerCountTest), and Rosh Hashana 5787 = 12-13/9/2026
+ * (AlarmTimeCalculatorTest). Nissan has 30 days, Iyar 29.
  */
 class WomensAreaCalculatorTest {
 
+    private val fifteenNissan = LocalDate.of(2026, 4, 2)
+
     @Test
-    fun `onahBeinonit is exactly 30 days later, regardless of which Hebrew months it crosses`() {
-        assertEquals(LocalDate.of(2026, 5, 2), WomensAreaCalculator.onahBeinonit(LocalDate.of(2026, 4, 2)))
-        // Crosses a Cheshvan/Kislev-length year boundary — still plain +30,
-        // since a civil day is the same length regardless of which Hebrew
-        // month it falls in.
-        assertEquals(LocalDate.of(2026, 11, 20), WomensAreaCalculator.onahBeinonit(LocalDate.of(2026, 10, 21)))
+    fun `onahBeinonit is day 30, counting the veset day itself as day 1`() {
+        // 15 Nissan = day 1 ... 30 Nissan = day 16, 1 Iyar = day 17 ... 14 Iyar = day 30.
+        assertEquals(LocalDate.of(2026, 5, 1), WomensAreaCalculator.onahBeinonit(fifteenNissan))
+        val prediction = WomensAreaCalculator.predict(fifteenNissan, Onah.DAY, previousStart = null)
+        assertEquals(30, prediction.countDayNumber(prediction.onahBeinonit))
     }
 
     @Test
-    fun `haflaga projects the previous gap forward, or is null with no previous entry`() {
+    fun `haflaga counts from the previous veset day as 1 up to this veset's day, then runs that count forward`() {
         val start = LocalDate.of(2026, 5, 20)
-        assertEquals(LocalDate.of(2026, 6, 17), WomensAreaCalculator.haflaga(start, LocalDate.of(2026, 4, 22))) // 28-day gap
-        assertEquals(LocalDate.of(2026, 5, 25), WomensAreaCalculator.haflaga(start, LocalDate.of(2026, 5, 15))) // 5-day gap
+        val previous = LocalDate.of(2026, 4, 22)
+        // 22.4 = 1 ... 20.5 = 29, so this is a haflaga of 29.
+        assertEquals(29, WomensAreaCalculator.haflagaInterval(start, previous))
+        // Run forward: 20.5 = 1 ... 17.6 = 29.
+        val haflaga = WomensAreaCalculator.haflaga(start, previous)
+        assertEquals(LocalDate.of(2026, 6, 17), haflaga)
+        val prediction = WomensAreaCalculator.predict(start, Onah.NIGHT, previous)
+        assertEquals(29, prediction.countDayNumber(haflaga!!))
+
         assertNull(WomensAreaCalculator.haflaga(start, previousStart = null))
+        assertNull(WomensAreaCalculator.haflagaInterval(start, previousStart = start))
     }
 
     @Test
     fun `yomHachodesh is the same Hebrew day-of-month, next Hebrew month`() {
-        // 15 Nissan 5786 = 2026-04-02 -> 15 Iyar 5786 (Nissan has 30 days, no clamp needed)
-        assertEquals(LocalDate.of(2026, 5, 2), WomensAreaCalculator.yomHachodesh(LocalDate.of(2026, 4, 2)))
+        // 15 Nissan -> 15 Iyar. Nissan has 30 days, so this is day 31 of the count.
+        val yom = WomensAreaCalculator.yomHachodesh(fifteenNissan)
+        assertEquals(LocalDate.of(2026, 5, 2), yom)
+        assertEquals(31, WomensAreaCalculator.predict(fifteenNissan, Onah.DAY, null).countDayNumber(yom!!))
     }
 
     @Test
-    fun `yomHachodesh clamps to month-end when the next month is shorter`() {
-        // 30 Nissan 5786 (month end) = 2026-04-17 -> Iyar has only 29 days,
-        // so this clamps to 29 Iyar, not a nonexistent 30 Iyar.
+    fun `a veset on the 30th has no yomHachodesh when the next month has only 29 days`() {
+        // 30 Nissan 5786 = 2026-04-17; Iyar has no 30th. Not moved to 29 Iyar.
         val thirtyNissan = LocalDate.of(2026, 4, 17)
-        assertEquals(LocalDate.of(2026, 5, 16), WomensAreaCalculator.yomHachodesh(thirtyNissan))
+        assertNull(WomensAreaCalculator.yomHachodesh(thirtyNissan))
+        assertTrue(WomensAreaCalculator.isYomHachodeshMissing(thirtyNissan))
+        val prediction = WomensAreaCalculator.predict(thirtyNissan, Onah.DAY, null)
+        assertTrue(prediction.yomHachodeshMissing)
+        assertEquals(listOf(VesetKind.ONAH_BEINONIT), prediction.prishaDays.map { it.kind })
+
+        assertFalse(WomensAreaCalculator.isYomHachodeshMissing(fifteenNissan))
     }
 
     @Test
     fun `yomHachodesh rolls the Hebrew year over from Elul to Tishrei`() {
-        // 15 Elul 5786 = 2026-08-28 -> 15 Tishrei 5787 = 2026-09-26 (RH 5787
-        // is 2026-09-12/13, an already-verified anchor in this project).
-        val fifteenElul = LocalDate.of(2026, 8, 28)
-        assertEquals(LocalDate.of(2026, 9, 26), WomensAreaCalculator.yomHachodesh(fifteenElul))
+        // 15 Elul 5786 = 2026-08-28 -> 15 Tishrei 5787 = 2026-09-26.
+        assertEquals(LocalDate.of(2026, 9, 26), WomensAreaCalculator.yomHachodesh(LocalDate.of(2026, 8, 28)))
     }
 
     @Test
-    fun `yomHachodesh returns null past HebrewMonthSequence's own supported range`() {
-        // The very last month in the whole sequence, by construction — no
-        // guessed date, just HebrewMonthSequence's own documented boundary.
+    fun `yomHachodesh returns null past HebrewMonthSequence's own supported range, without calling it missing`() {
         val lastMonth = HebrewMonthSequence.refAt(HebrewMonthSequence.size - 1)
         assertNull(WomensAreaCalculator.yomHachodesh(lastMonth.lastDay))
+        assertFalse(WomensAreaCalculator.isYomHachodeshMissing(lastMonth.lastDay))
     }
 
     @Test
-    fun `predict bundles all three, correctly nulling haflaga with no previous entry`() {
-        val start = LocalDate.of(2026, 4, 2)
-        val withPrevious = WomensAreaCalculator.predict(start, LocalDate.of(2026, 3, 5))
-        assertEquals(start, withPrevious.sourceStart)
-        assertEquals(LocalDate.of(2026, 5, 2), withPrevious.onahBeinonit)
-        assertEquals(LocalDate.of(2026, 4, 30), withPrevious.haflaga) // 28-day gap projected forward
-        assertEquals(LocalDate.of(2026, 5, 2), withPrevious.yomHachodesh)
+    fun `every separation day inherits the veset's onah`() {
+        val prediction = WomensAreaCalculator.predict(fifteenNissan, Onah.NIGHT, LocalDate.of(2026, 3, 5))
+        assertEquals(3, prediction.prishaDays.size)
+        assertTrue(prediction.prishaDays.all { it.onah == Onah.NIGHT })
+        // In date order: haflaga (29 days from 5.3 -> 30.4), onah beinonit (1.5), yom hachodesh (2.5).
+        assertEquals(
+            listOf(VesetKind.HAFLAGA, VesetKind.ONAH_BEINONIT, VesetKind.YOM_HACHODESH),
+            prediction.prishaDays.map { it.kind },
+        )
+        assertEquals(LocalDate.of(2026, 4, 30), prediction.haflaga)
+    }
 
-        val withoutPrevious = WomensAreaCalculator.predict(start, previousStart = null)
-        assertNull(withoutPrevious.haflaga)
+    @Test
+    fun `the count runs to day 30, or on to a later separation day`() {
+        val plain = WomensAreaCalculator.predict(LocalDate.of(2026, 4, 17), Onah.DAY, null)
+        assertEquals(30, plain.lastCountedDay)
+        assertNull(plain.countDayNumber(LocalDate.of(2026, 4, 16)))
+        assertEquals(1, plain.countDayNumber(LocalDate.of(2026, 4, 17)))
+
+        // A 35-day haflaga carries the count past 30.
+        val start = LocalDate.of(2026, 5, 20)
+        val long = WomensAreaCalculator.predict(start, Onah.DAY, start.minusDays(34))
+        assertEquals(35, long.haflagaInterval)
+        assertEquals(35, long.lastCountedDay)
     }
 
     @Test
