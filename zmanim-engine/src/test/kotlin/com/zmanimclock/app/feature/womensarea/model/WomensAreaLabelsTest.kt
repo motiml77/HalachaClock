@@ -64,6 +64,21 @@ class WomensAreaLabelsTest {
     }
 
     @Test
+    fun `festivals, fasts and rosh chodesh are named briefly, ordinary days not at all`() {
+        fun moed(y: Int, m: Int, d: Int) =
+            WomensAreaLabels.moedLabel(com.zmanimclock.app.feature.calendar.model.MonthGridBuilder.metaFor(LocalDate.of(y, m, d)))
+        assertEquals("פסח", moed(2026, 4, 2)) // 15 Nissan 5786
+        assertEquals("ראש השנה", moed(2026, 9, 12))
+        assertEquals("צום גדליה", moed(2026, 9, 14))
+        assertEquals("חוה״מ סוכות", moed(2026, 9, 27))
+        assertEquals("ר״ח", moed(2026, 10, 12)) // 1 Cheshvan 5787
+        assertEquals("ר״ח · ו׳ חנוכה", moed(2026, 12, 10)) // 30 Kislev
+        assertEquals("יום העצמאות", moed(2027, 5, 12))
+        assertEquals("י״ז בתמוז", moed(2027, 7, 22))
+        assertEquals(null, moed(2026, 9, 15))
+    }
+
+    @Test
     fun `names`() {
         assertEquals("עונה בינונית", VesetKind.ONAH_BEINONIT.hebrewName)
         assertEquals("בלילה", Onah.NIGHT.hebrewName)

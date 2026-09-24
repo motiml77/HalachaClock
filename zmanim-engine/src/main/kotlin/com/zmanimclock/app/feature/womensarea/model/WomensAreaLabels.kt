@@ -2,6 +2,7 @@ package com.zmanimclock.app.feature.womensarea.model
 
 import com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter
 import com.kosherjava.zmanim.hebrewcalendar.JewishDate
+import com.zmanimclock.app.feature.calendar.model.CalendarDayMeta
 import com.zmanimclock.app.feature.calendar.model.toGregorianCalendar
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -115,6 +116,31 @@ object WomensAreaLabels {
         VesetKind.HAFLAGA -> "${day.kind.hebrewName} (${day.dayNumber} יום)"
         VesetKind.YOM_HACHODESH -> "${day.kind.hebrewName} · ${hebrewDayAndMonth(day.date)}"
     }
+
+    /**
+     * The festival / fast / Rosh Chodesh of a day, short enough for the top of
+     * a calendar cell — from the same CalendarDayMeta the Calendar tab uses,
+     * so both tabs name every day identically. Null on an ordinary day.
+     * Rosh Chodesh that is also a Chanukah day carries both.
+     */
+    fun moedLabel(meta: CalendarDayMeta): String? {
+        val name = meta.yomTovName?.let(::shorten)
+        return when {
+            meta.isRoshChodesh && name != null -> "ר״ח · $name"
+            meta.isRoshChodesh -> "ר״ח"
+            else -> name
+        }
+    }
+
+    private val SHORT_FORMS = listOf(
+        "חול המועד" to "חוה״מ",
+        "ערב ראש השנה" to "ערב ר״ה",
+        "ערב יום כיפור" to "ערב יוה״כ",
+        "שבעה עשר בתמוז" to "י״ז בתמוז",
+    )
+
+    private fun shorten(name: String): String =
+        SHORT_FORMS.fold(name) { acc, (long, short) -> acc.replace(long, short) }
 
     /** "יום רביעי" / "שבת" — "יום שבת" reads wrongly. */
     private fun eveningDay(date: LocalDate): String =

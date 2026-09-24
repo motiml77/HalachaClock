@@ -55,12 +55,12 @@ import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
 // Taller than the Calendar tab's 58dp: a cell here carries the day count, the
-// Hebrew and civil numerals, a separation day's name and its יום/לילה, and
-// the clean-day number at the bottom.
+// Hebrew and civil numerals, the day's festival in small type, a separation
+// day's name and its יום/לילה, and the clean-day number at the bottom.
 // Still a fixed 6 rows, for the same reason as the Calendar tab: a Hebrew
 // month is 29 or 30 days on any weekday, and a constant height keeps the grid
 // from resizing under a swipe.
-private val CELL_HEIGHT = 88.dp
+private val CELL_HEIGHT = 90.dp
 
 /**
  * The swipeable Hebrew-month grid for the Women's Area, over the REAL
@@ -155,15 +155,27 @@ private fun WomensAreaDayCell(
             modifier = Modifier.fillMaxSize().padding(horizontal = 2.dp, vertical = 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Top line: the count from the veset (start side) and the tevila
+            // Top line: the count from the veset (start side), the day's
+            // festival / fast / ר״ח in small type beside it, and the tevila
             // star (end side). Fixed height so the numerals never shift.
-            Row(Modifier.fillMaxWidth().height(15.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 // A helper, not the point of the day — so smaller than the
                 // clean-day number and the Hebrew date.
                 marker?.countDayNumber?.let {
                     CountChip(it, WomensAreaCountBlue, RoundedCornerShape(4.dp), size = 12.dp, fontSize = 7.5f)
                 }
-                Spacer(Modifier.weight(1f))
+                val moed = WomensAreaLabels.moedLabel(meta)
+                Text(
+                    text = moed.orEmpty(),
+                    modifier = Modifier.weight(1f).padding(horizontal = 1.dp),
+                    fontSize = 6.5.sp,
+                    lineHeight = 7.sp,
+                    fontWeight = if (meta.isYomTovAssurBemelacha) FontWeight.Bold else FontWeight.Normal,
+                    color = if (meta.isYomTovAssurBemelacha) cs.primary else cs.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 if (isTevila) {
                     Text("★", fontSize = 12.sp, lineHeight = 13.sp, color = WomensAreaTevilaBlue)
                 }
