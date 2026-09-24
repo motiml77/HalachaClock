@@ -4,34 +4,48 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.zmanimclock.app.scheduling.NotificationHelper
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaNotificationText
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import java.time.LocalDate
 
-/** Posts one day's reminder of the 7-day clean-count. See [WomensAreaReminderScheduler]. */
+/**
+ * Posts one Women's Area reminder — a clean day's, or the tevila evening's.
+ * See [WomensAreaReminderScheduler].
+ */
 @HiltWorker
 class WomensAreaReminderWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val notificationHelper: NotificationHelper,
+    private val notifier: WomensAreaNotifier,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val dayNumber = inputData.getInt(KEY_DAY_NUMBER, -1)
         val notificationId = inputData.getInt(KEY_NOTIFICATION_ID, -1)
-        if (dayNumber !in 1..7 || notificationId < 0) return Result.failure()
-        notificationHelper.showWomensAreaReminder(notificationId, dayNumber)
+        val hefsekEpochDay = inputData.getLong(KEY_HEFSEK_EPOCH_DAY, Long.MIN_VALUE)
+        if (notificationId < 0 || hefsekEpochDay == Long.MIN_VALUE) return Result.failure()
+        val hefsek = LocalDate.ofEpochDay(hefsekEpochDay)
+
+        val content = when (inputData.getString(KEY_KIND)) {
+            KIND_TEVILA -> WomensAreaNotificationText.tevilaEvening(hefsek)
+            KIND_CLEAN -> {
+                val day = inputData.getInt(KEY_DAY_NUMBER, -1)
+                if (day !in 1..7) return Result.failure()
+                WomensAreaNotificationText.cleanDay(day, hefsek)
+            }
+            else -> return Result.failure()
+        }
+        notifier.show(notificationId, content)
         return Result.success()
     }
 
     companion object {
+        const val KEY_KIND = "kind"
         const val KEY_DAY_NUMBER = "day_number"
+        const val KEY_HEFSEK_EPOCH_DAY = "hefsek_epoch_day"
         const val KEY_NOTIFICATION_ID = "notification_id"
 
-        /** One unique work name per (entry, day, time slot). */
-        fun workName(entryId: Long, dayNumber: Int, slot: Int) = "womens_area_reminder_${entryId}_${dayNumber}_$slot"
-
-        /** The name used before there could be several times a day — only for cancelling those. */
-        fun legacyWorkName(entryId: Long, dayNumber: Int) = "womens_area_reminder_${entryId}_$dayNumber"
+        const val KIND_CLEAN = "clean"
+        const val KIND_TEVILA = "tevila"
     }
 }

@@ -141,38 +141,38 @@ class WomensAreaViewModel @Inject constructor(
 
     // ------------------------------------------------------- reminders
 
-    fun setRemindersEnabled(enabled: Boolean) = viewModelScope.launch {
-        settings.setRemindersEnabled(enabled)
-        rescheduleLatest()
-    }
+    fun setRemindersEnabled(enabled: Boolean) = changeReminders { settings.setRemindersEnabled(enabled) }
 
-    fun addReminderTime(time: LocalTime) = viewModelScope.launch {
-        settings.setReminderTimes(settings.state.first().reminderTimes + time)
-        rescheduleLatest()
-    }
+    fun addReminderTime(time: LocalTime) =
+        changeReminders { settings.setReminderTimes(it.reminderTimes + time) }
 
-    fun removeReminderTime(time: LocalTime) = viewModelScope.launch {
-        settings.setReminderTimes(settings.state.first().reminderTimes - time)
-        rescheduleLatest()
-    }
+    fun removeReminderTime(time: LocalTime) =
+        changeReminders { settings.setReminderTimes(it.reminderTimes - time) }
 
-    private suspend fun scheduleIfOn(entryId: Long, hefsek: LocalDate) {
-        val current = settings.state.first()
-        if (current.remindersEnabled) reminderScheduler.scheduleSevenDayCount(entryId, hefsek, current.reminderTimes)
-    }
+    fun setTevilaReminderEnabled(enabled: Boolean) = changeReminders { settings.setTevilaReminderEnabled(enabled) }
+
+    fun addTevilaReminderTime(time: LocalTime) =
+        changeReminders { settings.setTevilaReminderTimes(it.tevilaReminderTimes + time) }
+
+    fun removeTevilaReminderTime(time: LocalTime) =
+        changeReminders { settings.setTevilaReminderTimes(it.tevilaReminderTimes - time) }
 
     /**
-     * After a change to the reminder settings: clear everything and re-queue
-     * the latest hefsek's remaining reminders under the new settings. Only
-     * the latest can still have clean days ahead of it.
+     * Applies one change to the reminder settings, then clears every queued
+     * reminder and re-queues the latest hefsek's remaining ones under the new
+     * settings. Only the latest hefsek can still have days ahead of it.
      */
-    private suspend fun rescheduleLatest() {
+    private fun changeReminders(change: suspend (WomensAreaSecurity) -> Unit) = viewModelScope.launch {
+        change(settings.state.first())
         reminderScheduler.cancelAll()
         val latest = dao.getAllEntries().first()
             .filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
-            .maxByOrNull { it.epochDay } ?: return
-        reminderScheduler.cancel(latest.id) // also clears any queued before tags existed
+            .maxByOrNull { it.epochDay } ?: return@launch
         scheduleIfOn(latest.id, latest.date)
+    }
+
+    private suspend fun scheduleIfOn(entryId: Long, hefsek: LocalDate) {
+        reminderScheduler.schedule(entryId, hefsek, settings.state.first())
     }
 }
 

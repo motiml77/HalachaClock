@@ -119,11 +119,20 @@ fun WomensAreaScreen(
             prediction?.let { PrishaSummaryCard(it) }
             hefsek?.let { TaharaSummaryCard(it, prediction) }
             WomensAreaRemindersCard(
-                enabled = reminders.remindersEnabled,
-                times = reminders.reminderTimes,
-                onEnabledChange = viewModel::setRemindersEnabled,
-                onAddTime = viewModel::addReminderTime,
-                onRemoveTime = viewModel::removeReminderTime,
+                clean = ReminderSectionState(
+                    enabled = reminders.remindersEnabled,
+                    times = reminders.reminderTimes,
+                    onEnabledChange = { viewModel.setRemindersEnabled(it) },
+                    onAddTime = { viewModel.addReminderTime(it) },
+                    onRemoveTime = { viewModel.removeReminderTime(it) },
+                ),
+                tevila = ReminderSectionState(
+                    enabled = reminders.tevilaReminderEnabled,
+                    times = reminders.tevilaReminderTimes,
+                    onEnabledChange = { viewModel.setTevilaReminderEnabled(it) },
+                    onAddTime = { viewModel.addTevilaReminderTime(it) },
+                    onRemoveTime = { viewModel.removeTevilaReminderTime(it) },
+                ),
             )
             OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))

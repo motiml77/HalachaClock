@@ -411,42 +411,6 @@ class NotificationHelper @Inject constructor(
         }
     }
 
-    /**
-     * One day of the Women's Area 7-day count.
-     *
-     * VISIBILITY_PRIVATE with a neutral public version deliberately: the
-     * whole feature is gated behind biometric/PIN specifically for privacy,
-     * so the lock screen must not defeat that by showing "day 4 of 7" to
-     * anyone who glances at the phone.
-     */
-    fun showWomensAreaReminder(notificationId: Int, dayNumber: Int) {
-        val manager = context.getSystemService<NotificationManager>() ?: return
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            notificationId,
-            Intent(context, com.zmanimclock.app.MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val publicVersion = NotificationCompat.Builder(context, CHANNEL_REMINDER)
-            .setSmallIcon(R.drawable.ic_stat_zman)
-            .setContentTitle("איזור נשי")
-            .setContentText("תזכורת")
-            .build()
-        val notification = NotificationCompat.Builder(context, CHANNEL_REMINDER)
-            .setSmallIcon(R.drawable.ic_stat_zman)
-            .setColor(ACCENT)
-            .setContentTitle("איזור נשי")
-            .setContentText("יום $dayNumber לספירת שבעה נקיים")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setPublicVersion(publicVersion)
-            .setAutoCancel(true)
-            .setContentIntent(contentIntent)
-            .build()
-        manager.notify(notificationId, notification)
-    }
-
     /** A plain (non-ringing) reminder notification for notification-only alerts. */
     fun showReminder(alertId: Long, title: String, timeText: String, vibrate: Boolean) {
         val manager = context.getSystemService<NotificationManager>() ?: return

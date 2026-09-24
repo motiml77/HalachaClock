@@ -36,6 +36,9 @@ data class WomensAreaSecurity(
     val remindersEnabled: Boolean = false,
     /** The times of day they fire at, sorted. */
     val reminderTimes: List<LocalTime> = WomensAreaReminderTimes.DEFAULT,
+    /** ערב טבילה reminder, on the 7th clean day — also off until turned on. */
+    val tevilaReminderEnabled: Boolean = false,
+    val tevilaReminderTimes: List<LocalTime> = WomensAreaReminderTimes.TEVILA_DEFAULT,
 )
 
 @Singleton
@@ -46,6 +49,8 @@ class WomensAreaSecurityRepository @Inject constructor(
         val ENABLED = booleanPreferencesKey("enabled")
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         val REMINDER_TIMES = stringPreferencesKey("reminder_times")
+        val TEVILA_REMINDER_ENABLED = booleanPreferencesKey("tevila_reminder_enabled")
+        val TEVILA_REMINDER_TIMES = stringPreferencesKey("tevila_reminder_times")
     }
 
     val state: Flow<WomensAreaSecurity> = context.womensAreaSecurityStore.data.map { prefs ->
@@ -53,6 +58,11 @@ class WomensAreaSecurityRepository @Inject constructor(
             enabled = prefs[Keys.ENABLED] ?: false,
             remindersEnabled = prefs[Keys.REMINDERS_ENABLED] ?: false,
             reminderTimes = WomensAreaReminderTimes.decode(prefs[Keys.REMINDER_TIMES]),
+            tevilaReminderEnabled = prefs[Keys.TEVILA_REMINDER_ENABLED] ?: false,
+            tevilaReminderTimes = WomensAreaReminderTimes.decode(
+                prefs[Keys.TEVILA_REMINDER_TIMES],
+                default = WomensAreaReminderTimes.TEVILA_DEFAULT,
+            ),
         )
     }
 
@@ -66,5 +76,13 @@ class WomensAreaSecurityRepository @Inject constructor(
 
     suspend fun setReminderTimes(times: List<LocalTime>) {
         context.womensAreaSecurityStore.edit { it[Keys.REMINDER_TIMES] = WomensAreaReminderTimes.encode(times) }
+    }
+
+    suspend fun setTevilaReminderEnabled(enabled: Boolean) {
+        context.womensAreaSecurityStore.edit { it[Keys.TEVILA_REMINDER_ENABLED] = enabled }
+    }
+
+    suspend fun setTevilaReminderTimes(times: List<LocalTime>) {
+        context.womensAreaSecurityStore.edit { it[Keys.TEVILA_REMINDER_TIMES] = WomensAreaReminderTimes.encode(times) }
     }
 }

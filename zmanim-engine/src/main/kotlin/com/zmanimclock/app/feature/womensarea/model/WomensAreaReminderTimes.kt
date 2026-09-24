@@ -11,8 +11,11 @@ import java.util.Locale
  */
 object WomensAreaReminderTimes {
 
-    /** Two a day — morning and afternoon — until she changes them. */
+    /** Clean days: two a day — morning and afternoon — until she changes them. */
     val DEFAULT: List<LocalTime> = listOf(LocalTime.of(8, 0), LocalTime.of(18, 0))
+
+    /** ערב טבילה: one, in the afternoon of the 7th day, in time to get ready. */
+    val TEVILA_DEFAULT: List<LocalTime> = listOf(LocalTime.of(16, 0))
 
     /** How many she can add; each is 7 scheduled notifications. */
     const val MAX = 4
@@ -20,8 +23,8 @@ object WomensAreaReminderTimes {
     fun encode(times: List<LocalTime>): String =
         normalize(times).joinToString(",", transform = ::format)
 
-    fun decode(stored: String?): List<LocalTime> {
-        if (stored.isNullOrBlank()) return DEFAULT
+    fun decode(stored: String?, default: List<LocalTime> = DEFAULT): List<LocalTime> {
+        if (stored == null) return default
         return normalize(
             stored.split(',').mapNotNull { part ->
                 val (h, m) = part.trim().split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
