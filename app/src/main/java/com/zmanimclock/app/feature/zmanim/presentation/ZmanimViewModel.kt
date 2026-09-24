@@ -12,7 +12,6 @@ import com.zmanimclock.app.feature.zmanim.data.ZmanimRepository
 import com.zmanimclock.app.feature.zmanim.model.FastDays
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
-import com.zmanimclock.app.feature.zmanim.model.isSunUpAt
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,14 +86,8 @@ class ZmanimViewModel @Inject constructor(
         /** Hero: the next zman of the day (null when the day is done). */
         val nextName: String? = null,
         val nextTime: String? = null,
-        /**
-         * The next zman's exact moment. The hero counts down to it to the
-         * second itself, rather than being handed a string that could only
-         * change once a minute.
-         */
-        val nextAt: Instant? = null,
-        /** Sun or moon in the hero — see [isSunUpAt]. */
-        val sunUp: Boolean = true,
+        /** Short countdown, e.g. "1:06". */
+        val countdown: String? = null,
         val rows: List<ZmanRow> = emptyList(),
         val fastBanner: FastBanner? = null,
     )
@@ -186,8 +179,7 @@ class ZmanimViewModel @Inject constructor(
                 basedOnVisibleSunrise = day.basedOnVisibleSunrise,
                 nextName = next?.first?.let { day.hebrewNameOf(it) },
                 nextTime = next?.second?.asZmanTimeOrNull(zone),
-                nextAt = next?.second,
-                sunUp = day.isSunUpAt(now),
+                countdown = next?.second?.let { formatCountdown(now, it) },
                 rows = timed.map { (kind, instant) ->
                     ZmanRow(
                         kind = kind,
@@ -271,5 +263,11 @@ class ZmanimViewModel @Inject constructor(
 
         /** Ten seconds of ring and vibration, then the screen waits for אישור. */
         const val TZEIT_GUARD_RING_SECONDS = 10
+    }
+
+    /** Short "1:06" / "0:42" countdown (README §7.1). */
+    private fun formatCountdown(now: Instant, target: Instant): String {
+        val minutes = java.time.Duration.between(now, target).toMinutes()
+        return "%d:%02d".format(minutes / 60, minutes % 60)
     }
 }

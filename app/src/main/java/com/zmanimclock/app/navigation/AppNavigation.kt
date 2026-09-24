@@ -49,8 +49,11 @@ fun AppNavigation() {
     val womensAreaEnabled by womensAreaSecurity.security.collectAsStateWithLifecycle()
     val bottomBarScreens = remember(womensAreaEnabled.enabled) {
         if (womensAreaEnabled.enabled) {
-            // [Zmanim, Calendar, Alarms] -> appended after Alarms.
-            Screen.bottomBarScreens + Screen.WomensArea
+            // Right after Alarms, found by name rather than by a fixed index,
+            // so this keeps working whether or not Settings is still a tab.
+            Screen.bottomBarScreens.toMutableList().apply {
+                add(indexOf(Screen.Alarms) + 1, Screen.WomensArea)
+            }
         } else {
             Screen.bottomBarScreens
         }
@@ -94,13 +97,6 @@ fun AppNavigation() {
                 HomeScreen(
                     onCreateZmanAlarm = { zman ->
                         navController.navigate("alarm_edit?type=ZMAN&zman=$zman")
-                    },
-                    onOpenSettings = {
-                        navController.navigate(Screen.Settings.route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
                     },
                 )
             }
