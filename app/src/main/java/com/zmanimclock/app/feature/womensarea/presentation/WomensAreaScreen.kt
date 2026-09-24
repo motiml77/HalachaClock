@@ -197,9 +197,9 @@ private fun CalendarLegend() {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         LegendItem("ראייה") { Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(WomensAreaVesetMarker.copy(alpha = 0.5f))) }
-        LegendItem("ספירה") {
-            Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(WomensAreaCountBlue), contentAlignment = Alignment.Center) {
-                Text("1", color = Color.White, fontSize = 8.sp, lineHeight = 9.sp, fontWeight = FontWeight.Bold)
+        LegendItem("ספירת הימים לחישוב הפרישות") {
+            Box(Modifier.size(12.dp).clip(RoundedCornerShape(4.dp)).background(WomensAreaCountBlue), contentAlignment = Alignment.Center) {
+                Text("1", color = Color.White, fontSize = 7.5.sp, lineHeight = 8.5.sp, fontWeight = FontWeight.Bold)
             }
         }
         LegendItem("פרישה") { Box(Modifier.size(14.dp).border(2.dp, WomensAreaPrishaRed, RoundedCornerShape(4.dp))) }

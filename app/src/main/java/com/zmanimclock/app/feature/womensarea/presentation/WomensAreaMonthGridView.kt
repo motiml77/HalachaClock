@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zmanimclock.app.feature.calendar.model.CalendarDayMeta
@@ -152,7 +153,11 @@ private fun WomensAreaDayCell(
             // Top line: the count from the veset (start side) and the tevila
             // star (end side). Fixed height so the numerals never shift.
             Row(Modifier.fillMaxWidth().height(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                marker?.countDayNumber?.let { CountChip(it, WomensAreaCountBlue, RoundedCornerShape(5.dp)) }
+                // A helper, not the point of the day — so smaller than the
+                // clean-day number and the Hebrew date.
+                marker?.countDayNumber?.let {
+                    CountChip(it, WomensAreaCountBlue, RoundedCornerShape(4.dp), size = 12.dp, fontSize = 7.5f)
+                }
                 Spacer(Modifier.weight(1f))
                 if (isTevila) {
                     Text("★", fontSize = 12.sp, lineHeight = 13.sp, color = WomensAreaTevilaBlue)
@@ -196,10 +201,10 @@ private fun WomensAreaDayCell(
 }
 
 @Composable
-private fun CountChip(number: Int, color: Color, shape: Shape) {
+private fun CountChip(number: Int, color: Color, shape: Shape, size: Dp = 15.dp, fontSize: Float = 9f) {
     Box(
         modifier = Modifier
-            .sizeIn(minWidth = 15.dp, minHeight = 15.dp)
+            .sizeIn(minWidth = size, minHeight = size)
             .clip(shape)
             .background(color)
             .padding(horizontal = 2.dp),
@@ -207,8 +212,8 @@ private fun CountChip(number: Int, color: Color, shape: Shape) {
     ) {
         Text(
             text = number.toString(),
-            fontSize = 9.sp,
-            lineHeight = 10.sp,
+            fontSize = fontSize.sp,
+            lineHeight = (fontSize + 1).sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
         )
