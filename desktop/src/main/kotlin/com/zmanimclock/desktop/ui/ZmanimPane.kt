@@ -2,6 +2,7 @@ package com.zmanimclock.desktop.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,12 +32,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NotificationsNone
+import com.zmanimclock.app.feature.zmanim.format.countdownText
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.desktop.Ext
 import com.zmanimclock.desktop.ZmanNumberFamily
@@ -43,7 +47,6 @@ import com.zmanimclock.desktop.data.DayView
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.data.ZmanRow
 import kotlinx.coroutines.delay
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 
@@ -89,92 +92,105 @@ fun ZmanimPane(service: DesktopZmanimService, onAddAlert: (ZmanKind) -> Unit = {
 @Composable
 internal fun DayHero(view: DayView, service: DesktopZmanimService, now: Instant) {
     val ext = Ext.colors
-    val cs = MaterialTheme.colorScheme
     Column(
         Modifier.fillMaxWidth()
             .padding(top = 2.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.verticalGradient(listOf(ext.heroTop, ext.heroBottom)))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text(
-                    view.hebrewDate,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = ext.heroText,
-                )
-                Text(
-                    "${view.gregorianDate} · ${view.weekdayName} · ${view.cityName}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = ext.heroLabel,
-                )
-            }
+        Column(Modifier.padding(horizontal = 4.dp)) {
+            Text(
+                view.hebrewDate,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = ext.heroText,
+            )
+            Text(
+                "${view.gregorianDate} · ${view.weekdayName} · ${view.cityName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = ext.heroLabel,
+            )
         }
 
         if (view.headlineLabel != null && view.headlineTime != null) {
-            // Sized to its contents, NOT to the window.
-            //
-            // This card used to take weight(1f) and stretch the whole width, so
-            // a label and a time — five words between them — sat inside a box
-            // most of which was empty, and on any day that is not today, where
-            // there is no countdown, the entire left half was blank. A card
-            // that hugs what it holds says the same thing without the hole.
-            Row(
-                // Pushed to the far side from the date above it. Under RTL the
-                // date starts at the right, so the card sits left and the two
-                // blocks bracket the hero instead of stacking against one edge.
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.End,
-            ) {
-            Row(
-                Modifier.clip(RoundedCornerShape(10.dp))
-                    .background(ext.heroInner)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Column {
-                    Text(
-                        view.headlineLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = ext.heroLabel,
-                    )
-                    Text(
-                        view.headlineTime,
-                        fontFamily = ZmanNumberFamily,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ext.heroText,
-                    )
-                }
-                if (view.isToday) {
-                    service.nextZman(now)?.let { (_, instant) ->
-                        Text(
-                            "בעוד ${countdown(now, instant)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = ext.accentGold,
-                        )
-                    }
-                }
-            }
-            }
+            val countdownTo = if (view.isToday) service.nextZman(now)?.second else null
+            NextZmanCard(
+                time = view.headlineTime,
+                label = view.headlineLabel,
+                countdown = countdownTo?.let { countdownText(now, it) },
+                sunUp = view.sunUp,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
 
         if (view.notes.isNotEmpty()) {
             Text(
                 view.notes.joinToString("  ·  "),
-                Modifier.padding(top = 6.dp),
+                Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = ext.accentGold,
             )
         }
+    }
+}
+
+/**
+ * The headline zman as one card: the time large, its name in the sun's gold
+ * under it, the countdown under that — and a sun or a moon beside them,
+ * whichever is in the sky.
+ *
+ * The text is the card's first child, so under RTL it holds the reading edge
+ * (right) and the picture sits opposite it, on the left.
+ */
+@Composable
+internal fun NextZmanCard(
+    time: String,
+    label: String,
+    countdown: String?,
+    sunUp: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val ext = Ext.colors
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier.fillMaxWidth()
+            .clip(shape)
+            // Lit from the top corner and falling away, as on a lit panel —
+            // a flat fill here read as a hole cut in the hero.
+            .background(
+                Brush.linearGradient(
+                    listOf(lerp(ext.heroInner, Color.White, 0.07f), lerp(ext.heroInner, Color.Black, 0.22f)),
+                ),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                time,
+                fontFamily = ZmanNumberFamily,
+                fontSize = 40.sp,
+                lineHeight = 44.sp,
+                fontWeight = FontWeight.Bold,
+                color = ext.heroText,
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = SkyGold,
+            )
+            if (countdown != null) {
+                Text(
+                    "בעוד $countdown",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ext.heroLabel,
+                )
+            }
+        }
+        SkyGlyph(sunUp = sunUp, modifier = Modifier.size(60.dp))
     }
 }
 
@@ -232,7 +248,7 @@ internal fun ZmanListRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // A short gold bar against the reading edge of the NEXT row —
-                // the same accent the countdown uses, so "הזמן הבא" is findable
+                // the brand gold, so "הזמן הבא" is findable
                 // from across the room without reading anything. First child
                 // of an RTL Row, so it lands on the RIGHT.
                 if (row.isNext) {
@@ -282,16 +298,6 @@ internal fun ZmanListRow(
             color = cs.outlineVariant.copy(alpha = 0.55f),
         )
     }
-}
-
-/** "1:06:32" / "6:32" — hours only when there are any. */
-internal fun countdown(now: Instant, target: Instant): String {
-    val d = Duration.between(now, target)
-    if (d.isNegative || d.isZero) return "0:00"
-    val h = d.toHours()
-    val m = d.toMinutes() % 60
-    val s = d.seconds % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
 /** Alias so the import list stays honest about what Compose's remember is. */
