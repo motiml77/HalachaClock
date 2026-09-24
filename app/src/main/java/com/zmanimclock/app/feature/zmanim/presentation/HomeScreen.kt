@@ -1,6 +1,7 @@
 package com.zmanimclock.app.feature.zmanim.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,22 +28,35 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.zmanimclock.app.feature.zmanim.format.countdownText
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
+import com.zmanimclock.app.ui.components.SkyGlyph
+import com.zmanimclock.app.ui.components.SkyGold
 import com.zmanimclock.app.ui.theme.Ext
+import com.zmanimclock.app.ui.theme.TNUM
 import com.zmanimclock.app.ui.theme.ZmanListTimeStyle
+import kotlinx.coroutines.delay
+import java.time.Instant
 
 /**
  * מסך הזמנים — style 1D (Claude Design §7.1): NextHero header + flat
@@ -74,6 +88,7 @@ fun HomeScreen(
         guardArmed = tzeitGuard != null,
         onBellClick = { kind -> onCreateZmanAlarm(kind.name) },
         onGuardClick = { row -> guardDialogFor = row },
+        onNextReached = viewModel::refresh,
     )
 
     guardDialogFor?.let { row ->
@@ -94,6 +109,7 @@ fun ZmanimContent(
     guardArmed: Boolean = false,
     onBellClick: (ZmanKind) -> Unit,
     onGuardClick: (ZmanimViewModel.ZmanRow) -> Unit = {},
+    onNextReached: () -> Unit = {},
 ) {
     if (state.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -103,7 +119,7 @@ fun ZmanimContent(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        NextHero(state)
+        NextHero(state, onNextReached)
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(state.rows, key = { it.kind.name }) { row ->
                 ZmanRow(
@@ -156,16 +172,16 @@ private fun FastBannerCard(banner: ZmanimViewModel.FastBanner) {
     }
 }
 
-/** §6.2 — the primary hero header: date + sunrise tag + next-zman block. */
+/** §6.2 — the primary hero header: the date, then the next-zman card. */
 @Composable
-private fun NextHero(state: ZmanimViewModel.UiState) {
+private fun NextHero(state: ZmanimViewModel.UiState, onNextReached: () -> Unit) {
     val ext = Ext.colors
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(ext.heroTop, ext.heroBottom)))
-            .padding(horizontal = 24.dp)
-            .padding(top = 20.dp, bottom = 24.dp),
+            .padding(horizontal = 20.dp)
+            .padding(top = 20.dp, bottom = 20.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -187,41 +203,105 @@ private fun NextHero(state: ZmanimViewModel.UiState) {
         }
 
         if (state.nextName != null) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 18.dp)
-                    .background(ext.heroInner, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-            ) {
-                Text(
-                    text = "הזמן הבא — ${state.nextName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = ext.heroLabel,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        text = state.nextTime.orEmpty(),
-                        style = MaterialTheme.typography.displayLarge,
-                        color = Color.White,
-                    )
-                    state.countdown?.let {
-                        Text(
-                            text = "בעוד $it",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = ext.accentGold,
-                            modifier = Modifier.padding(bottom = 10.dp),
-                        )
-                    }
+            NextZmanCard(
+                time = state.nextTime.orEmpty(),
+                label = state.nextName,
+                nextAt = state.nextAt,
+                sunUp = state.sunUp,
+                onReached = onNextReached,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The next zman as one card: the time large, its name in the sun's gold
+ * under it, the live countdown under that — and a sun or a moon beside them,
+ * whichever is in the sky now.
+ *
+ * The text is the card's first child, so under RTL it holds the reading edge
+ * (right) and the picture sits opposite it, on the left. The desktop hero
+ * (ZmanimPane.NextZmanCard) is the same card; keep the two in step.
+ */
+@Composable
+private fun NextZmanCard(
+    time: String,
+    label: String,
+    nextAt: Instant?,
+    sunUp: Boolean,
+    onReached: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val ext = Ext.colors
+    val shape = RoundedCornerShape(20.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            // Lit from the top corner and falling away, as on a lit panel —
+            // a flat fill reads as a hole cut in the hero.
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        lerp(ext.heroInner, Color.White, 0.07f),
+                        lerp(ext.heroInner, Color.Black, 0.22f),
+                    ),
+                ),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .padding(start = 20.dp, end = 16.dp, top = 10.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = time,
+                style = MaterialTheme.typography.displayLarge,
+                color = Color.White,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleLarge,
+                color = SkyGold,
+            )
+            nextAt?.let { NextCountdown(target = it, onReached = onReached) }
+        }
+        SkyGlyph(sunUp = sunUp, modifier = Modifier.size(84.dp))
+    }
+}
+
+/**
+ * "בעוד 1:24:36", ticking every second while the screen is visible.
+ *
+ * Ticks on the wall clock rather than on a fixed delay, so it lands on the
+ * second boundary and self-corrects after the device sleeps. Stops while the
+ * app is in the background — nothing is on screen to update. When the zman
+ * arrives it asks for a refresh at once, so the card moves on to the next
+ * zman at that second instead of sitting on "0:00" until the minute ticker.
+ */
+@Composable
+private fun NextCountdown(target: Instant, onReached: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val reached by rememberUpdatedState(onReached)
+    var now by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(target, lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                val n = Instant.now()
+                now = n
+                if (!n.isBefore(target)) {
+                    reached()
+                    break
                 }
+                delay(1_000L - (n.toEpochMilli() % 1_000L))
             }
         }
     }
+    Text(
+        text = "בעוד ${countdownText(now, target)}",
+        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = TNUM),
+        color = Ext.colors.heroLabel,
+    )
 }
 
 /** §6.3 — sunrise-source tag: gold pill (visible) / muted outline (mishor). */

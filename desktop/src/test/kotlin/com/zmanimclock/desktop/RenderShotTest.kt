@@ -21,6 +21,7 @@ import com.zmanimclock.desktop.ui.OffsetPicker
 import com.zmanimclock.desktop.data.DesktopPrefs
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.ui.CalendarPane
+import com.zmanimclock.desktop.ui.NextZmanCard
 import com.zmanimclock.desktop.ui.SettingsPane
 import com.zmanimclock.desktop.ui.TrayMenuContent
 import com.zmanimclock.desktop.ui.TrayMenuDivider
@@ -92,6 +93,22 @@ class RenderShotTest {
     @Test fun zmanim() = both("desk_zmanim", 320) { ZmanimPane(service()) }
 
     @Test fun calendar() = both("desk_calendar", 660) { CalendarPane(service()) }
+
+    /**
+     * The hero's next-zman card under both skies. The live pane only ever
+     * shows whichever is up at the moment the test runs, so a broken moon
+     * could otherwise hide behind a daytime test run indefinitely.
+     */
+    @Test
+    fun nextZmanCard() {
+        for (sunUp in listOf(true, false)) {
+            both("desk_next_card_${if (sunUp) "day" else "night"}", 320) {
+                Box(Modifier.padding(10.dp)) {
+                    NextZmanCard(time = "18:25", label = "הדלקת נרות", countdown = "1:24:36", sunUp = sunUp)
+                }
+            }
+        }
+    }
 
     @Test
     fun alerts() {

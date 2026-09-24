@@ -50,7 +50,7 @@ import com.zmanimclock.desktop.ZmanNumberFamily
 import com.zmanimclock.desktop.ZmanimDesktopTheme
 import com.zmanimclock.desktop.data.DesktopZmanimService
 import com.zmanimclock.desktop.ui.ZmanListRow
-import com.zmanimclock.desktop.ui.countdown
+import com.zmanimclock.app.feature.zmanim.format.countdownText
 import kotlinx.coroutines.delay
 import java.awt.GraphicsDevice
 import java.awt.GraphicsEnvironment
@@ -308,7 +308,7 @@ private fun WindowScope.WidgetCard(
                     }
                     if (next != null) {
                         Text(
-                            "בעוד ${countdown(now, next.second)}",
+                            "בעוד ${countdownText(now, next.second)}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = cs.primary,

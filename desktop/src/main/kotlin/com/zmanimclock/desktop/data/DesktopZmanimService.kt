@@ -13,9 +13,9 @@ import com.zmanimclock.app.feature.zmanim.engine.DayZmanim
 import com.zmanimclock.app.feature.zmanim.engine.EngineLocation
 import com.zmanimclock.app.feature.zmanim.engine.MaranZmanimEngine
 import com.zmanimclock.app.feature.zmanim.format.asZmanTime
-import com.zmanimclock.app.feature.zmanim.format.asZmanTimeOrNull
 import com.zmanimclock.app.feature.zmanim.model.ZmanKind
 import com.zmanimclock.app.feature.zmanim.model.instantOf
+import com.zmanimclock.app.feature.zmanim.model.isSunUpAt
 import com.zmanimclock.app.feature.zmanim.model.nextRelevantZman
 import com.zmanimclock.app.feature.zmanim.model.hebrewNameOf
 import com.zmanimclock.app.feature.zmanim.model.relevantTimedZmanim
@@ -45,6 +45,12 @@ data class DayView(
     val basedOnVisibleSunrise: Boolean,
     val headlineLabel: String?,
     val headlineTime: String?,
+    /**
+     * Sun or moon in the hero: whether the sun is up NOW for today, and at
+     * the headline zman for any other day — a צאת שבת headline gets the moon
+     * whatever the hour it happens to be viewed at.
+     */
+    val sunUp: Boolean,
     val rows: List<ZmanRow>,
     val notes: List<String>,
     val undefined: Boolean,
@@ -211,7 +217,8 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
             cityName = city.nameHebrew,
             basedOnVisibleSunrise = d.basedOnVisibleSunrise,
             headlineLabel = headline?.first,
-            headlineTime = headline?.second,
+            headlineTime = headline?.second?.asZmanTime(zone),
+            sunUp = d.isSunUpAt(if (isToday) now else headline?.second ?: now),
             rows = timed.map { (kind, instant) ->
                 ZmanRow(
                     kind = kind,
@@ -233,14 +240,12 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
         next: Pair<ZmanKind, Instant>?,
         timed: List<Pair<ZmanKind, Instant>>,
         meta: CalendarDayMeta,
-    ): Pair<String, String>? {
-        fun timeOf(kind: ZmanKind) =
-            timed.firstOrNull { it.first == kind }?.second?.asZmanTimeOrNull(zone)
+    ): Pair<String, Instant>? {
+        fun timeOf(kind: ZmanKind) = timed.firstOrNull { it.first == kind }?.second
 
         if (isToday) {
-            next?.let { (kind, instant) ->
-                return "הזמן הבא — ${kind.hebrewName}" to instant.asZmanTime(zone)
-            }
+            // The name alone: the card's "בעוד …" line already says it is next.
+            next?.let { (kind, instant) -> return kind.hebrewName to instant }
         }
         // "The next zman" is meaningless three weeks out, so a non-today day
         // headlines with whatever actually defines it.
