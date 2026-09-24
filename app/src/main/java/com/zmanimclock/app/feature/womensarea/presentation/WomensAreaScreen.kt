@@ -1,11 +1,17 @@
 package com.zmanimclock.app.feature.womensarea.presentation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.rememberPagerState
@@ -13,7 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -28,24 +37,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zmanimclock.app.feature.calendar.model.HebrewMonthSequence
 import com.zmanimclock.app.feature.calendar.presentation.MonthHeader
 import com.zmanimclock.app.feature.calendar.presentation.WeekdayRow
+import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
-import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
-import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
+import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
+import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
+import com.zmanimclock.app.ui.WomensAreaCountBlue
+import com.zmanimclock.app.ui.WomensAreaLilac
+import com.zmanimclock.app.ui.WomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
+import com.zmanimclock.app.ui.WomensAreaSpringIcon
 import com.zmanimclock.app.ui.WomensAreaTevilaBlue
+import com.zmanimclock.app.ui.WomensAreaVesetMarker
 import java.time.LocalDate
 
 /**
@@ -79,8 +99,8 @@ fun WomensAreaScreen(
 
     val entries by viewModel.allEntries.collectAsStateWithLifecycle()
     val hefsek by viewModel.latestHefsek.collectAsStateWithLifecycle()
-    val reminders by viewModel.reminderSettings.collectAsStateWithLifecycle()
-    // The tapped day — its action dialog is open while this is non-null.
+    val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    // The day whose sheet is open, if any.
     var tapped by remember { mutableStateOf<LocalDate?>(null) }
 
     Column(
@@ -106,34 +126,32 @@ fun WomensAreaScreen(
             today = today,
             onDayClick = { tapped = it },
         )
+        CalendarLegend()
 
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (entries.isEmpty()) FirstTimeCard()
+            Button(
+                onClick = { tapped = today },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = WomensAreaLilac),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text("  רישום להיום", style = MaterialTheme.typography.titleMedium)
+            }
             Text(
-                text = "הקישי על יום בלוח כדי לרשום התחלת ווסת או הפסק טהרה.",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "או הקישי על כל יום בלוח.",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
             )
             prediction?.let { PrishaSummaryCard(it) }
             hefsek?.let { TaharaSummaryCard(it, prediction) }
-            WomensAreaRemindersCard(
-                clean = ReminderSectionState(
-                    enabled = reminders.remindersEnabled,
-                    times = reminders.reminderTimes,
-                    onEnabledChange = { viewModel.setRemindersEnabled(it) },
-                    onAddTime = { viewModel.addReminderTime(it) },
-                    onRemoveTime = { viewModel.removeReminderTime(it) },
-                ),
-                tevila = ReminderSectionState(
-                    enabled = reminders.tevilaReminderEnabled,
-                    times = reminders.tevilaReminderTimes,
-                    onEnabledChange = { viewModel.setTevilaReminderEnabled(it) },
-                    onAddTime = { viewModel.addTevilaReminderTime(it) },
-                    onRemoveTime = { viewModel.removeTevilaReminderTime(it) },
-                ),
-            )
+            WomensAreaRemindersCard(reminders = reminders, onChange = viewModel::setReminders)
             OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("  היסטוריית רשומות", style = MaterialTheme.typography.bodyMedium)
@@ -142,16 +160,21 @@ fun WomensAreaScreen(
     }
 
     tapped?.let { date ->
-        WomensAreaDayActionDialog(
+        WomensAreaDaySheet(
             date = date,
             today = today,
             entriesOnDay = entries.filter { it.epochDay == date.toEpochDay() },
-            onVeset = { onah ->
+            previousVeset = entries
+                .filter { it.type == WomensAreaEntryType.PERIOD_START && it.epochDay < date.toEpochDay() }
+                .maxOfOrNull { it.epochDay }
+                ?.let(LocalDate::ofEpochDay),
+            savedReminders = reminders,
+            onSaveVeset = { onah ->
                 viewModel.addPeriodStart(date, onah)
                 tapped = null
             },
-            onHefsek = {
-                viewModel.addHefsekTahara(date)
+            onSaveHefsek = { chosen ->
+                viewModel.addHefsekTahara(date, chosen)
                 tapped = null
             },
             onDelete = { entry ->
@@ -163,12 +186,62 @@ fun WomensAreaScreen(
     }
 }
 
+/** What each mark on the calendar means — one line, under the grid. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CalendarLegend() {
+    val cs = MaterialTheme.colorScheme
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        LegendItem("ראייה") { Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(WomensAreaVesetMarker.copy(alpha = 0.5f))) }
+        LegendItem("ספירה") {
+            Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(WomensAreaCountBlue), contentAlignment = Alignment.Center) {
+                Text("1", color = Color.White, fontSize = 8.sp, lineHeight = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        LegendItem("פרישה") { Box(Modifier.size(14.dp).border(2.dp, WomensAreaPrishaRed, RoundedCornerShape(4.dp))) }
+        LegendItem("נקיים") { Box(Modifier.size(14.dp).border(2.dp, WomensAreaCleanGreen, RoundedCornerShape(4.dp))) }
+        LegendItem("טבילה") { Text("★", color = WomensAreaTevilaBlue, fontSize = 13.sp, lineHeight = 14.sp) }
+        LegendItem("היום") { Box(Modifier.size(14.dp).border(2.dp, cs.primary, RoundedCornerShape(4.dp))) }
+    }
+}
+
+@Composable
+private fun LegendItem(label: String, swatch: @Composable () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        swatch()
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Shown until the first entry: what to do, in one sentence, with the area's own icon. */
+@Composable
+private fun FirstTimeCard() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(WomensAreaLilacContainer)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(WomensAreaSpringIcon, contentDescription = null, tint = OnWomensAreaLilacContainer, modifier = Modifier.size(32.dp))
+        Text(
+            "כדי להתחיל, הקישי על היום שבו התחילה הראייה ובחרי \"התחלת ווסת\". ימי הפרישה יסומנו בלוח מעצמם.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = OnWomensAreaLilacContainer,
+        )
+    }
+}
+
 /** The latest הפסק טהרה, its 7 clean days and the tevila — and a warning if the tevila night is a separation night. */
 @Composable
 private fun TaharaSummaryCard(hefsek: LocalDate, prediction: VesetPrediction?) {
     val cs = MaterialTheme.colorScheme
-    val clean = WomensAreaCalculator.cleanDayDates(hefsek)
-    val tevilaDay = WomensAreaCalculator.tevilaDay(hefsek)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -181,35 +254,7 @@ private fun TaharaSummaryCard(hefsek: LocalDate, prediction: VesetPrediction?) {
                 style = MaterialTheme.typography.bodySmall,
                 color = cs.onSurfaceVariant,
             )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(2.dp, WomensAreaCleanGreen, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text("שבעה נקיים", fontWeight = FontWeight.Bold, color = WomensAreaCleanGreen)
-                Text(
-                    "מיום ${WomensAreaLabels.weekdayName(clean.first())} ${WomensAreaLabels.hebrewDayAndMonth(clean.first())} " +
-                        "(${WomensAreaLabels.gregorianShort(clean.first())}) עד יום " +
-                        "${WomensAreaLabels.weekdayName(clean.last())} ${WomensAreaLabels.hebrewDayAndMonth(clean.last())} " +
-                        "(${WomensAreaLabels.gregorianShort(clean.last())})",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(2.dp, WomensAreaTevilaBlue, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text("★ טבילה", fontWeight = FontWeight.Bold, color = WomensAreaTevilaBlue)
-                Text(WomensAreaLabels.tevilaTiming(tevilaDay), style = MaterialTheme.typography.bodySmall)
-                Text(
-                    "טובלים רק לאחר צאת הכוכבים — לא לפני.",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            TaharaDetails(hefsek)
             if (prediction?.clashesWithTevila(hefsek) == true) {
                 Text(
                     "ליל הטבילה חל ביום פרישה — יש לשאול רב.",
@@ -267,12 +312,7 @@ private fun PrishaRow(day: PrishaDay, prediction: VesetPrediction) {
         VesetKind.HAFLAGA -> "${day.kind.hebrewName} (${prediction.haflagaInterval} יום)"
         else -> day.kind.hebrewName
     }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(2.dp, WomensAreaPrishaRed, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
+    FramedBlock(WomensAreaPrishaRed) {
         Text(
             text = "$title — יום ${day.dayNumber} לספירה",
             style = MaterialTheme.typography.bodyMedium,

@@ -26,19 +26,27 @@ import javax.inject.Singleton
 private val Context.womensAreaSecurityStore: DataStore<Preferences> by
     preferencesDataStore(name = "womens_area_security")
 
+/**
+ * The reminders she chose — each kind off until she turns it on, then at the
+ * times of day she picked. Asked for right where she records a הפסק טהרה,
+ * and editable on the area's main screen.
+ */
+data class WomensAreaReminders(
+    /** On each of the 7 clean days. */
+    val cleanEnabled: Boolean = false,
+    val cleanTimes: List<LocalTime> = WomensAreaReminderTimes.DEFAULT,
+    /** On the evening of the 7th day, before its tzeit. */
+    val tevilaEnabled: Boolean = false,
+    val tevilaTimes: List<LocalTime> = WomensAreaReminderTimes.TEVILA_DEFAULT,
+)
+
 data class WomensAreaSecurity(
     /**
      * "איזור נשי" — whether the tab is shown at all. Only ever turned on after
      * the device lock was passed in Settings (see SettingsScreen).
      */
     val enabled: Boolean = false,
-    /** שבעה נקיים reminders — off until she turns them on inside the area. */
-    val remindersEnabled: Boolean = false,
-    /** The times of day they fire at, sorted. */
-    val reminderTimes: List<LocalTime> = WomensAreaReminderTimes.DEFAULT,
-    /** ערב טבילה reminder, on the 7th clean day — also off until turned on. */
-    val tevilaReminderEnabled: Boolean = false,
-    val tevilaReminderTimes: List<LocalTime> = WomensAreaReminderTimes.TEVILA_DEFAULT,
+    val reminders: WomensAreaReminders = WomensAreaReminders(),
 )
 
 @Singleton
@@ -56,12 +64,14 @@ class WomensAreaSecurityRepository @Inject constructor(
     val state: Flow<WomensAreaSecurity> = context.womensAreaSecurityStore.data.map { prefs ->
         WomensAreaSecurity(
             enabled = prefs[Keys.ENABLED] ?: false,
-            remindersEnabled = prefs[Keys.REMINDERS_ENABLED] ?: false,
-            reminderTimes = WomensAreaReminderTimes.decode(prefs[Keys.REMINDER_TIMES]),
-            tevilaReminderEnabled = prefs[Keys.TEVILA_REMINDER_ENABLED] ?: false,
-            tevilaReminderTimes = WomensAreaReminderTimes.decode(
-                prefs[Keys.TEVILA_REMINDER_TIMES],
-                default = WomensAreaReminderTimes.TEVILA_DEFAULT,
+            reminders = WomensAreaReminders(
+                cleanEnabled = prefs[Keys.REMINDERS_ENABLED] ?: false,
+                cleanTimes = WomensAreaReminderTimes.decode(prefs[Keys.REMINDER_TIMES]),
+                tevilaEnabled = prefs[Keys.TEVILA_REMINDER_ENABLED] ?: false,
+                tevilaTimes = WomensAreaReminderTimes.decode(
+                    prefs[Keys.TEVILA_REMINDER_TIMES],
+                    default = WomensAreaReminderTimes.TEVILA_DEFAULT,
+                ),
             ),
         )
     }
@@ -70,19 +80,13 @@ class WomensAreaSecurityRepository @Inject constructor(
         context.womensAreaSecurityStore.edit { it[Keys.ENABLED] = enabled }
     }
 
-    suspend fun setRemindersEnabled(enabled: Boolean) {
-        context.womensAreaSecurityStore.edit { it[Keys.REMINDERS_ENABLED] = enabled }
-    }
-
-    suspend fun setReminderTimes(times: List<LocalTime>) {
-        context.womensAreaSecurityStore.edit { it[Keys.REMINDER_TIMES] = WomensAreaReminderTimes.encode(times) }
-    }
-
-    suspend fun setTevilaReminderEnabled(enabled: Boolean) {
-        context.womensAreaSecurityStore.edit { it[Keys.TEVILA_REMINDER_ENABLED] = enabled }
-    }
-
-    suspend fun setTevilaReminderTimes(times: List<LocalTime>) {
-        context.womensAreaSecurityStore.edit { it[Keys.TEVILA_REMINDER_TIMES] = WomensAreaReminderTimes.encode(times) }
+    /** All four reminder settings in one write, so a reader never sees half a change. */
+    suspend fun setReminders(reminders: WomensAreaReminders) {
+        context.womensAreaSecurityStore.edit {
+            it[Keys.REMINDERS_ENABLED] = reminders.cleanEnabled
+            it[Keys.REMINDER_TIMES] = WomensAreaReminderTimes.encode(reminders.cleanTimes)
+            it[Keys.TEVILA_REMINDER_ENABLED] = reminders.tevilaEnabled
+            it[Keys.TEVILA_REMINDER_TIMES] = WomensAreaReminderTimes.encode(reminders.tevilaTimes)
+        }
     }
 }

@@ -6,7 +6,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
-import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurity
+import com.zmanimclock.app.feature.womensarea.security.WomensAreaReminders
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Duration
 import java.time.LocalDate
@@ -34,17 +34,17 @@ class WomensAreaReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     /**
-     * Queues this hefsek's reminders under [settings]: on each clean day at
+     * Queues this hefsek's reminders under [reminders]: on each clean day at
      * each clean-day time, and on the 7th day (ערב טבילה) at each tevila time
      * — each kind only if she turned it on, and only moments still ahead (a
      * backfilled hefsek gets only what remains). Every request carries this
-     * entry's tag, so [cancel] clears them however many there were.
+     * entry's tag as well as the feature's, so [cancelAll] clears them however many there were.
      */
-    fun schedule(entryId: Long, hefsek: LocalDate, settings: WomensAreaSecurity) {
-        if (settings.remindersEnabled) {
+    fun schedule(entryId: Long, hefsek: LocalDate, reminders: WomensAreaReminders) {
+        if (reminders.cleanEnabled) {
             WomensAreaCalculator.cleanDayDates(hefsek).forEachIndexed { index, date ->
                 val day = index + 1
-                settings.reminderTimes.forEachIndexed { slot, time ->
+                reminders.cleanTimes.forEachIndexed { slot, time ->
                     enqueue(
                         name = "womens_area_clean_${entryId}_${day}_$slot",
                         entryId = entryId,
@@ -52,7 +52,6 @@ class WomensAreaReminderScheduler @Inject constructor(
                         data = workDataOf(
                             WomensAreaReminderWorker.KEY_KIND to WomensAreaReminderWorker.KIND_CLEAN,
                             WomensAreaReminderWorker.KEY_DAY_NUMBER to day,
-                            WomensAreaReminderWorker.KEY_HEFSEK_EPOCH_DAY to hefsek.toEpochDay(),
                             // Same id for every time on one day: a later
                             // reminder replaces that day's earlier one
                             // instead of stacking up.
@@ -62,16 +61,15 @@ class WomensAreaReminderScheduler @Inject constructor(
                 }
             }
         }
-        if (settings.tevilaReminderEnabled) {
+        if (reminders.tevilaEnabled) {
             val tevilaDay = WomensAreaCalculator.tevilaDay(hefsek)
-            settings.tevilaReminderTimes.forEachIndexed { slot, time ->
+            reminders.tevilaTimes.forEachIndexed { slot, time ->
                 enqueue(
                     name = "womens_area_tevila_${entryId}_$slot",
                     entryId = entryId,
                     fireAt = tevilaDay.atTime(time),
                     data = workDataOf(
                         WomensAreaReminderWorker.KEY_KIND to WomensAreaReminderWorker.KIND_TEVILA,
-                        WomensAreaReminderWorker.KEY_HEFSEK_EPOCH_DAY to hefsek.toEpochDay(),
                         WomensAreaReminderWorker.KEY_NOTIFICATION_ID to notificationId(entryId, TEVILA_SLOT),
                     ),
                 )
@@ -91,12 +89,12 @@ class WomensAreaReminderScheduler @Inject constructor(
         WorkManager.getInstance(context).enqueueUniqueWork(name, ExistingWorkPolicy.REPLACE, request)
     }
 
-    /** Cancels every reminder for [entryId] — used on edit (re-scheduled right after) and delete. */
-    fun cancel(entryId: Long) {
-        WorkManager.getInstance(context).cancelAllWorkByTag(entryTag(entryId))
-    }
-
-    /** Cancels every Women's Area reminder — before re-queuing under changed settings. */
+    /**
+     * Cancels every Women's Area reminder — before re-queuing the latest
+     * hefsek's under the current settings (see WomensAreaViewModel).
+     * WorkManager runs operations in order, so a cancel followed by enqueues
+     * never loses the new ones.
+     */
     fun cancelAll() {
         WorkManager.getInstance(context).cancelAllWorkByTag(ALL_TAG)
     }

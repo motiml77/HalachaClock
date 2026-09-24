@@ -63,7 +63,7 @@ import java.time.LocalDate
  * where she makes the choice.
  *
  * Used to edit an entry from the history screen; new entries are made by
- * tapping a day on the calendar (WomensAreaDayActionDialog).
+ * tapping a day on the calendar (WomensAreaDaySheet).
  */
 @Composable
 fun WomensAreaHebrewDateDialog(

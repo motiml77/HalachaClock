@@ -1,46 +1,35 @@
 package com.zmanimclock.app.feature.womensarea.model
 
-import java.time.LocalDate
-
-/** Title, one-line text and expanded text of one Women's Area notification. */
-data class NotificationText(val title: String, val text: String, val bigText: String)
+/** Title and one-line text of one Women's Area notification. */
+data class NotificationText(val title: String, val text: String)
 
 /**
  * The words of the Women's Area notifications, in one testable place.
  *
- * What the lock screen shows is NOT here: it is always just "תזכורת" (the
- * notification's public version), so nothing personal is readable without
- * unlocking the phone.
+ * MODEST BY DESIGN — the owner's rule: a notification never names what it is
+ * about. No "נקיים", "טבילה", "מקווה", "ווסת", "הפסק" or "פרישה" — only
+ * "התראה אישית" and a day number or "הערב". She knows what it means; anyone
+ * glancing at the phone, even unlocked, does not. [FORBIDDEN_WORDS] is
+ * checked by a test so a later edit cannot slip one in.
+ *
+ * The lock screen shows even less: just [TITLE] (the public version).
  */
 object WomensAreaNotificationText {
 
-    /** Day [day] (1..7) of the count after a hefsek on [hefsek]. */
-    fun cleanDay(day: Int, hefsek: LocalDate): NotificationText {
-        val tevilaDay = WomensAreaCalculator.tevilaDay(hefsek)
-        val left = WomensAreaCalculator.CLEAN_DAYS_COUNT - day
-        val title = "שבעה נקיים · יום $day מתוך ${WomensAreaCalculator.CLEAN_DAYS_COUNT}"
-        return if (left == 0) {
-            NotificationText(
-                title = title,
-                text = "היום האחרון — הלילה טבילה, לאחר צאת הכוכבים בלבד",
-                bigText = "היום האחרון לספירה.\n★ טבילה: ${WomensAreaLabels.tevilaTiming(tevilaDay)}",
-            )
-        } else {
-            NotificationText(
-                title = title,
-                text = "זמן בדיקה",
-                bigText = "זמן בדיקה · נותרו עוד $left ימים.\n★ טבילה: ${WomensAreaLabels.tevilaTiming(tevilaDay)}",
-            )
-        }
-    }
+    const val TITLE = "התראה אישית"
 
-    /** ערב טבילה — on the 7th clean day, before its tzeit. */
-    fun tevilaEvening(hefsek: LocalDate): NotificationText {
-        val tevilaDay = WomensAreaCalculator.tevilaDay(hefsek)
-        return NotificationText(
-            title = "★ ערב טבילה",
-            text = "הערב — לאחר צאת הכוכבים בלבד",
-            bigText = "${WomensAreaLabels.tevilaTiming(tevilaDay)}.\nלא לטבול לפני צאת הכוכבים.",
-        )
-    }
+    /** Words no notification may contain. */
+    val FORBIDDEN_WORDS = listOf("נקי", "טבילה", "מקווה", "ווסת", "וסת", "הפסק", "פרישה", "טהרה", "ראייה")
+
+    /** Day [day] (1..7) of the count. */
+    fun cleanDay(day: Int): NotificationText = NotificationText(
+        title = TITLE,
+        text = if (day == WomensAreaCalculator.CLEAN_DAYS_COUNT) "יום $day · אחרון" else "יום $day",
+    )
+
+    /** The evening of the 7th day, before its tzeit. */
+    fun tevilaEvening(): NotificationText = NotificationText(
+        title = TITLE,
+        text = "הערב · לאחר צאת הכוכבים",
+    )
 }

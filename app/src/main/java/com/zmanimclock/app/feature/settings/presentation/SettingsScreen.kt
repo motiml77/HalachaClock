@@ -752,8 +752,9 @@ private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit
             ) {
                 Text("איזור נשי", style = MaterialTheme.typography.titleMedium, color = titleColor)
                 Text(
-                    "לוח שנה עברי אישי לחישוב ימי פרישה, שבעה נקיים וליל הטבילה. " +
-                        "ההפעלה והכניסה בטביעת אצבע או בקוד המכשיר.",
+                    // Settings is open to anyone holding the phone, so this
+                    // line says what protects the area, not what is in it.
+                    "לוח אישי מוגן. ההפעלה והכניסה בטביעת אצבע או בקוד המכשיר.",
                     style = MaterialTheme.typography.bodySmall,
                     color = subColor,
                 )

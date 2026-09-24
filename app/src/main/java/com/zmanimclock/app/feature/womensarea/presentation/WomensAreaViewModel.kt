@@ -14,7 +14,7 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarkers
 import com.zmanimclock.app.feature.womensarea.scheduling.WomensAreaReminderScheduler
-import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurity
+import com.zmanimclock.app.feature.womensarea.security.WomensAreaReminders
 import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.LocalTime
 import javax.inject.Inject
 
 @HiltViewModel
@@ -34,9 +33,10 @@ class WomensAreaViewModel @Inject constructor(
     private val settings: WomensAreaSecurityRepository,
 ) : ViewModel() {
 
-    /** Whether the שבעה נקיים reminders are on, and at which times. */
-    val reminderSettings: StateFlow<WomensAreaSecurity> = settings.state
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WomensAreaSecurity())
+    /** Which reminders she chose, and at which times. */
+    val reminders: StateFlow<WomensAreaReminders> = settings.state
+        .map { it.reminders }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WomensAreaReminders())
 
     val allEntries: StateFlow<List<WomensAreaEntryEntity>> = dao.getAllEntries()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -111,68 +111,54 @@ class WomensAreaViewModel @Inject constructor(
         )
     }
 
-    /** [date] is the day the הפסק טהרה was made, before its shkia. */
-    fun addHefsekTahara(date: LocalDate) = viewModelScope.launch {
-        val id = dao.insert(
-            WomensAreaEntryEntity(type = WomensAreaEntryType.HEFSEK_TAHARA, epochDay = date.toEpochDay())
-        )
-        scheduleIfOn(id, date)
+    /**
+     * [date] is the day the הפסק טהרה was made, before its shkia. [reminders]
+     * is what she chose on the same screen; it becomes the saved setting, and
+     * the reminders are queued from it.
+     */
+    fun addHefsekTahara(date: LocalDate, reminders: WomensAreaReminders) = viewModelScope.launch {
+        settings.setReminders(reminders)
+        dao.insert(WomensAreaEntryEntity(type = WomensAreaEntryType.HEFSEK_TAHARA, epochDay = date.toEpochDay()))
+        rescheduleLatest()
     }
 
     /**
      * [onah] is required for a veset — a veset is never saved without ביום /
-     * בלילה (the dialogs cannot confirm without one either) — and ignored for
+     * בלילה (the screens cannot confirm without one either) — and ignored for
      * a HEFSEK_TAHARA, which has none.
      */
     fun updateEntry(entry: WomensAreaEntryEntity, newDate: LocalDate, onah: Onah?) = viewModelScope.launch {
         val isVeset = entry.type == WomensAreaEntryType.PERIOD_START
         if (isVeset && onah == null) return@launch
         dao.update(entry.copy(epochDay = newDate.toEpochDay(), onah = if (isVeset) onah else null))
-        if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) {
-            reminderScheduler.cancel(entry.id)
-            scheduleIfOn(entry.id, newDate)
-        }
+        if (!isVeset) rescheduleLatest()
     }
 
     fun deleteEntry(entry: WomensAreaEntryEntity) = viewModelScope.launch {
         dao.delete(entry)
-        if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) reminderScheduler.cancel(entry.id)
+        if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) rescheduleLatest()
     }
 
     // ------------------------------------------------------- reminders
 
-    fun setRemindersEnabled(enabled: Boolean) = changeReminders { settings.setRemindersEnabled(enabled) }
-
-    fun addReminderTime(time: LocalTime) =
-        changeReminders { settings.setReminderTimes(it.reminderTimes + time) }
-
-    fun removeReminderTime(time: LocalTime) =
-        changeReminders { settings.setReminderTimes(it.reminderTimes - time) }
-
-    fun setTevilaReminderEnabled(enabled: Boolean) = changeReminders { settings.setTevilaReminderEnabled(enabled) }
-
-    fun addTevilaReminderTime(time: LocalTime) =
-        changeReminders { settings.setTevilaReminderTimes(it.tevilaReminderTimes + time) }
-
-    fun removeTevilaReminderTime(time: LocalTime) =
-        changeReminders { settings.setTevilaReminderTimes(it.tevilaReminderTimes - time) }
+    /** From the reminders card on the main screen. */
+    fun setReminders(reminders: WomensAreaReminders) = viewModelScope.launch {
+        settings.setReminders(reminders)
+        rescheduleLatest()
+    }
 
     /**
-     * Applies one change to the reminder settings, then clears every queued
-     * reminder and re-queues the latest hefsek's remaining ones under the new
-     * settings. Only the latest hefsek can still have days ahead of it.
+     * Clears every queued reminder and re-queues the latest hefsek's remaining
+     * ones under the saved settings. Only the latest hefsek can still have
+     * days ahead of it, so this is the one rule for every change — a new
+     * hefsek, an edited or deleted one, or changed settings.
      */
-    private fun changeReminders(change: suspend (WomensAreaSecurity) -> Unit) = viewModelScope.launch {
-        change(settings.state.first())
+    private suspend fun rescheduleLatest() {
         reminderScheduler.cancelAll()
         val latest = dao.getAllEntries().first()
             .filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
-            .maxByOrNull { it.epochDay } ?: return@launch
-        scheduleIfOn(latest.id, latest.date)
-    }
-
-    private suspend fun scheduleIfOn(entryId: Long, hefsek: LocalDate) {
-        reminderScheduler.schedule(entryId, hefsek, settings.state.first())
+            .maxByOrNull { it.epochDay } ?: return
+        reminderScheduler.schedule(latest.id, latest.date, settings.state.first().reminders)
     }
 }
 
