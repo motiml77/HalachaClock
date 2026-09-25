@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.Onah
+import com.zmanimclock.app.feature.womensarea.model.TevilaBlock
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
@@ -433,6 +434,20 @@ internal fun TaharaDetails(hefsek: LocalDate) {
             Text(WomensAreaLabels.tevilaTiming(WomensAreaCalculator.tevilaDay(hefsek)), style = MaterialTheme.typography.bodySmall)
             Text("טובלים רק לאחר צאת הכוכבים — לא לפני.", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
         }
+        WomensAreaCalculator.tevilaNightBlock(hefsek)?.let { TevilaBlockWarning(it) }
+    }
+}
+
+/** Red, bold, framed: ליל הטבילה is a night with no tevila (Yom Kippur / Tisha B'Av). */
+@Composable
+internal fun TevilaBlockWarning(block: TevilaBlock) {
+    FramedBlock(WomensAreaPrishaRed) {
+        Text(
+            WomensAreaLabels.tevilaBlockText(block),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = WomensAreaPrishaRed,
+        )
     }
 }
 

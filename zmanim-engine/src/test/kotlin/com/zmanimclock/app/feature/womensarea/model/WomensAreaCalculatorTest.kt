@@ -150,4 +150,23 @@ class WomensAreaCalculatorTest {
         assertNull(WomensAreaCalculator.hefsekDayNumber(hefsek.plusDays(1), hefsek))
         assertFalse(WomensAreaCalculator.isEarlyHefsek(hefsek.plusDays(1), hefsek))
     }
+
+    @Test
+    fun `a tevila night on Yom Kippur or Tisha B'Av is flagged, including a deferred 9 Av`() {
+        // Tevila night = hefsek + 8. 10 Tishrei 5787 = 21.9.2026 → hefsek 13.9.
+        assertEquals(TevilaBlock.YOM_KIPPUR, WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2026, 9, 13)))
+        assertNull(WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2026, 9, 12))) // ליל ט׳ תשרי
+        assertNull(WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2026, 9, 14))) // ליל י״א תשרי
+        // 9 Av 5787 = Thursday 12.8.2027 → hefsek 4.8.
+        assertEquals(TevilaBlock.TISHA_BEAV, WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2027, 8, 4)))
+        assertNull(WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2027, 8, 5))) // 10 Av, not deferred
+        // 5782: 9 Av was Shabbat 6.8.2022, the fast on Sunday 10 Av — both nights flagged, 11 Av not.
+        assertEquals(TevilaBlock.TISHA_BEAV, WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2022, 7, 29)))
+        assertEquals(TevilaBlock.TISHA_BEAV, WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2022, 7, 30)))
+        assertNull(WomensAreaCalculator.tevilaNightBlock(LocalDate.of(2022, 7, 31)))
+        assertEquals(
+            "ליל הטבילה חל בליל יום הכיפורים — אין טובלים בלילה זה. יש לשאול רב.",
+            WomensAreaLabels.tevilaBlockText(TevilaBlock.YOM_KIPPUR),
+        )
+    }
 }

@@ -21,6 +21,8 @@ data class WomensAreaMarker(
      * night that opens the next Hebrew day).
      */
     val isTevilaDay: Boolean = false,
+    /** On the tevila day: set when its night is one with no tevila (Yom Kippur / Tisha B'Av). */
+    val tevilaBlock: TevilaBlock? = null,
 )
 
 /**
@@ -54,7 +56,9 @@ object WomensAreaMarkers {
             WomensAreaCalculator.cleanDayDates(hefsek).forEachIndexed { i, date ->
                 edit(date) { it.copy(cleanDayNumber = i + 1) }
             }
-            edit(WomensAreaCalculator.tevilaDay(hefsek)) { it.copy(isTevilaDay = true) }
+            edit(WomensAreaCalculator.tevilaDay(hefsek)) {
+                it.copy(isTevilaDay = true, tevilaBlock = WomensAreaCalculator.tevilaNightBlock(hefsek))
+            }
         }
         return markers
     }

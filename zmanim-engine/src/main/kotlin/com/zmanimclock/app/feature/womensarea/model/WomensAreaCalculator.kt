@@ -14,6 +14,9 @@ import java.time.temporal.ChronoUnit
  */
 enum class Onah { DAY, NIGHT }
 
+/** A night on which there is no tevila. */
+enum class TevilaBlock { YOM_KIPPUR, TISHA_BEAV }
+
 /** Which of the three separation days a marker represents. */
 enum class VesetKind { ONAH_BEINONIT, HAFLAGA, YOM_HACHODESH }
 
@@ -202,4 +205,26 @@ object WomensAreaCalculator {
 
     /** The Hebrew day whose NIGHT is ליל הטבילה — the day after [tevilaDay]. */
     fun tevilaNight(hefsek: LocalDate): LocalDate = tevilaDay(hefsek).plusDays(1)
+
+    /**
+     * A night on which there is no tevila, if ליל הטבילה after [hefsek] is
+     * one: the night of יום הכיפורים (10 Tishrei), or of תשעה באב — the 9th of
+     * Av, and also the 10th when the fast is deferred to it because the 9th
+     * was Shabbat (both nights are then a question). The app only says so;
+     * what to do is for a rabbi.
+     */
+    fun tevilaNightBlock(hefsek: LocalDate): TevilaBlock? {
+        val night = tevilaNight(hefsek)
+        val jd = JewishDate(night.toGregorianCalendar())
+        return when {
+            jd.jewishMonth == TISHREI && jd.jewishDayOfMonth == 10 -> TevilaBlock.YOM_KIPPUR
+            jd.jewishMonth == AV && jd.jewishDayOfMonth == 9 -> TevilaBlock.TISHA_BEAV
+            jd.jewishMonth == AV && jd.jewishDayOfMonth == 10 &&
+                night.minusDays(1).dayOfWeek == java.time.DayOfWeek.SATURDAY -> TevilaBlock.TISHA_BEAV
+            else -> null
+        }
+    }
+
+    private const val TISHREI = 7
+    private const val AV = 5
 }

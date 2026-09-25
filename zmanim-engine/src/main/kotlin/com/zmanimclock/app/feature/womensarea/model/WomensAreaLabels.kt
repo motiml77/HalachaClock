@@ -148,18 +148,20 @@ object WomensAreaLabels {
      */
     fun patternText(pattern: HistoryPattern): String = when (pattern) {
         is HistoryPattern.SameHaflaga ->
-            "הפלגה של ${pattern.days} יום חזרה ${pattern.count} פעמים ברצף" + onahSuffix(pattern.sameOnah)
+            "הפלגה של ${pattern.days} יום חזרה ${pattern.count} פעמים ברצף"
         is HistoryPattern.SameDayOfMonth ->
-            "הראייה הופיעה ${pattern.count} חודשים ברצף ב${hebrewNumber(pattern.dayOfMonth)} בחודש" +
-                onahSuffix(pattern.sameOnah)
+            "הראייה הופיעה ${pattern.count} חודשים ברצף ב${hebrewNumber(pattern.dayOfMonth)} בחודש"
         is HistoryPattern.SteadyHaflagaStep -> {
             val by = kotlin.math.abs(pattern.step)
             val days = if (by == 1) "ביום אחד" else "ב־$by ימים"
             "ההפלגות ${if (pattern.step > 0) "גדלות" else "קטנות"} $days בכל פעם (${pattern.count} הפלגות ברצף)"
         }
-    }
+    } + if (pattern.onah == Onah.DAY) " — כולן ביום" else " — כולן בלילה"
 
-    private fun onahSuffix(sameOnah: Boolean) = if (sameOnah) ", ובאותה עונה" else ", אך לא באותה עונה"
+    /** The warning when ליל הטבילה is a night with no tevila. */
+    fun tevilaBlockText(block: TevilaBlock): String =
+        "ליל הטבילה חל ב" + (if (block == TevilaBlock.YOM_KIPPUR) "ליל יום הכיפורים" else "ליל תשעה באב") +
+            " — אין טובלים בלילה זה. יש לשאול רב."
 
     /** "ט״ו" — KosherJava's gematria, as everywhere else. */
     fun hebrewNumber(n: Int): String = formatter().formatHebrewNumber(n)

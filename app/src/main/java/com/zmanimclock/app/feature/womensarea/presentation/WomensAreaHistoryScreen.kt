@@ -441,6 +441,7 @@ private fun CycleCard(
                             color = WomensAreaTevilaBlue,
                         )
                     }
+                    WomensAreaCalculator.tevilaNightBlock(hefsek.date)?.let { TevilaBlockWarning(it) }
                 }
                 entryOf(cycle.veset.id)?.let { entry ->
                     EntryActionsRow("הראייה", onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })

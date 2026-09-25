@@ -1,6 +1,7 @@
 package com.zmanimclock.app.feature.womensarea.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,15 +20,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +56,7 @@ import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaHistory
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
@@ -100,6 +103,7 @@ fun WomensAreaScreen(
     val entries by viewModel.allEntries.collectAsStateWithLifecycle()
     val hefsek by viewModel.latestHefsek.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val history by viewModel.history.collectAsStateWithLifecycle()
     // The day whose sheet is open, if any.
     var tapped by remember { mutableStateOf<LocalDate?>(null) }
 
@@ -152,10 +156,7 @@ fun WomensAreaScreen(
             prediction?.let { PrishaSummaryCard(it) }
             hefsek?.let { TaharaSummaryCard(it, prediction) }
             WomensAreaRemindersCard(reminders = reminders, onChange = viewModel::setReminders)
-            OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("  היסטוריה ודפוסים", style = MaterialTheme.typography.bodyMedium)
-            }
+            HistoryEntryCard(history, onClick = onOpenHistory)
         }
     }
 
@@ -184,6 +185,67 @@ fun WomensAreaScreen(
             },
             onDismiss = { tapped = null },
         )
+    }
+}
+
+/**
+ * The way into the history — a card in the area's own style rather than a
+ * plain button, with a live one-line summary (how many vesets, the latest
+ * haflaga) and a badge when something repeats, so it is worth opening.
+ */
+@Composable
+private fun HistoryEntryCard(history: HistoryUi, onClick: () -> Unit) {
+    val latestHaflaga = history.cycles.firstOrNull()?.haflagaInterval
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = WomensAreaLilacContainer),
+        border = BorderStroke(1.5.dp, WomensAreaLilac.copy(alpha = 0.6f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(WomensAreaLilac),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Insights, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "היסטוריה ודפוסים",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = OnWomensAreaLilacContainer,
+                )
+                Text(
+                    when {
+                        history.cycles.isEmpty() -> "כאן יופיעו ${WomensAreaHistory.KEEP} הראיות האחרונות"
+                        latestHaflaga == null -> "${history.cycles.size} ראיות רשומות"
+                        else -> "${history.cycles.size} ראיות · הפלגה אחרונה $latestHaflaga יום"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnWomensAreaLilacContainer.copy(alpha = 0.8f),
+                )
+                if (history.patterns.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(WomensAreaLilac)
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(Icons.Filled.Repeat, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Text("נמצא דפוס חוזר", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = OnWomensAreaLilacContainer)
+        }
     }
 }
 

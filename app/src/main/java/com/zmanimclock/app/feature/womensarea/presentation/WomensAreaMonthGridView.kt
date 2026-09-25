@@ -42,6 +42,7 @@ import com.zmanimclock.app.feature.calendar.model.CalendarDayMeta
 import com.zmanimclock.app.feature.calendar.model.MonthGrid
 import com.zmanimclock.app.feature.womensarea.model.Onah
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
+import com.zmanimclock.app.feature.womensarea.model.TevilaBlock
 import com.zmanimclock.app.feature.womensarea.model.VesetKind
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
@@ -202,6 +203,14 @@ private fun WomensAreaDayCell(
                 isVesetDay -> {
                     CellTitle("ראייה", cs.onSurface)
                     OnahPill(marker?.vesetOnah, cs.onSurface)
+                }
+                isTevila && marker?.tevilaBlock != null -> {
+                    CellTitle("אין טבילה", WomensAreaPrishaRed)
+                    CellTitle(
+                        if (marker.tevilaBlock == TevilaBlock.YOM_KIPPUR) "ליל יוה״כ" else "ליל ת״ב",
+                        WomensAreaPrishaRed,
+                        bold = false,
+                    )
                 }
                 isTevila -> {
                     CellTitle("טבילה", WomensAreaTevilaBlue)

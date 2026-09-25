@@ -26,16 +26,21 @@ data class Cycle(
     val hefsek: HefsekRecord?,
 )
 
-/** Something the history shows that repeats. Never a ruling — a thing to bring to a rabbi. */
+/**
+ * Something the history shows that repeats — always among vesets of one
+ * [onah]. Never a ruling: a thing to bring to a rabbi.
+ */
 sealed class HistoryPattern {
+    abstract val onah: Onah
+
     /** The last [count] haflagot (newest back) are all [days] long. */
-    data class SameHaflaga(val days: Int, val count: Int, val sameOnah: Boolean) : HistoryPattern()
+    data class SameHaflaga(val days: Int, val count: Int, override val onah: Onah) : HistoryPattern()
 
     /** The last [count] vesets fell on the same Hebrew day-of-month, in consecutive months. */
-    data class SameDayOfMonth(val dayOfMonth: Int, val count: Int, val sameOnah: Boolean) : HistoryPattern()
+    data class SameDayOfMonth(val dayOfMonth: Int, val count: Int, override val onah: Onah) : HistoryPattern()
 
     /** The last [count] haflagot change by the same [step] each time (a dilug), e.g. 28, 29, 30. */
-    data class SteadyHaflagaStep(val step: Int, val count: Int) : HistoryPattern()
+    data class SteadyHaflagaStep(val step: Int, val count: Int, override val onah: Onah) : HistoryPattern()
 }
 
 /**
@@ -82,35 +87,38 @@ object WomensAreaHistory {
         return (sorted.drop(KEEP).map { it.id } + hefseks.filter { it.date < oldestKept }.map { it.id }).toSet()
     }
 
-    /** What repeats in [cycles] (newest first), each counted back from the newest. */
+    /**
+     * What repeats in [cycles] (newest first), each counted back from the
+     * newest — and ONLY among vesets that were all in the same onah (all
+     * ביום or all בלילה): a pattern that mixes day and night is not one, and
+     * is not reported at all. For a haflaga that means both of its ends.
+     */
     fun patterns(cycles: List<Cycle>): List<HistoryPattern> {
+        val onah = cycles.firstOrNull()?.veset?.onah ?: return emptyList()
+        // The newest vesets that share the newest one's onah, unbroken.
+        val sameOnah = cycles.takeWhile { it.veset.onah == onah }
+        // Haflagot whose BOTH ends are in that run: cycle i's haflaga runs from veset i+1 to veset i.
+        val haflagot = sameOnah.dropLast(1).map { it.haflagaInterval!! }
         val found = mutableListOf<HistoryPattern>()
 
-        // Equal haflagot, newest back.
-        val haflagot = cycles.mapNotNull { it.haflagaInterval }
+        // Equal haflagot.
         if (haflagot.isNotEmpty()) {
             val run = haflagot.takeWhile { it == haflagot.first() }.size
-            if (run >= MIN_REPEAT) {
-                val onot = cycles.take(run).map { it.veset.onah }
-                found += HistoryPattern.SameHaflaga(haflagot.first(), run, onot.all { it != null && it == onot.first() })
-            }
+            if (run >= MIN_REPEAT) found += HistoryPattern.SameHaflaga(haflagot.first(), run, onah)
         }
 
         // Same day of the month, in consecutive Hebrew months.
         var dayRun = 1
-        while (dayRun < cycles.size && sameDayNextMonth(cycles[dayRun].veset.date, cycles[dayRun - 1].veset.date)) dayRun++
-        if (dayRun >= MIN_REPEAT) {
-            val onot = cycles.take(dayRun).map { it.veset.onah }
-            found += HistoryPattern.SameDayOfMonth(cycles.first().hebrewDayOfMonth, dayRun, onot.all { it != null && it == onot.first() })
-        }
+        while (dayRun < sameOnah.size && sameDayNextMonth(sameOnah[dayRun].veset.date, sameOnah[dayRun - 1].veset.date)) dayRun++
+        if (dayRun >= MIN_REPEAT) found += HistoryPattern.SameDayOfMonth(sameOnah.first().hebrewDayOfMonth, dayRun, onah)
 
-        // A steady, non-zero step between haflagot (dilug), newest back — needs 3 haflagot.
+        // A steady, non-zero step between haflagot (dilug) — needs 3 haflagot.
         if (haflagot.size >= MIN_REPEAT) {
             val step = haflagot[0] - haflagot[1]
             if (step != 0) {
                 var n = 2
                 while (n < haflagot.size && haflagot[n - 1] - haflagot[n] == step) n++
-                if (n >= MIN_REPEAT) found += HistoryPattern.SteadyHaflagaStep(step, n)
+                if (n >= MIN_REPEAT) found += HistoryPattern.SteadyHaflagaStep(step, n, onah)
             }
         }
         return found

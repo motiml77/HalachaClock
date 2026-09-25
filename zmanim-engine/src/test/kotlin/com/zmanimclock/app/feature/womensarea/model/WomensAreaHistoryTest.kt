@@ -42,10 +42,10 @@ class WomensAreaHistoryTest {
     }
 
     @Test
-    fun `three equal haflagot in a row are reported, with whether the onah matched`() {
+    fun `three equal haflagot in a row, all in one onah, are reported`() {
         val same = WomensAreaHistory.cycles(everyN(h(5786, 7, 1), 29, 5, Onah.NIGHT), emptyList())
-        assertEquals(listOf(HistoryPattern.SameHaflaga(29, 4, sameOnah = true)), WomensAreaHistory.patterns(same).filterIsInstance<HistoryPattern.SameHaflaga>())
-        assertEquals("הפלגה של 29 יום חזרה 4 פעמים ברצף, ובאותה עונה", WomensAreaLabels.patternText(HistoryPattern.SameHaflaga(29, 4, true)))
+        assertEquals(listOf(HistoryPattern.SameHaflaga(29, 4, Onah.NIGHT)), WomensAreaHistory.patterns(same).filterIsInstance<HistoryPattern.SameHaflaga>())
+        assertEquals("הפלגה של 29 יום חזרה 4 פעמים ברצף — כולן בלילה", WomensAreaLabels.patternText(HistoryPattern.SameHaflaga(29, 4, Onah.NIGHT)))
 
         // Two equal then a different one: not reported.
         val vs = listOf(veset(h(5786, 7, 1)), veset(h(5786, 7, 25)), veset(h(5786, 8, 23)), veset(h(5786, 9, 22)))
@@ -55,13 +55,31 @@ class WomensAreaHistoryTest {
     }
 
     @Test
+    fun `equal haflagot across a change of onah are NOT a pattern`() {
+        // Four vesets 29 days apart — three equal haflagot — but the oldest was by day.
+        val vs = everyN(h(5786, 7, 1), 29, 4, Onah.NIGHT).mapIndexed { i, v -> if (i == 0) v.copy(onah = Onah.DAY) else v }
+        val cycles = WomensAreaHistory.cycles(vs, emptyList())
+        assertEquals(listOf(29, 29, 29, null), cycles.map { it.haflagaInterval })
+        // Only two haflagot have both ends בלילה: not enough.
+        assertTrue(WomensAreaHistory.patterns(cycles).isEmpty())
+
+        // Same haflagot, the NEWEST by day: the run stops at once.
+        val newestDay = everyN(h(5786, 7, 1), 29, 5, Onah.NIGHT).mapIndexed { i, v -> if (i == 4) v.copy(onah = Onah.DAY) else v }
+        assertTrue(WomensAreaHistory.patterns(WomensAreaHistory.cycles(newestDay, emptyList())).isEmpty())
+
+        // A veset with no onah recorded breaks it as well.
+        val unknown = everyN(h(5786, 7, 1), 29, 5, Onah.NIGHT).mapIndexed { i, v -> if (i == 2) v.copy(onah = null) else v }
+        assertTrue(WomensAreaHistory.patterns(WomensAreaHistory.cycles(unknown, emptyList())).isEmpty())
+    }
+
+    @Test
     fun `the same Hebrew date three months running is reported — across a leap year's two Adars`() {
         val vs = listOf(h(5787, 11, 14), h(5787, 12, 14), h(5787, 13, 14), h(5787, 1, 14)).map { veset(it, Onah.DAY) }
         val patterns = WomensAreaHistory.patterns(WomensAreaHistory.cycles(vs, emptyList()))
-        assertEquals(HistoryPattern.SameDayOfMonth(14, 4, true), patterns.filterIsInstance<HistoryPattern.SameDayOfMonth>().single())
+        assertEquals(HistoryPattern.SameDayOfMonth(14, 4, Onah.DAY), patterns.filterIsInstance<HistoryPattern.SameDayOfMonth>().single())
         assertEquals(
-            "הראייה הופיעה 4 חודשים ברצף בי״ד בחודש, ובאותה עונה",
-            WomensAreaLabels.patternText(HistoryPattern.SameDayOfMonth(14, 4, true)),
+            "הראייה הופיעה 4 חודשים ברצף בי״ד בחודש — כולן ביום",
+            WomensAreaLabels.patternText(HistoryPattern.SameDayOfMonth(14, 4, Onah.DAY)),
         )
         // A skipped month breaks it: 14 Shevat, then 14 Adar II.
         val skipped = listOf(h(5787, 10, 14), h(5787, 11, 14), h(5787, 13, 14)).map { veset(it) }
@@ -69,22 +87,23 @@ class WomensAreaHistoryTest {
     }
 
     @Test
-    fun `mixed onot are said so`() {
+    fun `the same date with mixed onot is not reported`() {
         val vs = listOf(h(5786, 1, 5), h(5786, 2, 5), h(5786, 3, 5)).mapIndexed { i, d -> veset(d, if (i == 1) Onah.NIGHT else Onah.DAY) }
-        val p = WomensAreaHistory.patterns(WomensAreaHistory.cycles(vs, emptyList())).filterIsInstance<HistoryPattern.SameDayOfMonth>().single()
-        assertEquals(false, p.sameOnah)
-        assertTrue(WomensAreaLabels.patternText(p).endsWith("אך לא באותה עונה"))
+        assertTrue(WomensAreaHistory.patterns(WomensAreaHistory.cycles(vs, emptyList())).isEmpty())
     }
 
     @Test
-    fun `a steady step between haflagot (dilug) is reported`() {
+    fun `a steady step between haflagot (dilug), in one onah, is reported`() {
         // Haflagot 28, 29, 30 in time order → newest first 30, 29, 28 → growing by one.
         var d = h(5786, 7, 1)
         val vs = mutableListOf(veset(d))
         for (gap in listOf(28, 29, 30)) { d = d.plusDays((gap - 1).toLong()); vs += veset(d) }
         val p = WomensAreaHistory.patterns(WomensAreaHistory.cycles(vs, emptyList()))
-        assertEquals(listOf(HistoryPattern.SteadyHaflagaStep(1, 3)), p.filterIsInstance<HistoryPattern.SteadyHaflagaStep>())
-        assertEquals("ההפלגות גדלות ביום אחד בכל פעם (3 הפלגות ברצף)", WomensAreaLabels.patternText(p.filterIsInstance<HistoryPattern.SteadyHaflagaStep>().single()))
+        assertEquals(listOf(HistoryPattern.SteadyHaflagaStep(1, 3, Onah.DAY)), p.filterIsInstance<HistoryPattern.SteadyHaflagaStep>())
+        assertEquals(
+            "ההפלגות גדלות ביום אחד בכל פעם (3 הפלגות ברצף) — כולן ביום",
+            WomensAreaLabels.patternText(p.filterIsInstance<HistoryPattern.SteadyHaflagaStep>().single()),
+        )
     }
 
     @Test

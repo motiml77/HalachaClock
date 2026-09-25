@@ -61,7 +61,8 @@ class WomensAreaReminderScheduler @Inject constructor(
                 }
             }
         }
-        if (reminders.tevilaEnabled) {
+        // No "הערב · לאחר צאת הכוכבים" on a night with no tevila (Yom Kippur / Tisha B'Av).
+        if (reminders.tevilaEnabled && WomensAreaCalculator.tevilaNightBlock(hefsek) == null) {
             val tevilaDay = WomensAreaCalculator.tevilaDay(hefsek)
             reminders.tevilaTimes.forEachIndexed { slot, time ->
                 enqueue(

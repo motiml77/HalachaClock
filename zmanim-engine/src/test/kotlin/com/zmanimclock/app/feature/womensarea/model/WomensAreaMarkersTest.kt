@@ -70,4 +70,12 @@ class WomensAreaMarkersTest {
         assertFalse(WomensAreaCalculator.predict(veset, Onah.DAY, previous).clashesWithTevila(hefsek))
         assertFalse(WomensAreaCalculator.predict(veset, Onah.NIGHT, previous).clashesWithTevila(hefsek.minusDays(1)))
     }
+
+    @Test
+    fun `the tevila day carries a Yom Kippur block when its night is one`() {
+        val hefsek = LocalDate.of(2026, 9, 13) // tevila night = 10 Tishrei 5787
+        val m = WomensAreaMarkers.build(null, null, null, hefsek)
+        assertEquals(TevilaBlock.YOM_KIPPUR, m.getValue(hefsek.plusDays(7)).tevilaBlock)
+        assertNull(WomensAreaMarkers.build(null, null, null, hefsek.plusDays(1)).getValue(hefsek.plusDays(8)).tevilaBlock)
+    }
 }
