@@ -39,4 +39,8 @@ interface WomensAreaDao {
 
     @Delete
     suspend fun delete(entry: WomensAreaEntryEntity)
+
+    /** For keeping only the last few vesets — see WomensAreaHistory.idsToPrune. */
+    @Query("DELETE FROM womens_area_entries WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 }

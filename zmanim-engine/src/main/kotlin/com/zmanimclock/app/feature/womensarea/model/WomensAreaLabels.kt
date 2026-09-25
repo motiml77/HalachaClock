@@ -142,6 +142,28 @@ object WomensAreaLabels {
     private fun shorten(name: String): String =
         SHORT_FORMS.fold(name) { acc, (long, short) -> acc.replace(long, short) }
 
+    /**
+     * One pattern the history found, in plain words — an observation, never
+     * "you have a וסת קבוע": that is for a rabbi.
+     */
+    fun patternText(pattern: HistoryPattern): String = when (pattern) {
+        is HistoryPattern.SameHaflaga ->
+            "הפלגה של ${pattern.days} יום חזרה ${pattern.count} פעמים ברצף" + onahSuffix(pattern.sameOnah)
+        is HistoryPattern.SameDayOfMonth ->
+            "הראייה הופיעה ${pattern.count} חודשים ברצף ב${hebrewNumber(pattern.dayOfMonth)} בחודש" +
+                onahSuffix(pattern.sameOnah)
+        is HistoryPattern.SteadyHaflagaStep -> {
+            val by = kotlin.math.abs(pattern.step)
+            val days = if (by == 1) "ביום אחד" else "ב־$by ימים"
+            "ההפלגות ${if (pattern.step > 0) "גדלות" else "קטנות"} $days בכל פעם (${pattern.count} הפלגות ברצף)"
+        }
+    }
+
+    private fun onahSuffix(sameOnah: Boolean) = if (sameOnah) ", ובאותה עונה" else ", אך לא באותה עונה"
+
+    /** "ט״ו" — KosherJava's gematria, as everywhere else. */
+    fun hebrewNumber(n: Int): String = formatter().formatHebrewNumber(n)
+
     /** "יום רביעי" / "שבת" — "יום שבת" reads wrongly. */
     private fun eveningDay(date: LocalDate): String =
         if (date.dayOfWeek == DayOfWeek.SATURDAY) "שבת" else "יום ${weekdayName(date)}"

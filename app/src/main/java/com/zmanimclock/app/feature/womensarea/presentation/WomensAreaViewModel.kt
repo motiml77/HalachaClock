@@ -8,7 +8,12 @@ import com.zmanimclock.app.feature.calendar.model.MonthGridBuilder
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaDao
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
+import com.zmanimclock.app.feature.womensarea.model.Cycle
+import com.zmanimclock.app.feature.womensarea.model.HefsekRecord
+import com.zmanimclock.app.feature.womensarea.model.HistoryPattern
 import com.zmanimclock.app.feature.womensarea.model.Onah
+import com.zmanimclock.app.feature.womensarea.model.VesetRecord
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaHistory
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
@@ -60,6 +65,20 @@ class WomensAreaViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LatestEntries())
 
+    /** The history screen: the kept cycles (newest first), what repeats in them, and each row's entry. */
+    val history: StateFlow<HistoryUi> = allEntries
+        .map { entries ->
+            val cycles = WomensAreaHistory.cycles(entries.vesetRecords(), entries.hefsekRecords())
+            val attached = cycles.mapNotNull { it.hefsek?.id }.toSet()
+            HistoryUi(
+                cycles = cycles,
+                patterns = WomensAreaHistory.patterns(cycles),
+                entriesById = entries.associateBy { it.id },
+                otherHefseks = entries.filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA && it.id !in attached },
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUi())
+
     /** The latest הפסק טהרה's date, for the tevila line of the card under the calendar. */
     val latestHefsek: StateFlow<LocalDate?> = latestEntries
         .map { it.hefsek?.date }
@@ -109,6 +128,7 @@ class WomensAreaViewModel @Inject constructor(
         dao.insert(
             WomensAreaEntryEntity(type = WomensAreaEntryType.PERIOD_START, epochDay = date.toEpochDay(), onah = onah)
         )
+        pruneToLastVesets()
     }
 
     /**
@@ -131,12 +151,27 @@ class WomensAreaViewModel @Inject constructor(
         val isVeset = entry.type == WomensAreaEntryType.PERIOD_START
         if (isVeset && onah == null) return@launch
         dao.update(entry.copy(epochDay = newDate.toEpochDay(), onah = if (isVeset) onah else null))
+        // A moved date can reorder the cycles, so the keep-last-6 rule runs again.
+        pruneToLastVesets()
         if (!isVeset) rescheduleLatest()
     }
 
     fun deleteEntry(entry: WomensAreaEntryEntity) = viewModelScope.launch {
         dao.delete(entry)
         if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) rescheduleLatest()
+    }
+
+    /**
+     * Keeps only the last WomensAreaHistory.KEEP vesets, and the hefseks of
+     * their cycles — a new veset beyond that replaces the oldest, as the
+     * owner asked. Re-queues reminders if a hefsek went with it.
+     */
+    private suspend fun pruneToLastVesets() {
+        val entries = dao.getAllEntries().first()
+        val ids = WomensAreaHistory.idsToPrune(entries.vesetRecords(), entries.hefsekRecords())
+        if (ids.isEmpty()) return
+        dao.deleteByIds(ids.toList())
+        rescheduleLatest()
     }
 
     // ------------------------------------------------------- reminders
@@ -161,6 +196,20 @@ class WomensAreaViewModel @Inject constructor(
         reminderScheduler.schedule(latest.id, latest.date, settings.state.first().reminders)
     }
 }
+
+data class HistoryUi(
+    val cycles: List<Cycle> = emptyList(),
+    val patterns: List<HistoryPattern> = emptyList(),
+    val entriesById: Map<Long, WomensAreaEntryEntity> = emptyMap(),
+    /** Hefseks not shown inside a cycle (e.g. before the first veset kept, or an earlier one in the same cycle). */
+    val otherHefseks: List<WomensAreaEntryEntity> = emptyList(),
+)
+
+private fun List<WomensAreaEntryEntity>.vesetRecords() =
+    filter { it.type == WomensAreaEntryType.PERIOD_START }.map { VesetRecord(it.id, it.date, it.onah) }
+
+private fun List<WomensAreaEntryEntity>.hefsekRecords() =
+    filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }.map { HefsekRecord(it.id, it.date) }
 
 private data class LatestEntries(
     val veset: WomensAreaEntryEntity? = null,

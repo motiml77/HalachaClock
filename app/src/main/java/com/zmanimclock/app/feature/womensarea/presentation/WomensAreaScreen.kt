@@ -154,7 +154,7 @@ fun WomensAreaScreen(
             WomensAreaRemindersCard(reminders = reminders, onChange = viewModel::setReminders)
             OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("  היסטוריית רשומות", style = MaterialTheme.typography.bodyMedium)
+                Text("  היסטוריה ודפוסים", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
