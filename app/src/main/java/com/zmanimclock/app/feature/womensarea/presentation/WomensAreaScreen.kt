@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,6 +55,7 @@ import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
+import com.zmanimclock.app.feature.womensarea.model.VesetRecord
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaHistory
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
@@ -165,10 +165,9 @@ fun WomensAreaScreen(
             date = date,
             today = today,
             entriesOnDay = entries.filter { it.epochDay == date.toEpochDay() },
-            previousVeset = entries
+            earlierVesets = entries
                 .filter { it.type == WomensAreaEntryType.PERIOD_START && it.epochDay < date.toEpochDay() }
-                .maxOfOrNull { it.epochDay }
-                ?.let(LocalDate::ofEpochDay),
+                .map { VesetRecord(it.id, LocalDate.ofEpochDay(it.epochDay), it.onah) },
             vesetOnOrBefore = entries.latestVesetOnOrBefore(date),
             savedReminders = reminders,
             onSaveVeset = { onah ->
@@ -191,7 +190,8 @@ fun WomensAreaScreen(
 /**
  * The way into the history — a card in the area's own style rather than a
  * plain button, with a live one-line summary (how many vesets, the latest
- * haflaga) and a badge when something repeats, so it is worth opening.
+ * haflaga). No pattern badge: what repeats is for her to look at inside the
+ * history, not something the main screen points out.
  */
 @Composable
 private fun HistoryEntryCard(history: HistoryUi, onClick: () -> Unit) {
@@ -229,20 +229,6 @@ private fun HistoryEntryCard(history: HistoryUi, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = OnWomensAreaLilacContainer.copy(alpha = 0.8f),
                 )
-                if (history.patterns.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(WomensAreaLilac)
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(Icons.Filled.Repeat, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                        Text("נמצא דפוס חוזר", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = OnWomensAreaLilacContainer)
         }

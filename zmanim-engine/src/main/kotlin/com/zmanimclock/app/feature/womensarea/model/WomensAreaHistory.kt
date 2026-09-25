@@ -28,7 +28,7 @@ data class Cycle(
 
 /**
  * Something the history shows that repeats — always among vesets of one
- * [onah]. Never a ruling: a thing to bring to a rabbi.
+ * [onah]. An observation only: the app gives it no status of any kind.
  */
 sealed class HistoryPattern {
     abstract val onah: Onah
@@ -53,7 +53,7 @@ object WomensAreaHistory {
     /** How many vesets are kept; a new one beyond this replaces the oldest. */
     const val KEEP = 6
 
-    /** Patterns are reported from this many repeats; 3 is when poskim speak of a וסת קבוע. */
+    /** Patterns are shown from this many repeats in a row. */
     const val MIN_REPEAT = 3
 
     /** The cycles, newest first. */
@@ -66,7 +66,9 @@ object WomensAreaHistory {
                 veset = veset,
                 haflagaInterval = WomensAreaCalculator.haflagaInterval(veset.date, previous),
                 hebrewDayOfMonth = JewishDate(veset.date.toGregorianCalendar()).jewishDayOfMonth,
-                prediction = WomensAreaCalculator.predict(veset.date, veset.onah, previous),
+                // What the calendar showed for this cycle: its own days, and
+                // those carried over from the vesets kept before it.
+                prediction = WomensAreaCalculator.predictWithHistory(veset.date, veset.onah, sorted.take(i)),
                 // The hefsek of this cycle: the latest one on or after this veset and before the next.
                 hefsek = hefseks
                     .filter { it.date >= veset.date && (next == null || it.date < next) }

@@ -17,8 +17,19 @@ enum class Onah { DAY, NIGHT }
 /** A night on which there is no tevila. */
 enum class TevilaBlock { YOM_KIPPUR, TISHA_BEAV }
 
-/** Which of the three separation days a marker represents. */
-enum class VesetKind { ONAH_BEINONIT, HAFLAGA, YOM_HACHODESH }
+/**
+ * Which separation day a marker represents: the three from the latest veset,
+ * and the two carried over from earlier ones that have not been uprooted.
+ */
+enum class VesetKind {
+    ONAH_BEINONIT,
+    HAFLAGA,
+    YOM_HACHODESH,
+    /** יום החודש of an EARLIER veset whose date is still ahead — not yet uprooted. */
+    YOM_HACHODESH_PREVIOUS,
+    /** An earlier, longer haflaga not yet uprooted, counted from the latest veset. */
+    HAFLAGA_NOT_UPROOTED,
+}
 
 /** One separation day: which kind, on which Hebrew day, in which onah, and its number in the count. */
 data class PrishaDay(
@@ -28,6 +39,10 @@ data class PrishaDay(
     val onah: Onah?,
     /** Its place in the count that starts at 1 on the veset day itself. */
     val dayNumber: Int,
+    /** For a carried-over day: the earlier veset it comes from (יום החודש) or where its haflaga began. */
+    val fromVeset: LocalDate? = null,
+    /** For [VesetKind.HAFLAGA_NOT_UPROOTED]: the haflaga's length. */
+    val interval: Int? = null,
 )
 
 /**
@@ -63,14 +78,18 @@ data class VesetPrediction(
     val yomHachodesh: LocalDate?,
     /** True when [yomHachodesh] is null because the next month has no ל׳. */
     val yomHachodeshMissing: Boolean,
+    /** Days carried over from earlier vesets, not yet uprooted (see WomensAreaCalculator.carriedOver). */
+    val carried: List<PrishaDay> = emptyList(),
 ) {
-    /** The separation days, in date order. */
+    /** The separation days, in date order — this veset's own, then any carried over. */
     val prishaDays: List<PrishaDay>
-        get() = listOfNotNull(
-            PrishaDay(VesetKind.ONAH_BEINONIT, onahBeinonit, onah, dayNumberOf(onahBeinonit)),
-            haflaga?.let { PrishaDay(VesetKind.HAFLAGA, it, onah, dayNumberOf(it)) },
-            yomHachodesh?.let { PrishaDay(VesetKind.YOM_HACHODESH, it, onah, dayNumberOf(it)) },
-        ).sortedWith(compareBy({ it.date }, { it.kind.ordinal }))
+        get() = (
+            listOfNotNull(
+                PrishaDay(VesetKind.ONAH_BEINONIT, onahBeinonit, onah, dayNumberOf(onahBeinonit)),
+                haflaga?.let { PrishaDay(VesetKind.HAFLAGA, it, onah, dayNumberOf(it)) },
+                yomHachodesh?.let { PrishaDay(VesetKind.YOM_HACHODESH, it, onah, dayNumberOf(it)) },
+            ) + carried
+            ).sortedWith(compareBy({ it.date }, { it.kind.ordinal }))
 
     /** How far the on-calendar count runs: at least to day 30, and on to the latest separation day. */
     val lastCountedDay: Int
@@ -147,6 +166,59 @@ object WomensAreaCalculator {
         val index = HebrewMonthSequence.indexOf(HebrewMonthRef(jd.jewishYear, jd.jewishMonth))
         if (index < 0 || index + 1 >= HebrewMonthSequence.size) return null
         return jd to HebrewMonthSequence.refAt(index + 1)
+    }
+
+    /**
+     * [predict], plus the days carried over from [earlier] vesets (any order,
+     * all before [start]) — the full picture the calendar shows.
+     */
+    fun predictWithHistory(start: LocalDate, onah: Onah?, earlier: List<VesetRecord>): VesetPrediction {
+        val before = earlier.filter { it.date < start }
+        return predict(start, onah, before.maxOfOrNull { it.date })
+            .copy(carried = carriedOver(start, onah, before))
+    }
+
+    /**
+     * The separation days that EARLIER vesets still impose after a new one on
+     * [start] — the ones not yet uprooted, because their day has not passed:
+     *
+     * יום החודש מראייה קודמת — any earlier veset's יום החודש that falls AFTER
+     * [start]. (One already passed without a sighting was uprooted; one the
+     * new veset fell on is that veset itself.) In the earlier veset's onah.
+     *
+     * הפלגה שלא נעקרה — an earlier haflaga LONGER than every haflaga after it:
+     * a longer haflaga uproots a shorter one, never the reverse, so a long one
+     * followed only by shorter ones was never tested and still counts, from
+     * [start]. Only when EVERY veset from the start of that haflaga up to and
+     * including [start] was in one onah — all ביום or all בלילה (the owner's
+     * rule); otherwise it is not carried at all.
+     */
+    fun carriedOver(start: LocalDate, onah: Onah?, earlier: List<VesetRecord>): List<PrishaDay> {
+        val before = earlier.filter { it.date < start }.sortedBy { it.date }
+        fun dayNumber(date: LocalDate) = (ChronoUnit.DAYS.between(start, date) + 1).toInt()
+        val out = mutableListOf<PrishaDay>()
+
+        before.forEach { e ->
+            val yom = yomHachodesh(e.date) ?: return@forEach
+            if (yom > start) out += PrishaDay(VesetKind.YOM_HACHODESH_PREVIOUS, yom, e.onah, dayNumber(yom), fromVeset = e.date)
+        }
+
+        if (onah != null && before.isNotEmpty()) {
+            val chain = before + VesetRecord(-1, start, onah)
+            // haflagot[i] runs from chain[i] to chain[i + 1]; the last is the current one.
+            val haflagot = (0 until chain.size - 1).map { haflagaInterval(chain[it + 1].date, chain[it].date)!! }
+            var longestSince = haflagot.last()
+            for (i in haflagot.size - 2 downTo 0) {
+                val h = haflagot[i]
+                val sameOnah = chain.subList(i, chain.size).all { it.onah == onah }
+                if (h > longestSince && sameOnah) {
+                    val date = start.plusDays((h - 1).toLong())
+                    out += PrishaDay(VesetKind.HAFLAGA_NOT_UPROOTED, date, onah, h, fromVeset = chain[i].date, interval = h)
+                }
+                longestSince = maxOf(longestSince, h)
+            }
+        }
+        return out
     }
 
     fun predict(start: LocalDate, onah: Onah?, previousStart: LocalDate?): VesetPrediction = VesetPrediction(

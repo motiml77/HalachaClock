@@ -82,7 +82,9 @@ import java.time.LocalDate
  *      days), its hefsek and tevila, and edit / delete.
  *
  * Newest first everywhere, so the three views read in the same order.
- * Nothing here decides a וסת קבוע; the screen says so.
+ * The screen only SHOWS what repeats. It never names, suggests or decides
+ * any status for it — drawing conclusions is hers, with her rabbi, not the
+ * app's (the owner's rule).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -245,7 +247,7 @@ private fun PatternsCard(patterns: List<HistoryPattern>, cycleCount: Int) {
             }
         }
         Text(
-            "זו התבוננות בלבד. קביעת וסת קבוע — בהתייעצות עם רב.",
+            "תצוגה בלבד, לעיון שלך. בכל שאלה — יש להתייעץ עם רב.",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

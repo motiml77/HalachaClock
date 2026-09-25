@@ -198,7 +198,14 @@ private fun WomensAreaDayCell(
             when {
                 isPrisha -> {
                     CellTitle(prishaName(prisha), WomensAreaPrishaRed, maxLines = if (cleanDayNumber != null) 1 else 2)
-                    OnahPill(prisha.first().onah, WomensAreaPrishaRed)
+                    // Days carried from an earlier veset keep ITS onah, so two
+                    // kinds on one cell can differ — then both are shown.
+                    val onot = prisha.map { it.onah }.distinct()
+                    if (onot.size == 1) {
+                        OnahPill(onot.single(), WomensAreaPrishaRed)
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { onot.forEach { OnahPill(it, WomensAreaPrishaRed) } }
+                    }
                 }
                 isVesetDay -> {
                     CellTitle("ראייה", cs.onSurface)
@@ -272,7 +279,11 @@ private fun CountChip(number: Int, color: Color, shape: Shape, size: Dp = 15.dp,
  * under the calendar spells every one out in full.
  */
 private fun prishaName(prisha: List<PrishaDay>): String =
-    if (prisha.size == 1) prisha.single().kind.hebrewName else prisha.joinToString(" + ") { it.kind.shortName }
+    if (prisha.size == 1) prisha.single().kind.cellName else prisha.joinToString(" + ") { it.kind.shortName }
+
+/** The full name, except where it would not fit two lines of a cell. */
+private val VesetKind.cellName: String
+    get() = if (this == VesetKind.YOM_HACHODESH_PREVIOUS) "יוה״ח מראייה קודמת" else hebrewName
 
 @Composable
 private fun CellTitle(text: String, color: Color, maxLines: Int = 1, bold: Boolean = true) {
@@ -327,4 +338,6 @@ private val VesetKind.shortName: String
         VesetKind.ONAH_BEINONIT -> "ע״ב"
         VesetKind.HAFLAGA -> "הפלגה"
         VesetKind.YOM_HACHODESH -> "יוה״ח"
+        VesetKind.YOM_HACHODESH_PREVIOUS -> "יוה״ח קודם"
+        VesetKind.HAFLAGA_NOT_UPROOTED -> "הפלגה ישנה"
     }

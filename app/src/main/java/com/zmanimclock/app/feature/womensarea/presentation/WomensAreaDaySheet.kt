@@ -50,6 +50,7 @@ import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.Onah
 import com.zmanimclock.app.feature.womensarea.model.TevilaBlock
+import com.zmanimclock.app.feature.womensarea.model.VesetRecord
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
@@ -88,8 +89,8 @@ fun WomensAreaDaySheet(
     date: LocalDate,
     today: LocalDate,
     entriesOnDay: List<WomensAreaEntryEntity>,
-    /** The latest veset before [date], for the haflaga in the preview. */
-    previousVeset: LocalDate?,
+    /** Every veset recorded before [date] — for the haflaga and the carried-over days in the preview. */
+    earlierVesets: List<VesetRecord>,
     /** The latest veset on or before [date], for the early-hefsek notice. */
     vesetOnOrBefore: LocalDate?,
     savedReminders: WomensAreaReminders,
@@ -138,7 +139,7 @@ fun WomensAreaDaySheet(
                 Step.VESET -> VesetStep(
                     date = date,
                     onah = onah,
-                    previousVeset = previousVeset,
+                    earlierVesets = earlierVesets,
                     onOnahChange = { onah = it },
                     onSave = { onah?.let(onSaveVeset) },
                 )
@@ -310,7 +311,7 @@ private fun RecordedRow(entry: WomensAreaEntryEntity, onDelete: () -> Unit) {
 private fun VesetStep(
     date: LocalDate,
     onah: Onah?,
-    previousVeset: LocalDate?,
+    earlierVesets: List<VesetRecord>,
     onOnahChange: (Onah) -> Unit,
     onSave: () -> Unit,
 ) {
@@ -329,7 +330,7 @@ private fun VesetStep(
         )
     }
     if (onah != Onah.NIGHT) HebrewDayInfoNote()
-    onah?.let { PrishaPreview(date, it, previousVeset) }
+    onah?.let { PrishaPreview(date, it, earlierVesets) }
     SaveButton(enabled = onah != null, label = if (onah == null) "יש לבחור ביום או בלילה" else "שמירה", onClick = onSave)
 }
 
@@ -364,8 +365,8 @@ private fun OnahTile(
 
 /** The separation days this veset will mark, before she saves it. */
 @Composable
-private fun PrishaPreview(date: LocalDate, onah: Onah, previousVeset: LocalDate?) {
-    val prediction = WomensAreaCalculator.predict(date, onah, previousVeset)
+private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<VesetRecord>) {
+    val prediction = WomensAreaCalculator.predictWithHistory(date, onah, earlierVesets)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("ימי הפרישה שיסומנו בלוח:", style = MaterialTheme.typography.labelLarge)
         prediction.prishaDays.forEach { day ->

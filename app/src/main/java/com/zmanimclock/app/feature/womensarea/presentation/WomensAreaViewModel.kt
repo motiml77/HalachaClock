@@ -59,6 +59,7 @@ class WomensAreaViewModel @Inject constructor(
             LatestEntries(
                 veset = vesets.getOrNull(0),
                 previousVeset = vesets.getOrNull(1),
+                earlierVesets = vesets.drop(1).map { VesetRecord(it.id, it.date, it.onah) },
                 hefsek = entries.filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
                     .maxByOrNull { it.epochDay },
             )
@@ -88,11 +89,7 @@ class WomensAreaViewModel @Inject constructor(
     val latestPrediction: StateFlow<VesetPrediction?> = latestEntries
         .map { latest ->
             latest.veset?.let { veset ->
-                WomensAreaCalculator.predict(
-                    start = veset.date,
-                    onah = veset.onah,
-                    previousStart = latest.previousVeset?.date,
-                )
+                WomensAreaCalculator.predictWithHistory(veset.date, veset.onah, latest.earlierVesets)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -105,6 +102,7 @@ class WomensAreaViewModel @Inject constructor(
                 latestVesetOnah = latest.veset?.onah,
                 previousVeset = latest.previousVeset?.date,
                 latestHefsek = latest.hefsek?.date,
+                earlierVesets = latest.earlierVesets,
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -214,6 +212,8 @@ private fun List<WomensAreaEntryEntity>.hefsekRecords() =
 private data class LatestEntries(
     val veset: WomensAreaEntryEntity? = null,
     val previousVeset: WomensAreaEntryEntity? = null,
+    /** Every veset before the latest — for the days carried over from them. */
+    val earlierVesets: List<VesetRecord> = emptyList(),
     val hefsek: WomensAreaEntryEntity? = null,
 )
 

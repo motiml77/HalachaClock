@@ -37,6 +37,12 @@ object WomensAreaMarkers {
         latestVesetOnah: Onah?,
         previousVeset: LocalDate?,
         latestHefsek: LocalDate?,
+        /**
+         * Every recorded veset before the latest, with its onah — for the days
+         * carried over from them (WomensAreaCalculator.carriedOver). Empty
+         * means only [previousVeset] is known, for the haflaga alone.
+         */
+        earlierVesets: List<VesetRecord> = emptyList(),
     ): Map<LocalDate, WomensAreaMarker> {
         val markers = mutableMapOf<LocalDate, WomensAreaMarker>()
         fun edit(date: LocalDate, change: (WomensAreaMarker) -> WomensAreaMarker) {
@@ -44,7 +50,11 @@ object WomensAreaMarkers {
         }
 
         latestVeset?.let { start ->
-            val prediction = WomensAreaCalculator.predict(start, latestVesetOnah, previousVeset)
+            val prediction = if (earlierVesets.isNotEmpty()) {
+                WomensAreaCalculator.predictWithHistory(start, latestVesetOnah, earlierVesets)
+            } else {
+                WomensAreaCalculator.predict(start, latestVesetOnah, previousVeset)
+            }
             for (n in 1..prediction.lastCountedDay) {
                 edit(start.plusDays((n - 1).toLong())) { it.copy(countDayNumber = n) }
             }

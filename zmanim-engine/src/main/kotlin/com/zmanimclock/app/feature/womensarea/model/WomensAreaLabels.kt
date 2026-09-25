@@ -15,6 +15,8 @@ object WomensAreaLabels {
             VesetKind.ONAH_BEINONIT -> "עונה בינונית"
             VesetKind.HAFLAGA -> "הפלגה"
             VesetKind.YOM_HACHODESH -> "יום החודש"
+            VesetKind.YOM_HACHODESH_PREVIOUS -> "יום החודש מראייה קודמת"
+            VesetKind.HAFLAGA_NOT_UPROOTED -> "הפלגה שלא נעקרה"
         }
 
     /** "ביום" / "בלילה". */
@@ -115,6 +117,9 @@ object WomensAreaLabels {
         VesetKind.ONAH_BEINONIT -> "${day.kind.hebrewName} · יום ${day.dayNumber}"
         VesetKind.HAFLAGA -> "${day.kind.hebrewName} (${day.dayNumber} יום)"
         VesetKind.YOM_HACHODESH -> "${day.kind.hebrewName} · ${hebrewDayAndMonth(day.date)}"
+        VesetKind.YOM_HACHODESH_PREVIOUS ->
+            "יום החודש מהראייה של ${day.fromVeset?.let(::hebrewDayAndMonth) ?: "ראייה קודמת"} · ${hebrewDayAndMonth(day.date)}"
+        VesetKind.HAFLAGA_NOT_UPROOTED -> "הפלגה שלא נעקרה (${day.interval} יום) · יום ${day.dayNumber}"
     }
 
     /**
@@ -143,8 +148,8 @@ object WomensAreaLabels {
         SHORT_FORMS.fold(name) { acc, (long, short) -> acc.replace(long, short) }
 
     /**
-     * One pattern the history found, in plain words — an observation, never
-     * "you have a וסת קבוע": that is for a rabbi.
+     * One pattern the history found, in plain words — what repeated, nothing
+     * more. It never names a status for it; conclusions are hers, not the app's.
      */
     fun patternText(pattern: HistoryPattern): String = when (pattern) {
         is HistoryPattern.SameHaflaga ->
