@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -114,6 +115,7 @@ fun WomensAreaScreen(
             .padding(PaddingValues(bottom = 24.dp)),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        KavuaNotice()
         MonthHeader(
             grid = viewModel.monthGrid(visibleMonthIndex),
             showTodayButton = visibleMonthIndex != HebrewMonthSequence.indexOf(today),
@@ -266,6 +268,31 @@ private fun LegendItem(label: String, swatch: @Composable () -> Unit) {
 }
 
 /** Shown until the first entry: what to do, in one sentence, with the area's own icon. */
+/**
+ * Always at the very top: the app counts separation days only, and never
+ * decides a וסת קבוע — that is for her rabbi, whatever the history shows.
+ */
+@Composable
+private fun KavuaNotice() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(WomensAreaLilacContainer)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.Info, contentDescription = null, tint = OnWomensAreaLilacContainer, modifier = Modifier.size(18.dp))
+        Text(
+            "האפליקציה אינה מחשבת \"וסת קבוע\". בכל שאלה בעניין זה — יש להתייעץ עם רב.",
+            style = MaterialTheme.typography.bodySmall,
+            color = OnWomensAreaLilacContainer,
+        )
+    }
+}
+
 @Composable
 private fun FirstTimeCard() {
     Row(
