@@ -186,9 +186,12 @@ object WomensAreaLabels {
         )
     }
 
-    /** "לפי וסת חצי קבוע (לא לפני יום 26) אינם מוצגים: הפלגה (24 יום) · יום החודש · ט״ו אייר". */
+    /**
+     * "לפי וסת חצי קבוע (לא לפני יום 26) אינם מוצגים: הפלגה (24 יום); יום החודש · ט״ו אייר".
+     * Joined with "; " — the titles themselves already use " · ".
+     */
     fun semiFixedHiddenLine(minDay: Int, hidden: List<PrishaDay>): String =
-        "לפי וסת חצי קבוע (לא לפני יום $minDay) אינם מוצגים: " + hidden.joinToString(" · ") { prishaTitle(it) }
+        "לפי וסת חצי קבוע (לא לפני יום $minDay) אינם מוצגים: " + hidden.joinToString("; ") { prishaTitle(it) }
 
     /** The warning on a cycle whose veset came before day [minDay], while it still stands. */
     fun semiFixedContradiction(interval: Int?, minDay: Int, consecutive: Int): String =
