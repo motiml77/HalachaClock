@@ -116,10 +116,23 @@ object WomensAreaLabels {
     fun prishaTitle(day: PrishaDay): String = when (day.kind) {
         VesetKind.ONAH_BEINONIT -> "${day.kind.hebrewName} · יום ${day.dayNumber}"
         VesetKind.HAFLAGA -> "${day.kind.hebrewName} (${day.dayNumber} יום)"
-        VesetKind.YOM_HACHODESH -> "${day.kind.hebrewName} · ${hebrewDayAndMonth(day.date)}"
+        VesetKind.YOM_HACHODESH -> "${day.kind.hebrewName} · ${hebrewDayAndMonth(day.date)}" + on29Suffix(day)
         VesetKind.YOM_HACHODESH_PREVIOUS ->
-            "יום החודש מהראייה של ${day.fromVeset?.let(::hebrewDayAndMonth) ?: "ראייה קודמת"} · ${hebrewDayAndMonth(day.date)}"
+            "יום החודש מהראייה של ${day.fromVeset?.let(::hebrewDayAndMonth) ?: "ראייה קודמת"} · ${hebrewDayAndMonth(day.date)}" +
+                on29Suffix(day)
         VesetKind.HAFLAGA_NOT_UPROOTED -> "הפלגה שלא נעקרה (${day.interval} יום) · יום ${day.dayNumber}"
+    }
+
+    private fun on29Suffix(day: PrishaDay) = if (day.onLastDayInsteadOf30) " (אין ל׳ בחודש)" else ""
+
+    /**
+     * Why יום החודש is on כ״ט — said wherever the separation days are listed:
+     * "הראייה הייתה בל׳ ניסן, ובחודש אייר אין ל׳ — לכן יום החודש בכ״ט אייר, היום האחרון בחודש."
+     */
+    fun yomHachodeshOn29Note(veset: LocalDate, yomHachodesh: LocalDate): String {
+        val fmt = formatter()
+        val month = fmt.formatMonth(jewishDateOf(veset)); val next = fmt.formatMonth(jewishDateOf(yomHachodesh))
+        return "הראייה הייתה בל׳ $month, ובחודש $next אין ל׳ — לכן יום החודש בכ״ט $next, היום האחרון בחודש."
     }
 
     /**

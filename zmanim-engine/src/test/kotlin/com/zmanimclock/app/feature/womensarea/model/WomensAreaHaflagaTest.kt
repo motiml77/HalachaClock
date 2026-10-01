@@ -211,11 +211,14 @@ class WomensAreaHaflagaTest {
     }
 
     @Test
-    fun `a veset on the 30th has a yom hachodesh only when the next month has a 30th`() {
-        assertTrue(WomensAreaCalculator.isYomHachodeshMissing(h(5787, 12, 30))) // Adar I 30 → Adar II has 29
-        assertTrue(WomensAreaCalculator.isYomHachodeshMissing(h(5786, 11, 30))) // Shevat 30 → Adar has 29
+    fun `a veset on the 30th - the 30th next month, or its 29th when it has none`() {
+        assertEquals(h(5787, 13, 29), WomensAreaCalculator.yomHachodesh(h(5787, 12, 30))) // Adar I 30 → Adar II has 29
+        assertTrue(WomensAreaCalculator.isYomHachodeshOn29(h(5787, 12, 30)))
+        assertEquals(h(5786, 12, 29), WomensAreaCalculator.yomHachodesh(h(5786, 11, 30))) // Shevat 30 → Adar has 29
+        assertEquals(h(5786, 2, 29), WomensAreaCalculator.yomHachodesh(h(5786, 1, 30))) // ל׳ ניסן → כ״ט אייר
         assertEquals(h(5785, 9, 30), WomensAreaCalculator.yomHachodesh(h(5785, 8, 30))) // Cheshvan 30 → Kislev 30 (5785)
-        assertTrue(WomensAreaCalculator.isYomHachodeshMissing(h(5786, 7, 30))) // Tishrei 30 → Cheshvan 5786 has 29
+        assertFalse(WomensAreaCalculator.isYomHachodeshOn29(h(5785, 8, 30)))
+        assertEquals(h(5786, 8, 29), WomensAreaCalculator.yomHachodesh(h(5786, 7, 30))) // Tishrei 30 → Cheshvan 5786 has 29
         assertEquals(h(5787, 8, 30), WomensAreaCalculator.yomHachodesh(h(5787, 7, 30))) // … but Cheshvan 5787 has 30
         assertEquals(h(5786, 6, 30 - 1), WomensAreaCalculator.yomHachodesh(h(5786, 5, 29))) // 29 Av → 29 Elul (Elul never has a 30th)
     }

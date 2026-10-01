@@ -54,16 +54,36 @@ class WomensAreaCalculatorTest {
     }
 
     @Test
-    fun `a veset on the 30th has no yomHachodesh when the next month has only 29 days`() {
-        // 30 Nissan 5786 = 2026-04-17; Iyar has no 30th. Not moved to 29 Iyar.
+    fun `a veset on the 30th, next month of 29 days - yom hachodesh is its 29th, and says why`() {
+        // 30 Nissan 5786 = 2026-04-17; Iyar has no 30th → 29 Iyar 5786 = 2026-05-16 (the ruling).
         val thirtyNissan = LocalDate.of(2026, 4, 17)
-        assertNull(WomensAreaCalculator.yomHachodesh(thirtyNissan))
-        assertTrue(WomensAreaCalculator.isYomHachodeshMissing(thirtyNissan))
+        val twentyNineIyar = LocalDate.of(2026, 5, 16)
+        assertEquals(twentyNineIyar, WomensAreaCalculator.yomHachodesh(thirtyNissan))
+        assertTrue(WomensAreaCalculator.isYomHachodeshOn29(thirtyNissan))
         val prediction = WomensAreaCalculator.predict(thirtyNissan, Onah.DAY, null)
-        assertTrue(prediction.yomHachodeshMissing)
-        assertEquals(listOf(VesetKind.ONAH_BEINONIT), prediction.prishaDays.map { it.kind })
+        assertTrue(prediction.yomHachodeshOn29)
+        // Day 30 of the count is that same 29 Iyar: both kinds on one day.
+        assertEquals(twentyNineIyar, prediction.onahBeinonit)
+        val yom = prediction.prishaDays.single { it.kind == VesetKind.YOM_HACHODESH }
+        assertTrue(yom.onLastDayInsteadOf30)
+        assertEquals("יום החודש · כ״ט אייר (אין ל׳ בחודש)", WomensAreaLabels.prishaTitle(yom))
+        assertEquals(
+            "הראייה הייתה בל׳ ניסן, ובחודש אייר אין ל׳ — לכן יום החודש בכ״ט אייר, היום האחרון בחודש.",
+            WomensAreaLabels.yomHachodeshOn29Note(thirtyNissan, twentyNineIyar),
+        )
 
-        assertFalse(WomensAreaCalculator.isYomHachodeshMissing(fifteenNissan))
+        assertFalse(WomensAreaCalculator.isYomHachodeshOn29(fifteenNissan))
+        assertFalse(WomensAreaCalculator.predict(fifteenNissan, Onah.DAY, null).prishaDays.any { it.onLastDayInsteadOf30 })
+    }
+
+    @Test
+    fun `an earlier veset on the 30th carries its 29th too, flagged`() {
+        // 30 Nissan 5786 → 29 Iyar; a new veset on 20 Iyar leaves it ahead.
+        val thirtyNissan = LocalDate.of(2026, 4, 17)
+        val carried = WomensAreaCalculator.carriedOver(LocalDate.of(2026, 5, 7), Onah.DAY, listOf(VesetRecord(1, thirtyNissan, Onah.DAY)))
+        val day = carried.single { it.kind == VesetKind.YOM_HACHODESH_PREVIOUS }
+        assertEquals(LocalDate.of(2026, 5, 16), day.date)
+        assertTrue(day.onLastDayInsteadOf30)
     }
 
     @Test
@@ -73,10 +93,10 @@ class WomensAreaCalculatorTest {
     }
 
     @Test
-    fun `yomHachodesh returns null past HebrewMonthSequence's own supported range, without calling it missing`() {
+    fun `yomHachodesh returns null past HebrewMonthSequence's own supported range`() {
         val lastMonth = HebrewMonthSequence.refAt(HebrewMonthSequence.size - 1)
         assertNull(WomensAreaCalculator.yomHachodesh(lastMonth.lastDay))
-        assertFalse(WomensAreaCalculator.isYomHachodeshMissing(lastMonth.lastDay))
+        assertFalse(WomensAreaCalculator.isYomHachodeshOn29(lastMonth.lastDay))
     }
 
     @Test

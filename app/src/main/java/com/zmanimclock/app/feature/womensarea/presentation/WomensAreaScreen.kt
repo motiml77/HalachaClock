@@ -420,8 +420,15 @@ private fun PrishaSummaryCard(prediction: VesetPrediction) {
             if (prediction.haflaga == null) {
                 MissingRow("הפלגה", "אין ראייה קודמת רשומה לחשב ממנה הפלגה")
             }
-            if (prediction.yomHachodeshMissing) {
-                MissingRow("יום החודש", "הראייה הייתה בל׳, ולחודש הבא אין ל׳ — יש לברר עם רב")
+            prediction.yomHachodesh?.takeIf { prediction.yomHachodeshOn29 }?.let { yom ->
+                // ל׳ followed by a 29-day month: the day is כ״ט — say why, in the area's lilac.
+                Text(
+                    WomensAreaLabels.yomHachodeshOn29Note(prediction.sourceStart, yom),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OnWomensAreaLilacContainer,
+                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(WomensAreaLilacContainer).padding(8.dp),
+                )
             }
             prediction.semiFixedMinDay?.let { n ->
                 if (prediction.hiddenDays.isNotEmpty()) SemiFixedHiddenNote(n, prediction.hiddenDays)

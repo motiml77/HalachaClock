@@ -43,6 +43,11 @@ data class PrishaDay(
     val fromVeset: LocalDate? = null,
     /** For [VesetKind.HAFLAGA_NOT_UPROOTED]: the haflaga's length. */
     val interval: Int? = null,
+    /**
+     * For יום החודש: the veset was on ל׳ and the next month has only 29
+     * days, so this is כ״ט of that month (see WomensAreaCalculator.yomHachodesh).
+     */
+    val onLastDayInsteadOf30: Boolean = false,
 )
 
 /**
@@ -71,13 +76,13 @@ data class VesetPrediction(
      */
     val haflagaInterval: Int?,
     /**
-     * The same Hebrew day-of-month in the next Hebrew month. Null when that
-     * month has no such day (a veset on ל׳ followed by a 29-day month) —
-     * see [yomHachodeshMissing] — or past HebrewMonthSequence's range.
+     * The same Hebrew day-of-month in the next Hebrew month — כ״ט when the
+     * veset was on ל׳ and that month has only 29 days (see
+     * [yomHachodeshOn29]). Null only past HebrewMonthSequence's range.
      */
     val yomHachodesh: LocalDate?,
-    /** True when [yomHachodesh] is null because the next month has no ל׳. */
-    val yomHachodeshMissing: Boolean,
+    /** True when [yomHachodesh] is כ״ט because the veset was on ל׳ and the next month has no ל׳. */
+    val yomHachodeshOn29: Boolean,
     /** Days carried over from earlier vesets, not yet uprooted (see WomensAreaCalculator.carriedOver). */
     val carried: List<PrishaDay> = emptyList(),
     /**
@@ -92,7 +97,9 @@ data class VesetPrediction(
             listOfNotNull(
                 PrishaDay(VesetKind.ONAH_BEINONIT, onahBeinonit, onah, dayNumberOf(onahBeinonit)),
                 haflaga?.let { PrishaDay(VesetKind.HAFLAGA, it, onah, dayNumberOf(it)) },
-                yomHachodesh?.let { PrishaDay(VesetKind.YOM_HACHODESH, it, onah, dayNumberOf(it)) },
+                yomHachodesh?.let {
+                    PrishaDay(VesetKind.YOM_HACHODESH, it, onah, dayNumberOf(it), onLastDayInsteadOf30 = yomHachodeshOn29)
+                },
             ) + carried
             ).sortedWith(compareBy({ it.date }, { it.kind.ordinal }))
 
@@ -160,20 +167,19 @@ object WomensAreaCalculator {
      * Adar I/II and the Elul→Tishrei year rollover step exactly as the
      * Calendar tab steps them.
      *
-     * A veset on ל׳ followed by a 29-day month has no such day, and this
-     * returns null rather than moving it to כ״ט or to the next ראש חודש:
-     * which day (if any) applies then is a question for a rabbi, not a
-     * default for arithmetic to pick. [isYomHachodeshMissing] tells that case
-     * apart from the out-of-range one.
+     * A veset on ל׳ followed by a 29-day month (ל׳ ניסן → אייר): the month
+     * has no ל׳, and by the halachic ruling the owner gave, the separation is
+     * on its LAST day, כ״ט. [isYomHachodeshOn29] tells that case apart, so
+     * every screen can say why the day is כ״ט.
      */
     fun yomHachodesh(start: LocalDate): LocalDate? {
         val (jd, next) = nextMonthOf(start) ?: return null
-        if (jd.jewishDayOfMonth > next.daysInMonth) return null
-        return JewishDate(next.year, next.month, jd.jewishDayOfMonth).toLocalDate()
+        val day = minOf(jd.jewishDayOfMonth, next.daysInMonth)
+        return JewishDate(next.year, next.month, day).toLocalDate()
     }
 
-    /** True when [start] is a ל׳ and the next Hebrew month has only 29 days. */
-    fun isYomHachodeshMissing(start: LocalDate): Boolean {
+    /** True when [start] is a ל׳ and the next Hebrew month has only 29 days — יום החודש is then its כ״ט. */
+    fun isYomHachodeshOn29(start: LocalDate): Boolean {
         val (jd, next) = nextMonthOf(start) ?: return false
         return jd.jewishDayOfMonth > next.daysInMonth
     }
@@ -217,7 +223,12 @@ object WomensAreaCalculator {
 
         before.forEach { e ->
             val yom = yomHachodesh(e.date) ?: return@forEach
-            if (yom > start) out += PrishaDay(VesetKind.YOM_HACHODESH_PREVIOUS, yom, e.onah, dayNumber(yom), fromVeset = e.date)
+            if (yom > start) {
+                out += PrishaDay(
+                    VesetKind.YOM_HACHODESH_PREVIOUS, yom, e.onah, dayNumber(yom), fromVeset = e.date,
+                    onLastDayInsteadOf30 = isYomHachodeshOn29(e.date),
+                )
+            }
         }
 
         if (onah != null && before.isNotEmpty()) {
@@ -245,7 +256,7 @@ object WomensAreaCalculator {
         haflaga = haflaga(start, previousStart),
         haflagaInterval = haflagaInterval(start, previousStart),
         yomHachodesh = yomHachodesh(start),
-        yomHachodeshMissing = isYomHachodeshMissing(start),
+        yomHachodeshOn29 = isYomHachodeshOn29(start),
     )
 
     /**

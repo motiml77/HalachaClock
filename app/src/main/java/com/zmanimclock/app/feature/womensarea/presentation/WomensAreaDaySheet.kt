@@ -458,11 +458,14 @@ private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<Veset
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (prediction.yomHachodeshMissing) {
+        prediction.yomHachodesh?.takeIf { prediction.yomHachodeshOn29 }?.let { yom ->
+            // ל׳ followed by a 29-day month: the day is כ״ט — say why, in the area's lilac.
             Text(
-                "יום החודש: הראייה בל׳, ולחודש הבא אין ל׳ — יש לברר עם רב.",
+                WomensAreaLabels.yomHachodeshOn29Note(prediction.sourceStart, yom),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                color = OnWomensAreaLilacContainer,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(WomensAreaLilacContainer).padding(8.dp),
             )
         }
         prediction.semiFixedMinDay?.let { n ->

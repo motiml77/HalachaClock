@@ -441,8 +441,15 @@ private fun CycleCard(
                 if (cycle.prediction.haflaga == null) {
                     Text("הפלגה: אין ראייה קודמת בהיסטוריה.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
                 }
-                if (cycle.prediction.yomHachodeshMissing) {
-                    Text("יום החודש: הראייה בל׳, ולחודש הבא אין ל׳.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                cycle.prediction.yomHachodesh?.takeIf { cycle.prediction.yomHachodeshOn29 }?.let { yom ->
+                    // ל׳ followed by a 29-day month: the day is כ״ט — say why, in the area's lilac.
+                    Text(
+                        WomensAreaLabels.yomHachodeshOn29Note(cycle.prediction.sourceStart, yom),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = OnWomensAreaLilacContainer,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(WomensAreaLilacContainer).padding(8.dp),
+                    )
                 }
                 cycle.hefsek?.let { hefsek ->
                     FramedBlock(WomensAreaCleanGreen) {
