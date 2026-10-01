@@ -24,6 +24,8 @@ data class Cycle(
     val hebrewDayOfMonth: Int,
     val prediction: VesetPrediction,
     val hefsek: HefsekRecord?,
+    /** Days of סתירת נקיים recorded in this cycle (before the next veset). */
+    val cleanInterruptions: List<LocalDate> = emptyList(),
 )
 
 /**
@@ -69,7 +71,11 @@ object WomensAreaHistory {
      * given, so the extra one stored behind them still gives the oldest shown
      * its haflaga and its carried-over days.
      */
-    fun cycles(vesets: List<VesetRecord>, hefseks: List<HefsekRecord>): List<Cycle> {
+    fun cycles(
+        vesets: List<VesetRecord>,
+        hefseks: List<HefsekRecord>,
+        cleanInterruptions: List<LocalDate> = emptyList(),
+    ): List<Cycle> {
         val sorted = vesets.sortedBy { it.date }
         return sorted.mapIndexed { i, veset ->
             val previous = sorted.getOrNull(i - 1)?.date
@@ -85,6 +91,9 @@ object WomensAreaHistory {
                 hefsek = hefseks
                     .filter { it.date >= veset.date && (next == null || it.date < next) }
                     .maxByOrNull { it.date },
+                cleanInterruptions = cleanInterruptions
+                    .filter { it >= veset.date && (next == null || it < next) }
+                    .sorted(),
             )
         }.reversed().take(KEEP)
     }

@@ -64,6 +64,7 @@ import com.zmanimclock.app.feature.womensarea.model.clashesWithTevila
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
 import com.zmanimclock.app.ui.WomensAreaCountBlue
+import com.zmanimclock.app.ui.WomensAreaInterruptOrange
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
@@ -107,6 +108,7 @@ fun WomensAreaScreen(
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val semiFixed by viewModel.semiFixed.collectAsStateWithLifecycle()
+    val cleanInterruptedOn by viewModel.cleanInterruptedOn.collectAsStateWithLifecycle()
     // The day whose sheet is open, if any.
     var tapped by remember { mutableStateOf<LocalDate?>(null) }
 
@@ -170,7 +172,9 @@ fun WomensAreaScreen(
             if (contradicted) semiFixedCard()
             prediction?.let { PrishaSummaryCard(it) }
             if (!contradicted) semiFixedCard()
-            hefsek?.let { TaharaSummaryCard(it, prediction) }
+            val interrupted = cleanInterruptedOn
+            if (interrupted != null) CleanInterruptedCard(interrupted)
+            else hefsek?.let { TaharaSummaryCard(it, prediction) }
             WomensAreaRemindersCard(reminders = reminders, onChange = viewModel::setReminders)
             HistoryEntryCard(history, onClick = onOpenHistory)
         }
@@ -194,6 +198,12 @@ fun WomensAreaScreen(
             vesetOnOrBefore = entries.latestVesetOnOrBefore(date),
             savedReminders = reminders,
             semiFixed = semiFixed.semiFixed,
+            latestHefsek = hefsek,
+            cleanInterruptedOn = cleanInterruptedOn,
+            onSaveInterruption = {
+                viewModel.addCleanInterruption(date)
+                tapped = null
+            },
             onSaveVeset = { onah ->
                 viewModel.addPeriodStart(date, onah)
                 tapped = null
@@ -332,6 +342,27 @@ private fun FirstTimeCard() {
             style = MaterialTheme.typography.bodyMedium,
             color = OnWomensAreaLilacContainer,
         )
+    }
+}
+
+/** After סתירת נקיים: what happened, and that a new hefsek is needed. */
+@Composable
+private fun CleanInterruptedCard(date: LocalDate) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.5.dp, WomensAreaInterruptOrange.copy(alpha = 0.6f)),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("שבעה נקיים וטבילה", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                WomensAreaLabels.cleanInterruptedText(date),
+                style = MaterialTheme.typography.bodyMedium,
+                color = WomensAreaInterruptOrange,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 

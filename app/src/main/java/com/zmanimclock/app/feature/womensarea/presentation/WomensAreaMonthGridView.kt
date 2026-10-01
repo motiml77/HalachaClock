@@ -48,6 +48,7 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
+import com.zmanimclock.app.ui.WomensAreaInterruptOrange
 import com.zmanimclock.app.ui.WomensAreaCountBlue
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
 import com.zmanimclock.app.ui.WomensAreaTevilaBlue
@@ -224,6 +225,10 @@ private fun WomensAreaDayCell(
                     CellTitle("אחר צאה״כ", WomensAreaTevilaBlue, bold = false)
                 }
                 isHefsek -> CellTitle("הפסק טהרה", WomensAreaCleanGreen, maxLines = 2)
+            }
+            if (marker?.cleanInterrupted == true) {
+                CellTitle("סתירת", WomensAreaInterruptOrange)
+                CellTitle("נקיים", WomensAreaInterruptOrange)
             }
             cleanDayNumber?.let {
                 Spacer(Modifier.height(2.dp))

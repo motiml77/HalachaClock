@@ -23,6 +23,8 @@ data class WomensAreaMarker(
     val isTevilaDay: Boolean = false,
     /** On the tevila day: set when its night is one with no tevila (Yom Kippur / Tisha B'Av). */
     val tevilaBlock: TevilaBlock? = null,
+    /** סתירת נקיים: blood was found on this day, so the latest hefsek's clean days no longer count. */
+    val cleanInterrupted: Boolean = false,
 )
 
 /**
@@ -45,6 +47,12 @@ object WomensAreaMarkers {
         earlierVesets: List<VesetRecord> = emptyList(),
         /** A וסת חצי קבוע in force for this cycle: no separation day before this day of the count. */
         semiFixedMinDay: Int? = null,
+        /**
+         * סתירת נקיים after [latestHefsek] (see WomensAreaCalculator.cleanInterruptionOf):
+         * that hefsek, its clean days and its tevila are no longer drawn — only
+         * this day, until a new hefsek is recorded.
+         */
+        cleanInterruptedOn: LocalDate? = null,
     ): Map<LocalDate, WomensAreaMarker> {
         val markers = mutableMapOf<LocalDate, WomensAreaMarker>()
         fun edit(date: LocalDate, change: (WomensAreaMarker) -> WomensAreaMarker) {
@@ -63,7 +71,8 @@ object WomensAreaMarkers {
             edit(start) { it.copy(isVesetDay = true, vesetOnah = latestVesetOnah) }
             prediction.prishaDays.forEach { day -> edit(day.date) { it.copy(prisha = it.prisha + day) } }
         }
-        latestHefsek?.let { hefsek ->
+        cleanInterruptedOn?.let { day -> edit(day) { it.copy(cleanInterrupted = true) } }
+        latestHefsek?.takeIf { cleanInterruptedOn == null }?.let { hefsek ->
             edit(hefsek) { it.copy(isHefsekDay = true) }
             WomensAreaCalculator.cleanDayDates(hefsek).forEachIndexed { i, date ->
                 edit(date) { it.copy(cleanDayNumber = i + 1) }

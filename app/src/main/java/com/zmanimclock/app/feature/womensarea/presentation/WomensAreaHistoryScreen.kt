@@ -63,6 +63,7 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaHistory
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
+import com.zmanimclock.app.ui.WomensAreaInterruptOrange
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
@@ -142,6 +143,9 @@ fun WomensAreaHistoryScreen(
                         cycle = cycle,
                         entryOf = { id -> history.entriesById[id] },
                         latestEntryId = latestEntryId,
+                        interruptionOn = { day ->
+                            entries.firstOrNull { it.type == WomensAreaEntryType.CLEAN_INTERRUPTED && it.epochDay == day.toEpochDay() }
+                        },
                         onEdit = { editing = it },
                         onDelete = { deleting = it },
                     )
@@ -378,6 +382,8 @@ private fun CycleCard(
     entryOf: (Long) -> WomensAreaEntryEntity?,
     /** Only the last entry on the calendar can be corrected or deleted — older ones were already counted from. */
     latestEntryId: Long?,
+    /** The סתירת נקיים entry on a day, for its actions. */
+    interruptionOn: (LocalDate) -> WomensAreaEntryEntity?,
     onEdit: (WomensAreaEntryEntity) -> Unit,
     onDelete: (WomensAreaEntryEntity) -> Unit,
 ) {
@@ -456,6 +462,19 @@ private fun CycleCard(
                 cycle.hefsek?.let { entryOf(it.id) }?.let { entry ->
                     EntryActionsRow("ההפסק", entry.id == latestEntryId, onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })
                 }
+                // סתירת נקיים in this cycle — the clean days were counted again after it.
+                cycle.cleanInterruptions.forEach { day ->
+                    FramedBlock(WomensAreaInterruptOrange) {
+                        Text("סתירת נקיים", fontWeight = FontWeight.Bold, color = WomensAreaInterruptOrange)
+                        Text(
+                            "יום ${WomensAreaLabels.weekdayName(day)} ${WomensAreaLabels.hebrewDayAndMonth(day)} (${WomensAreaLabels.gregorianShort(day)})",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    interruptionOn(day)?.let { entry ->
+                        EntryActionsRow("הסתירה", entry.id == latestEntryId, onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })
+                    }
+                }
             }
         }
     }
@@ -513,6 +532,7 @@ private val WomensAreaEntryType.label: String
     get() = when (this) {
         WomensAreaEntryType.PERIOD_START -> "התחלת ווסת"
         WomensAreaEntryType.HEFSEK_TAHARA -> "הפסק טהרה"
+        WomensAreaEntryType.CLEAN_INTERRUPTED -> "סתירת נקיים"
     }
 
 /** "ליל חמישי ט״ו ניסן — הערב של …" for a veset with its onah; "יום … לפני השקיעה" for a hefsek. */
@@ -522,6 +542,8 @@ private val WomensAreaEntryEntity.dateLabel: String
         return when {
             type == WomensAreaEntryType.PERIOD_START && onah != null -> WomensAreaLabels.onahTiming(date, onah)
             type == WomensAreaEntryType.PERIOD_START -> "${WomensAreaLabels.hebrewDate(date)} — לא צוין ביום או בלילה"
+            type == WomensAreaEntryType.CLEAN_INTERRUPTED ->
+                "יום ${WomensAreaLabels.weekdayName(date)} ${WomensAreaLabels.hebrewDayAndMonth(date)} (${WomensAreaLabels.gregorianShort(date)})"
             else -> WomensAreaLabels.hefsekTiming(date)
         }
     }

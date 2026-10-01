@@ -38,3 +38,6 @@ val WomensAreaTevilaBlue = Color(0xFF0277BD)
 
 /** יום נוכחי — a thick yellow frame, on the calendar, in the legend and in the date picker. */
 val WomensAreaTodayYellow = Color(0xFFF9B800)
+
+/** סתירת נקיים on the calendar and the main screen — set apart from the red of separation days. */
+val WomensAreaInterruptOrange = Color(0xFFE65100)

@@ -292,6 +292,19 @@ object WomensAreaCalculator {
      */
     fun tevilaDay(hefsek: LocalDate): LocalDate = hefsek.plusDays(CLEAN_DAYS_COUNT.toLong())
 
+    /**
+     * סתירת נקיים: blood found on [date], during the clean days after a hefsek
+     * on [hefsek] (or on the 7th day itself, before the tevila). The count is
+     * void — a new hefsek is needed and the clean days start again from it.
+     * Nothing about the vesets changes: this is not a new veset.
+     */
+    fun interruptsCleanDays(hefsek: LocalDate, date: LocalDate): Boolean =
+        date > hefsek && date <= tevilaDay(hefsek)
+
+    /** The first of [interruptions] that voids the clean days after [hefsek], if any. */
+    fun cleanInterruptionOf(hefsek: LocalDate, interruptions: List<LocalDate>): LocalDate? =
+        interruptions.filter { interruptsCleanDays(hefsek, it) }.minOrNull()
+
     /** The Hebrew day whose NIGHT is ליל הטבילה — the day after [tevilaDay]. */
     fun tevilaNight(hefsek: LocalDate): LocalDate = tevilaDay(hefsek).plusDays(1)
 

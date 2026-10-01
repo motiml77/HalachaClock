@@ -15,6 +15,12 @@ enum class WomensAreaEntryType {
     PERIOD_START,
     /** הפסק טהרה, made before shkia; שבעה נקיים start on the next Hebrew day. */
     HEFSEK_TAHARA,
+    /**
+     * סתירת נקיים — blood found during the clean days: the latest hefsek's
+     * count is void until a new hefsek. Not a veset; changes nothing about
+     * the separation days. Same TEXT column, so no migration.
+     */
+    CLEAN_INTERRUPTED,
 }
 
 /**

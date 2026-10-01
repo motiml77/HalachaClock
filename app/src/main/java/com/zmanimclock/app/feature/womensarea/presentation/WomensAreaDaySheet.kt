@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Delete
@@ -60,13 +61,14 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels.hebrewName
 import com.zmanimclock.app.feature.womensarea.security.WomensAreaReminders
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaCleanGreen
+import com.zmanimclock.app.ui.WomensAreaInterruptOrange
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
 import com.zmanimclock.app.ui.WomensAreaTevilaBlue
 import java.time.LocalDate
 
-private enum class Step { CHOOSE, VESET, HEFSEK }
+private enum class Step { CHOOSE, VESET, HEFSEK, INTERRUPT }
 
 /**
  * What opens when a day on the calendar is tapped (or "רישום להיום"): a
@@ -101,11 +103,19 @@ fun WomensAreaDaySheet(
     savedReminders: WomensAreaReminders,
     /** The וסת חצי קבוע she set, if any — the preview leaves out what it hides, or warns. */
     semiFixed: SemiFixedVeset?,
+    /** The latest hefsek, and whether its clean days were already interrupted — for סתירת נקיים. */
+    latestHefsek: LocalDate?,
+    cleanInterruptedOn: LocalDate?,
     onSaveVeset: (Onah) -> Unit,
     onSaveHefsek: (WomensAreaReminders) -> Unit,
+    onSaveInterruption: () -> Unit,
     onDelete: (WomensAreaEntryEntity) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // סתירת נקיים is offered on a clean day (or the 7th, before the tevila)
+    // of the latest hefsek, up to today, while that count still stands.
+    val canInterrupt = latestHefsek != null && cleanInterruptedOn == null && date <= today &&
+        WomensAreaCalculator.interruptsCleanDays(latestHefsek, date)
     var step by remember { mutableStateOf(Step.CHOOSE) }
     var onah by remember { mutableStateOf<Onah?>(null) }
     var reminders by remember { mutableStateOf(savedReminders) }
@@ -133,6 +143,8 @@ fun WomensAreaDaySheet(
                     today = today,
                     entriesOnDay = entriesOnDay,
                     latestEntryId = latestEntryId,
+                    canInterrupt = canInterrupt,
+                    onInterrupt = { step = Step.INTERRUPT },
                     onVeset = { step = Step.VESET },
                     onHefsek = {
                         // Before the 5th day: say so once, then carry on as usual.
@@ -152,6 +164,7 @@ fun WomensAreaDaySheet(
                     onOnahChange = { onah = it },
                     onSave = { onah?.let(onSaveVeset) },
                 )
+                Step.INTERRUPT -> InterruptStep(date = date, onSave = onSaveInterruption)
                 Step.HEFSEK -> HefsekStep(
                     date = date,
                     reminders = reminders,
@@ -203,6 +216,8 @@ private fun ChooseStep(
     today: LocalDate,
     entriesOnDay: List<WomensAreaEntryEntity>,
     latestEntryId: Long?,
+    canInterrupt: Boolean,
+    onInterrupt: () -> Unit,
     onVeset: () -> Unit,
     onHefsek: () -> Unit,
     onDelete: (WomensAreaEntryEntity) -> Unit,
@@ -228,6 +243,17 @@ private fun ChooseStep(
         enabled = canHefsek,
         onClick = onHefsek,
     )
+    if (canInterrupt) {
+        OptionCard(
+            icon = Icons.Filled.Replay,
+            tint = WomensAreaInterruptOrange,
+            tile = WomensAreaInterruptOrange.copy(alpha = 0.12f),
+            title = "סתירת נקיים",
+            subtitle = "נמצא דם באחד מימי הנקיים — הספירה מתחילה מחדש",
+            enabled = true,
+            onClick = onInterrupt,
+        )
+    }
     if (entriesOnDay.isNotEmpty()) {
         Text("רשום ביום זה", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
         entriesOnDay.forEach { entry ->
@@ -296,6 +322,7 @@ private fun RecordedRow(entry: WomensAreaEntryEntity, deletable: Boolean, onDele
     val label = when (entry.type) {
         WomensAreaEntryType.PERIOD_START -> "התחלת ווסת" + (entry.onah?.let { " · ${it.hebrewName}" } ?: "")
         WomensAreaEntryType.HEFSEK_TAHARA -> "הפסק טהרה"
+        WomensAreaEntryType.CLEAN_INTERRUPTED -> "סתירת נקיים"
     }
     if (!deletable) {
         Column(
@@ -442,6 +469,27 @@ private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<Veset
             if (prediction.hiddenDays.isNotEmpty()) SemiFixedHiddenNote(n, prediction.hiddenDays)
         }
     }
+}
+
+// ------------------------------------------------------- סתירת נקיים
+
+/**
+ * What סתירת נקיים does, said before she confirms it: the count is void, the
+ * old marks go, a new hefsek is needed — and the vesets are untouched.
+ */
+@Composable
+private fun InterruptStep(date: LocalDate, onSave: () -> Unit) {
+    Text("סתירת נקיים — ${WomensAreaLabels.weekdayName(date)} ${WomensAreaLabels.hebrewDayAndMonth(date)}", style = MaterialTheme.typography.titleMedium)
+    FramedBlock(WomensAreaInterruptOrange) {
+        Text("מה יקרה:", fontWeight = FontWeight.Bold, color = WomensAreaInterruptOrange)
+        listOf(
+            "ספירת שבעה נקיים מתאפסת.",
+            "הסימון של ההפסק, הנקיים והטבילה יוסר מהלוח, וכן ההתראות שלהם.",
+            "יש לעשות הפסק טהרה מחדש ולרשום אותו בלוח — הנקיים ייספרו ממנו מחדש.",
+            "חישובי הווסתות וימי הפרישה אינם משתנים.",
+        ).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+    }
+    SaveButton(enabled = true, label = "רישום סתירת נקיים", onClick = onSave)
 }
 
 // ----------------------------------------------------------------- step 2b

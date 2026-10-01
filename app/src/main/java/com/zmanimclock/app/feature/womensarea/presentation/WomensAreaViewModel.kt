@@ -62,12 +62,13 @@ class WomensAreaViewModel @Inject constructor(
         .map { entries ->
             val vesets = entries.filter { it.type == WomensAreaEntryType.PERIOD_START }
                 .sortedByDescending { it.epochDay }
+            val hefsek = entries.filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }.maxByOrNull { it.epochDay }
             LatestEntries(
                 veset = vesets.getOrNull(0),
                 previousVeset = vesets.getOrNull(1),
                 earlierVesets = vesets.drop(1).map { VesetRecord(it.id, it.date, it.onah) },
-                hefsek = entries.filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
-                    .maxByOrNull { it.epochDay },
+                hefsek = hefsek,
+                cleanInterruptedOn = hefsek?.let { WomensAreaCalculator.cleanInterruptionOf(it.date, entries.interruptionDates()) },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LatestEntries())
@@ -75,7 +76,7 @@ class WomensAreaViewModel @Inject constructor(
     /** The history screen: the kept cycles (newest first), what repeats in them, and each row's entry. */
     val history: StateFlow<HistoryUi> = allEntries
         .map { entries ->
-            val cycles = WomensAreaHistory.cycles(entries.vesetRecords(), entries.hefsekRecords())
+            val cycles = WomensAreaHistory.cycles(entries.vesetRecords(), entries.hefsekRecords(), entries.interruptionDates())
             val attached = cycles.mapNotNull { it.hefsek?.id }.toSet()
             // The cycle stored behind the shown ones keeps its hefsek out of view too.
             val oldestShown = cycles.lastOrNull()?.veset?.date
@@ -90,6 +91,11 @@ class WomensAreaViewModel @Inject constructor(
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUi())
+
+    /** סתירת נקיים after the latest hefsek, if any — the card then asks for a new hefsek. */
+    val cleanInterruptedOn: StateFlow<LocalDate?> = latestEntries
+        .map { it.cleanInterruptedOn }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** The latest הפסק טהרה's date, for the tevila line of the card under the calendar. */
     val latestHefsek: StateFlow<LocalDate?> = latestEntries
@@ -154,6 +160,7 @@ class WomensAreaViewModel @Inject constructor(
             latestHefsek = latest.hefsek?.date,
             earlierVesets = latest.earlierVesets,
             semiFixedMinDay = sf.minDayInForce,
+            cleanInterruptedOn = latest.cleanInterruptedOn,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -192,6 +199,16 @@ class WomensAreaViewModel @Inject constructor(
     }
 
     /**
+     * סתירת נקיים on [date]: the latest hefsek's clean days no longer count,
+     * and their reminders and the tevila's are cancelled. A new hefsek starts
+     * the count again. The vesets' calculations are untouched.
+     */
+    fun addCleanInterruption(date: LocalDate) = viewModelScope.launch {
+        dao.insert(WomensAreaEntryEntity(type = WomensAreaEntryType.CLEAN_INTERRUPTED, epochDay = date.toEpochDay()))
+        rescheduleLatest()
+    }
+
+    /**
      * [onah] is required for a veset — a veset is never saved without ביום /
      * בלילה (the screens cannot confirm without one either) — and ignored for
      * a HEFSEK_TAHARA, which has none.
@@ -218,7 +235,7 @@ class WomensAreaViewModel @Inject constructor(
         if (dao.getAllEntries().first().latestEntry()?.id != entry.id) return@launch
         if (entry.type == WomensAreaEntryType.PERIOD_START) settings.undoSemiFixedChangeBy(entry.date)
         dao.delete(entry)
-        if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) rescheduleLatest()
+        if (entry.type != WomensAreaEntryType.PERIOD_START) rescheduleLatest()
     }
 
     /**
@@ -228,7 +245,8 @@ class WomensAreaViewModel @Inject constructor(
      */
     private suspend fun pruneToLastVesets() {
         val entries = dao.getAllEntries().first()
-        val ids = WomensAreaHistory.idsToPrune(entries.vesetRecords(), entries.hefsekRecords())
+        // Interruptions go the way of hefseks: by date, with the cycle they belong to.
+        val ids = WomensAreaHistory.idsToPrune(entries.vesetRecords(), entries.hefsekRecords() + entries.interruptionRecords())
         if (ids.isEmpty()) return
         dao.deleteByIds(ids.toList())
         rescheduleLatest()
@@ -258,9 +276,12 @@ class WomensAreaViewModel @Inject constructor(
      */
     private suspend fun rescheduleLatest() {
         reminderScheduler.cancelAll()
-        val latest = dao.getAllEntries().first()
+        val entries = dao.getAllEntries().first()
+        val latest = entries
             .filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }
             .maxByOrNull { it.epochDay } ?: return
+        // After סתירת נקיים nothing is queued until a new hefsek.
+        if (WomensAreaCalculator.cleanInterruptionOf(latest.date, entries.interruptionDates()) != null) return
         reminderScheduler.schedule(latest.id, latest.date, settings.state.first().reminders)
     }
 }
@@ -292,12 +313,20 @@ private fun List<WomensAreaEntryEntity>.vesetRecords() =
 private fun List<WomensAreaEntryEntity>.hefsekRecords() =
     filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA }.map { HefsekRecord(it.id, it.date) }
 
+private fun List<WomensAreaEntryEntity>.interruptionDates() =
+    filter { it.type == WomensAreaEntryType.CLEAN_INTERRUPTED }.map { it.date }
+
+private fun List<WomensAreaEntryEntity>.interruptionRecords() =
+    filter { it.type == WomensAreaEntryType.CLEAN_INTERRUPTED }.map { HefsekRecord(it.id, it.date) }
+
 private data class LatestEntries(
     val veset: WomensAreaEntryEntity? = null,
     val previousVeset: WomensAreaEntryEntity? = null,
     /** Every veset before the latest — for the days carried over from them. */
     val earlierVesets: List<VesetRecord> = emptyList(),
     val hefsek: WomensAreaEntryEntity? = null,
+    /** סתירת נקיים after [hefsek], if any. */
+    val cleanInterruptedOn: LocalDate? = null,
 )
 
 private val WomensAreaEntryEntity.date: LocalDate get() = LocalDate.ofEpochDay(epochDay)

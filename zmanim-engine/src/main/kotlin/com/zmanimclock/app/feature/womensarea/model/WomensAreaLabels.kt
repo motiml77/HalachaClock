@@ -212,6 +212,12 @@ object WomensAreaLabels {
         "${WomensAreaSemiFixed.IN_A_ROW} ראיות ברצף הגיעו ביום $minDay או אחריו, ולכן הוסת החצי קבוע חזר: " +
             "ימי פרישה שלפני יום $minDay שוב אינם מוצגים בלוח. יש להתייעץ עם רב."
 
+    /** On the main screen after סתירת נקיים, until a new hefsek is recorded. */
+    fun cleanInterruptedText(date: LocalDate): String =
+        "סתירת נקיים ביום ${weekdayName(date)} ${hebrewDayAndMonth(date)} (${gregorianShort(date)}): " +
+            "ספירת שבעה נקיים התאפסה, וההפסק, הנקיים והטבילה הקודמים אינם מסומנים עוד. " +
+            "יש לעשות הפסק טהרה מחדש ולרשום אותו בלוח. חישובי הווסתות אינם משתנים."
+
     /** The warning when ליל הטבילה is a night with no tevila. */
     fun tevilaBlockText(block: TevilaBlock): String =
         "ליל הטבילה חל ב" + (if (block == TevilaBlock.YOM_KIPPUR) "ליל יום הכיפורים" else "ליל תשעה באב") +
