@@ -45,8 +45,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedMode
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaLabels
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaSemiFixed
+import com.zmanimclock.app.feature.womensarea.security.SemiFixedNotice
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
@@ -81,25 +83,27 @@ internal fun SemiFixedCard(ui: SemiFixedUi, onSave: (Int) -> Unit, onRemove: () 
                 Column(Modifier.weight(1f)) {
                     Text("וסת חצי קבוע", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        if (sf == null) "לא הוגדר · מגדירים רק לפי הוראת רב"
-                        else "מוגדר: אינה רואה לפני יום ${sf.minDay}",
+                        when {
+                            sf == null -> "לא הוגדר · מגדירים רק לפי הוראת רב"
+                            ui.status?.mode == SemiFixedMode.UPROOTED -> "נעקר · הוגדר: לא לפני יום ${sf.minDay}"
+                            else -> "מוגדר: אינה רואה לפני יום ${sf.minDay}"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = cs.onSurfaceVariant,
                     )
                 }
             }
 
-            if (sf != null && ui.status?.latestContradicts == true) {
-                SemiFixedWarning(
-                    WomensAreaLabels.semiFixedContradiction(
-                        ui.status.latestInterval,
-                        sf.minDay,
-                        ui.status.consecutiveContradictions,
-                    ),
-                )
-            } else if (sf != null) {
-                Text(
-                    "ימי פרישה שחלים לפני יום ${sf.minDay} אינם מוצגים בלוח.",
+            val status = ui.status
+            when {
+                sf == null || status == null -> Unit
+                status.mode == SemiFixedMode.UPROOTED ->
+                    SemiFixedWarning(WomensAreaLabels.semiFixedUprootedStatus(sf.minDay, status.run))
+                status.latestContradicts ->
+                    SemiFixedWarning(WomensAreaLabels.semiFixedContradiction(status.latestInterval, sf.minDay, status.run))
+                else -> Text(
+                    "ימי פרישה שחלים לפני יום ${sf.minDay} אינם מוצגים בלוח. " +
+                        "השאר — ביום או בלילה לפי הראייה האחרונה.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -239,15 +243,23 @@ internal fun SemiFixedHiddenNote(minDay: Int, hidden: List<PrishaDay>) {
     )
 }
 
-/** Once, after the app cancelled it: three sightings in a row before day N. */
+/** Once, after the vesets uprooted it (three in a row before day N) or established it again (three on time). */
 @Composable
-internal fun SemiFixedCancelledDialog(minDay: Int, onConfirm: () -> Unit) {
+internal fun SemiFixedNoticeDialog(notice: SemiFixedNotice, minDay: Int, onConfirm: () -> Unit) {
+    val uprooted = notice == SemiFixedNotice.UPROOTED
     AlertDialog(
         onDismissRequest = {},
-        icon = { Icon(Icons.Filled.Warning, contentDescription = null, tint = WomensAreaPrishaRed) },
-        title = { Text("הוסת החצי קבוע בוטל", textAlign = TextAlign.Center) },
-        text = { Text(WomensAreaLabels.semiFixedCancelled(minDay)) },
+        icon = {
+            Icon(
+                if (uprooted) Icons.Filled.Warning else Icons.Filled.DateRange,
+                contentDescription = null,
+                tint = if (uprooted) WomensAreaPrishaRed else WomensAreaLilac,
+            )
+        },
+        title = { Text(if (uprooted) "הוסת החצי קבוע נעקר" else "הוסת החצי קבוע חזר", textAlign = TextAlign.Center) },
+        text = {
+            Text(if (uprooted) WomensAreaLabels.semiFixedUprooted(minDay) else WomensAreaLabels.semiFixedReestablished(minDay))
+        },
         confirmButton = { TextButton(onClick = onConfirm) { Text("הבנתי") } },
     )
 }
-

@@ -55,6 +55,7 @@ import com.zmanimclock.app.feature.calendar.presentation.WeekdayRow
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.PrishaDay
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedMode
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
 import com.zmanimclock.app.feature.womensarea.model.VesetRecord
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaHistory
@@ -157,7 +158,8 @@ fun WomensAreaScreen(
                 textAlign = TextAlign.Center,
             )
             // A sighting before the וסת חצי קבוע's day N comes first, where she sees it.
-            val contradicted = semiFixed.status?.latestContradicts == true
+            val contradicted = semiFixed.status?.latestContradicts == true ||
+                semiFixed.status?.mode == SemiFixedMode.UPROOTED
             val semiFixedCard = @Composable {
                 SemiFixedCard(
                     ui = semiFixed,
@@ -174,8 +176,10 @@ fun WomensAreaScreen(
         }
     }
 
-    semiFixed.cancelledMinDay?.let { n ->
-        SemiFixedCancelledDialog(minDay = n, onConfirm = viewModel::dismissSemiFixedCancelled)
+    val notice = semiFixed.notice
+    val noticeOf = semiFixed.semiFixed
+    if (notice != null && noticeOf != null) {
+        SemiFixedNoticeDialog(notice = notice, minDay = noticeOf.minDay, onConfirm = viewModel::dismissSemiFixedNotice)
     }
 
     tapped?.let { date ->

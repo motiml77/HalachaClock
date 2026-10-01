@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.Onah
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedTransition
 import com.zmanimclock.app.feature.womensarea.model.SemiFixedVeset
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaSemiFixed
 import com.zmanimclock.app.feature.womensarea.model.TevilaBlock
@@ -373,9 +374,13 @@ private fun OnahTile(
 @Composable
 private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<VesetRecord>, semiFixed: SemiFixedVeset?) {
     val previous = earlierVesets.filter { it.date < date }.maxOfOrNull { it.date }
-    val contradicts = semiFixed != null && WomensAreaSemiFixed.contradicts(date, previous, semiFixed)
+    // The same rule as after saving, run with this veset included.
+    val status = semiFixed?.let { WomensAreaSemiFixed.status(earlierVesets.map { it.date } + date, it) }
+    val contradicts = semiFixed != null && status != null &&
+        WomensAreaSemiFixed.isBeforeMinDay(date, previous, semiFixed.minDay) == true &&
+        (status.latestContradicts || status.transition is SemiFixedTransition.Uprooted)
     val prediction = WomensAreaCalculator.predictWithHistory(date, onah, earlierVesets)
-        .copy(semiFixedMinDay = WomensAreaSemiFixed.minDayFor(semiFixed, contradicts))
+        .copy(semiFixedMinDay = WomensAreaSemiFixed.minDayFor(semiFixed, status))
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // Before day N: say so before she saves — this month will show every day.
         if (contradicts) {

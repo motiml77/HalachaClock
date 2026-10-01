@@ -166,33 +166,51 @@ object WomensAreaLabels {
     // ------------------------------------------------- וסת חצי קבוע
 
     /** The method, word for word as the setting window shows it. */
-    fun semiFixedMethod(minDay: Int): List<String> = listOf(
-        "וסת חצי קבוע — אישה שנקבע אצלה שאינה רואה לעולם לפני יום $minDay, " +
-            "בספירה מיום הראייה הקודמת (יום הראייה = יום 1, כמו בהפלגה).",
-        "לפי שיטה זו, הדבר עצמו הוא מעין וסת — וסת שלא לראות בימים שלפני כן. " +
-            "לכן ימי פרישה שחלים לפני יום $minDay אינם מוצגים בלוח: הפלגה קצרה, יום החודש " +
-            "והימים שנמשכים מראיות קודמות" +
-            (if (minDay > WomensAreaCalculator.ONAH_BEINONIT_DAY) ", וגם העונה הבינונית (יום 30)." else ".") +
-            " ימי פרישה מיום $minDay והלאה מוצגים כרגיל.",
-        "ראייה שתגיע לפני יום $minDay — תוצג אזהרה, ובאותו חודש יוצגו כל ימי הפרישה. " +
-            "אחרי ${WomensAreaSemiFixed.CANCEL_AFTER} ראיות כאלה ברצף ההגדרה תבוטל.",
-        "יש פוסקים שאינם סוברים כך. יש להגדיר רק לפי הוראת רב.",
-    )
+    fun semiFixedMethod(minDay: Int): List<String> {
+        val n = WomensAreaSemiFixed.IN_A_ROW
+        return listOf(
+            "וסת חצי קבוע — אישה שנקבע אצלה שאינה רואה לעולם לפני יום $minDay, " +
+                "בספירה מיום הראייה הקודמת (יום הראייה = יום 1, כמו בהפלגה). " +
+                "הספירה לפי הימים העבריים — היום מתחיל מהערב שלפניו — ואינה תלויה בעונה: " +
+                "ראייה ביום או בלילה נחשבות אותו דבר.",
+            "לפי שיטה זו, הדבר עצמו הוא מעין וסת — וסת שלא לראות בימים שלפני כן. " +
+                "לכן ימי פרישה שחלים לפני יום $minDay אינם מוצגים בלוח: הפלגה קצרה, יום החודש " +
+                "והימים שנמשכים מראיות קודמות" +
+                (if (minDay > WomensAreaCalculator.ONAH_BEINONIT_DAY) ", וגם העונה הבינונית (יום 30)." else ".") +
+                " ימי פרישה מיום $minDay והלאה מוצגים כרגיל.",
+            "ראייה שתגיע לפני יום $minDay — תוצג אזהרה, ובאותו חודש יוצגו כל ימי הפרישה. " +
+                "אם הראייה הבאה תגיע בזמן — חוזרים לוסת החצי קבוע.",
+            "$n ראיות ברצף לפני יום $minDay — הוסת החצי קבוע נעקר, ומוצגים כל ימי הפרישה " +
+                "עד שיהיו שוב $n ראיות ברצף שאינן לפני יום $minDay.",
+            "יש פוסקים שאינם סוברים כך. יש להגדיר רק לפי הוראת רב.",
+        )
+    }
 
-    /** "לא מוצגים לפי וסת חצי קבוע (לא לפני יום 26): הפלגה (24 יום) · יום החודש · ט״ו אייר". */
+    /** "לפי וסת חצי קבוע (לא לפני יום 26) אינם מוצגים: הפלגה (24 יום) · יום החודש · ט״ו אייר". */
     fun semiFixedHiddenLine(minDay: Int, hidden: List<PrishaDay>): String =
         "לפי וסת חצי קבוע (לא לפני יום $minDay) אינם מוצגים: " + hidden.joinToString(" · ") { prishaTitle(it) }
 
-    /** The warning on a cycle whose veset came before day [minDay]. */
+    /** The warning on a cycle whose veset came before day [minDay], while it still stands. */
     fun semiFixedContradiction(interval: Int?, minDay: Int, consecutive: Int): String =
         "הראייה האחרונה הגיעה " + (interval?.let { "ביום $it " } ?: "") +
             "— לפני יום $minDay שהוגדר כוסת חצי קבוע. בחודש זה מוצגים כל ימי הפרישה. יש לשאול רב." +
-            " (ראייה סותרת $consecutive מתוך ${WomensAreaSemiFixed.CANCEL_AFTER} ברצף)"
+            " (ראייה סותרת $consecutive מתוך ${WomensAreaSemiFixed.IN_A_ROW} ברצף)"
 
-    /** The message once [WomensAreaSemiFixed.CANCEL_AFTER] sightings in a row came before day [minDay]. */
-    fun semiFixedCancelled(minDay: Int): String =
-        "${WomensAreaSemiFixed.CANCEL_AFTER} ראיות ברצף הגיעו לפני יום $minDay, ולכן הוסת החצי קבוע בוטל. " +
-            "מעתה מוצגים בלוח כל ימי הפרישה. יש להתייעץ עם רב."
+    /** On the card while it is uprooted: how far the way back has got. */
+    fun semiFixedUprootedStatus(minDay: Int, onTimeRun: Int): String =
+        "נעקר — מוצגים כל ימי הפרישה. יחזור אחרי ${WomensAreaSemiFixed.IN_A_ROW} ראיות ברצף " +
+            "שאינן לפני יום $minDay (כעת $onTimeRun מתוך ${WomensAreaSemiFixed.IN_A_ROW})."
+
+    /** The one-time message when it is uprooted. */
+    fun semiFixedUprooted(minDay: Int): String =
+        "${WomensAreaSemiFixed.IN_A_ROW} ראיות ברצף הגיעו לפני יום $minDay, ולכן הוסת החצי קבוע נעקר. " +
+            "מעתה מוצגים בלוח כל ימי הפרישה, עד שיהיו שוב ${WomensAreaSemiFixed.IN_A_ROW} ראיות ברצף " +
+            "שאינן לפני יום $minDay. יש להתייעץ עם רב."
+
+    /** The one-time message when it is established again. */
+    fun semiFixedReestablished(minDay: Int): String =
+        "${WomensAreaSemiFixed.IN_A_ROW} ראיות ברצף הגיעו ביום $minDay או אחריו, ולכן הוסת החצי קבוע חזר: " +
+            "ימי פרישה שלפני יום $minDay שוב אינם מוצגים בלוח. יש להתייעץ עם רב."
 
     /** The warning when ליל הטבילה is a night with no tevila. */
     fun tevilaBlockText(block: TevilaBlock): String =

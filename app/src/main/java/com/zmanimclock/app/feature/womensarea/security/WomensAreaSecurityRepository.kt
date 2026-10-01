@@ -53,13 +53,12 @@ data class WomensAreaSecurity(
     val reminders: WomensAreaReminders = WomensAreaReminders(),
     /** וסת חצי קבוע, if she set one (by her rabbi's ruling) — null when none. */
     val semiFixed: SemiFixedVeset? = null,
-    /**
-     * Set when the app itself cancelled a וסת חצי קבוע after
-     * WomensAreaSemiFixed.CANCEL_AFTER contradicting sightings in a row: the N
-     * it had, for the message she sees once and confirms.
-     */
-    val semiFixedCancelledMinDay: Int? = null,
+    /** A change the app made to it on its own (uprooted / established again), until she confirms the message. */
+    val semiFixedNotice: SemiFixedNotice? = null,
 )
+
+/** The one-time messages about a וסת חצי קבוע. */
+enum class SemiFixedNotice { UPROOTED, REESTABLISHED }
 
 @Singleton
 class WomensAreaSecurityRepository @Inject constructor(
@@ -73,7 +72,8 @@ class WomensAreaSecurityRepository @Inject constructor(
         val TEVILA_REMINDER_TIMES = stringPreferencesKey("tevila_reminder_times")
         val SEMI_FIXED_MIN_DAY = intPreferencesKey("semi_fixed_min_day")
         val SEMI_FIXED_SINCE = longPreferencesKey("semi_fixed_since_epoch_day")
-        val SEMI_FIXED_CANCELLED = intPreferencesKey("semi_fixed_cancelled_min_day")
+        val SEMI_FIXED_UPROOTED_AT = longPreferencesKey("semi_fixed_uprooted_at_epoch_day")
+        val SEMI_FIXED_NOTICE = stringPreferencesKey("semi_fixed_notice")
     }
 
     val state: Flow<WomensAreaSecurity> = context.womensAreaSecurityStore.data.map { prefs ->
@@ -89,9 +89,15 @@ class WomensAreaSecurityRepository @Inject constructor(
                 ),
             ),
             semiFixed = prefs[Keys.SEMI_FIXED_MIN_DAY]?.let { minDay ->
-                SemiFixedVeset(minDay, LocalDate.ofEpochDay(prefs[Keys.SEMI_FIXED_SINCE] ?: 0L))
+                SemiFixedVeset(
+                    minDay = minDay,
+                    since = LocalDate.ofEpochDay(prefs[Keys.SEMI_FIXED_SINCE] ?: 0L),
+                    uprootedAt = prefs[Keys.SEMI_FIXED_UPROOTED_AT]?.let(LocalDate::ofEpochDay),
+                )
             },
-            semiFixedCancelledMinDay = prefs[Keys.SEMI_FIXED_CANCELLED],
+            semiFixedNotice = prefs[Keys.SEMI_FIXED_NOTICE]?.let { name ->
+                SemiFixedNotice.entries.firstOrNull { it.name == name }
+            },
         )
     }
 
@@ -110,34 +116,42 @@ class WomensAreaSecurityRepository @Inject constructor(
     }
 
     /**
-     * Sets (or, with null, removes) the וסת חצי קבוע. A new setting counts
-     * contradictions only from today — see SemiFixedVeset.since. Changing N
-     * keeps the original date, so an edit does not wipe a run already counting.
+     * Sets (or, with null, removes) the וסת חצי קבוע. A new one counts
+     * sightings only from today — see SemiFixedVeset.since. Changing N keeps
+     * the rest (its date, and whether it is uprooted), so an edit does not
+     * wipe a run already counting.
      */
     suspend fun setSemiFixed(minDay: Int?) {
         context.womensAreaSecurityStore.edit {
             if (minDay == null) {
                 it.remove(Keys.SEMI_FIXED_MIN_DAY)
                 it.remove(Keys.SEMI_FIXED_SINCE)
+                it.remove(Keys.SEMI_FIXED_UPROOTED_AT)
             } else {
                 if (it[Keys.SEMI_FIXED_MIN_DAY] == null) it[Keys.SEMI_FIXED_SINCE] = LocalDate.now().toEpochDay()
                 it[Keys.SEMI_FIXED_MIN_DAY] = minDay
             }
-            it.remove(Keys.SEMI_FIXED_CANCELLED)
+            it.remove(Keys.SEMI_FIXED_NOTICE)
         }
     }
 
-    /** Cancelled by the app after the contradictions in a row — remembered for the one-time message. */
-    suspend fun cancelSemiFixed(minDay: Int) {
+    /**
+     * Saves where the vesets took it on their own — uprooted, or established
+     * again (WomensAreaSemiFixed.after) — with the message she sees once.
+     */
+    suspend fun saveSemiFixedChange(updated: SemiFixedVeset, notice: SemiFixedNotice) {
         context.womensAreaSecurityStore.edit {
-            it.remove(Keys.SEMI_FIXED_MIN_DAY)
-            it.remove(Keys.SEMI_FIXED_SINCE)
-            it[Keys.SEMI_FIXED_CANCELLED] = minDay
+            if (it[Keys.SEMI_FIXED_MIN_DAY] == null) return@edit // removed meanwhile
+            it[Keys.SEMI_FIXED_SINCE] = updated.since.toEpochDay()
+            val uprootedAt = updated.uprootedAt
+            if (uprootedAt == null) it.remove(Keys.SEMI_FIXED_UPROOTED_AT)
+            else it[Keys.SEMI_FIXED_UPROOTED_AT] = uprootedAt.toEpochDay()
+            it[Keys.SEMI_FIXED_NOTICE] = notice.name
         }
     }
 
-    /** She saw the cancellation message and confirmed it. */
-    suspend fun dismissSemiFixedCancelled() {
-        context.womensAreaSecurityStore.edit { it.remove(Keys.SEMI_FIXED_CANCELLED) }
+    /** She saw the message and confirmed it. */
+    suspend fun dismissSemiFixedNotice() {
+        context.womensAreaSecurityStore.edit { it.remove(Keys.SEMI_FIXED_NOTICE) }
     }
 }

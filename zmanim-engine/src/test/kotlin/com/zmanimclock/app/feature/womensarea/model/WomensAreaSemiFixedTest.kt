@@ -86,62 +86,120 @@ class WomensAreaSemiFixedTest {
         assertEquals(VesetKind.ONAH_BEINONIT, markers.getValue(h(5786, 2, 26)).prisha.single().kind)
     }
 
-    // ------------------------------------------------------- contradiction
+    // ------------------------------------------------------- the rule over time
 
     private val since = LocalDate.of(2020, 1, 1)
-    private fun vesets(first: LocalDate, gaps: List<Int>) = gaps.runningFold(first) { d, g -> d.plusDays((g - 1).toLong()) }
+    private val sf = SemiFixedVeset(26, since)
+    private fun vesets(gaps: List<Int>, first: LocalDate = LocalDate.of(2026, 1, 1)) =
+        gaps.runningFold(first) { d, g -> d.plusDays((g - 1).toLong()) }
 
     @Test
-    fun `a veset on day N or later does not contradict`() {
-        val s = WomensAreaSemiFixed.status(vesets(LocalDate.of(2026, 1, 1), listOf(28, 26)), SemiFixedVeset(26, since))
+    fun `on day N or later it stands and hides`() {
+        val s = WomensAreaSemiFixed.status(vesets(listOf(28, 26)), sf)
+        assertEquals(SemiFixedMode.STANDS, s.mode)
         assertFalse(s.latestContradicts)
         assertEquals(26, s.latestInterval)
-        assertEquals(0, s.consecutiveContradictions)
+        assertEquals(26, WomensAreaSemiFixed.minDayFor(sf, s))
+        assertNull(s.transition)
     }
 
     @Test
-    fun `one before day N contradicts - this cycle shows every day`() {
-        val sf = SemiFixedVeset(26, since)
-        val s = WomensAreaSemiFixed.status(vesets(LocalDate.of(2026, 1, 1), listOf(28, 29, 24)), sf)
+    fun `one sighting before day N shows every day that cycle`() {
+        val s = WomensAreaSemiFixed.status(vesets(listOf(28, 29, 24)), sf)
+        assertEquals(SemiFixedMode.STANDS, s.mode)
         assertTrue(s.latestContradicts)
         assertEquals(24, s.latestInterval)
-        assertEquals(1, s.consecutiveContradictions)
-        assertFalse(s.shouldCancel)
-        assertNull(WomensAreaSemiFixed.minDayFor(sf, s.latestContradicts))
-        assertEquals(26, WomensAreaSemiFixed.minDayFor(sf, contradicted = false))
+        assertEquals(1, s.run)
+        assertNull(WomensAreaSemiFixed.minDayFor(sf, s))
     }
 
     @Test
-    fun `a sighting back on time ends the run`() {
-        val s = WomensAreaSemiFixed.status(vesets(LocalDate.of(2026, 1, 1), listOf(24, 25, 27)), SemiFixedVeset(26, since))
+    fun `back on time the next cycle - it hides again, onah beinonit too past 30`() {
+        val sf33 = SemiFixedVeset(33, since)
+        val s = WomensAreaSemiFixed.status(vesets(listOf(34, 28, 35)), sf33)
         assertFalse(s.latestContradicts)
-        assertEquals(0, s.consecutiveContradictions)
+        assertEquals(0, s.run)
+        assertEquals(33, WomensAreaSemiFixed.minDayFor(sf33, s))
+        val p = WomensAreaCalculator.predict(start, Onah.DAY, prev).copy(semiFixedMinDay = 33)
+        assertTrue(p.hiddenDays.any { it.kind == VesetKind.ONAH_BEINONIT })
     }
 
     @Test
-    fun `three in a row cancel it`() {
-        val s = WomensAreaSemiFixed.status(vesets(LocalDate.of(2026, 1, 1), listOf(28, 24, 25, 23)), SemiFixedVeset(26, since))
-        assertEquals(3, s.consecutiveContradictions)
-        assertTrue(s.shouldCancel)
+    fun `three in a row uproot it - every day shown`() {
+        val dates = vesets(listOf(28, 24, 25, 23))
+        val s = WomensAreaSemiFixed.status(dates, sf)
+        assertEquals(SemiFixedMode.UPROOTED, s.mode)
+        assertEquals(SemiFixedTransition.Uprooted(dates.last()), s.transition)
+        assertNull(WomensAreaSemiFixed.minDayFor(sf, s))
+        // Saved as uprooted, the same vesets find nothing new.
+        val saved = WomensAreaSemiFixed.after(sf, s.transition!!)
+        val again = WomensAreaSemiFixed.status(dates, saved)
+        assertEquals(SemiFixedMode.UPROOTED, again.mode)
+        assertNull(again.transition)
+        assertEquals(0, again.run)
+    }
+
+    @Test
+    fun `uprooted, on time once or twice is not enough - a break starts the count again`() {
+        val first = vesets(listOf(24, 25, 23)) // uprooted at the 4th veset
+        val saved = WomensAreaSemiFixed.after(sf, SemiFixedTransition.Uprooted(first.last()))
+        val more = vesets(listOf(27, 28, 22, 30), first.last()).drop(1)
+        val s = WomensAreaSemiFixed.status(first + more, saved)
+        assertEquals(SemiFixedMode.UPROOTED, s.mode)
+        assertEquals(1, s.run) // 27, 28, then 22 broke it, then 30
+        assertNull(WomensAreaSemiFixed.minDayFor(saved, s))
+    }
+
+    @Test
+    fun `uprooted, three in a row on time establish it again`() {
+        val first = vesets(listOf(24, 25, 23))
+        val saved = WomensAreaSemiFixed.after(sf, SemiFixedTransition.Uprooted(first.last()))
+        val more = vesets(listOf(27, 26, 30), first.last()).drop(1)
+        val all = first + more
+        val s = WomensAreaSemiFixed.status(all, saved)
+        assertEquals(SemiFixedMode.STANDS, s.mode)
+        assertEquals(SemiFixedTransition.Reestablished(all.last()), s.transition)
+        assertEquals(26, WomensAreaSemiFixed.minDayFor(saved, s))
+        // Saved as standing again: the old contradictions no longer count.
+        val restored = WomensAreaSemiFixed.after(saved, s.transition!!)
+        assertNull(restored.uprootedAt)
+        val again = WomensAreaSemiFixed.status(all, restored)
+        assertEquals(SemiFixedMode.STANDS, again.mode)
+        assertNull(again.transition)
+        assertFalse(again.latestContradicts)
     }
 
     @Test
     fun `vesets from before the setting never count`() {
-        val dates = vesets(LocalDate.of(2026, 1, 1), listOf(24, 25, 23))
-        // Set after the third veset: only the last one can contradict.
+        val dates = vesets(listOf(24, 25, 23))
         val s = WomensAreaSemiFixed.status(dates, SemiFixedVeset(26, dates[2].plusDays(1)))
-        assertEquals(1, s.consecutiveContradictions)
-        assertFalse(s.shouldCancel)
-        // Set after all of them: nothing contradicts.
+        assertEquals(1, s.run)
+        assertEquals(SemiFixedMode.STANDS, s.mode)
         val none = WomensAreaSemiFixed.status(dates, SemiFixedVeset(26, dates.last().plusDays(1)))
         assertFalse(none.latestContradicts)
     }
 
     @Test
     fun `the first veset, with nothing to count from, does not contradict`() {
-        val s = WomensAreaSemiFixed.status(listOf(LocalDate.of(2026, 1, 1)), SemiFixedVeset(26, since))
+        val s = WomensAreaSemiFixed.status(listOf(LocalDate.of(2026, 1, 1)), sf)
         assertFalse(s.latestContradicts)
         assertNull(s.latestInterval)
+    }
+
+    @Test
+    fun `day or night makes no difference - only the Hebrew day count`() {
+        // Seen Tuesday evening after shkia: the Hebrew day is Wednesday's, and
+        // that is the date recorded. 33 Hebrew days from the previous veset,
+        // whichever onah either was in.
+        val previous = LocalDate.of(2026, 3, 3)          // Tuesday (by day)
+        val tuesdayNight = LocalDate.of(2026, 4, 4)       // ליל … recorded on its Hebrew day
+        assertEquals(33, WomensAreaCalculator.haflagaInterval(tuesdayNight, previous))
+        assertEquals(false, WomensAreaSemiFixed.isBeforeMinDay(tuesdayNight, previous, 33))
+        assertEquals(true, WomensAreaSemiFixed.isBeforeMinDay(tuesdayNight.minusDays(1), previous, 33))
+        // And what it hides is by day number alone, the same in both onot.
+        val day = WomensAreaCalculator.predict(start, Onah.DAY, prev).copy(semiFixedMinDay = 28)
+        val night = WomensAreaCalculator.predict(start, Onah.NIGHT, prev).copy(semiFixedMinDay = 28)
+        assertEquals(day.hiddenDays.map { it.kind to it.date }, night.hiddenDays.map { it.kind to it.date })
     }
 
     // ------------------------------------------------------------ texts
@@ -157,7 +215,9 @@ class WomensAreaSemiFixedTest {
     fun `no text ever calls it a veset kavua`() {
         val all = WomensAreaLabels.semiFixedMethod(31) +
             WomensAreaLabels.semiFixedContradiction(24, 26, 1) +
-            WomensAreaLabels.semiFixedCancelled(26)
+            WomensAreaLabels.semiFixedUprooted(26) +
+            WomensAreaLabels.semiFixedReestablished(26) +
+            WomensAreaLabels.semiFixedUprootedStatus(26, 1)
         assertTrue(all.none { it.contains("וסת קבוע") || it.contains("ווסת קבוע") })
         assertEquals(
             "הראייה האחרונה הגיעה ביום 24 — לפני יום 26 שהוגדר כוסת חצי קבוע. בחודש זה מוצגים כל ימי הפרישה. יש לשאול רב. (ראייה סותרת 1 מתוך 3 ברצף)",

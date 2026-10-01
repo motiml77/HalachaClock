@@ -13,6 +13,7 @@ import com.zmanimclock.app.feature.womensarea.model.HefsekRecord
 import com.zmanimclock.app.feature.womensarea.model.HistoryPattern
 import com.zmanimclock.app.feature.womensarea.model.Onah
 import com.zmanimclock.app.feature.womensarea.model.SemiFixedStatus
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedTransition
 import com.zmanimclock.app.feature.womensarea.model.SemiFixedVeset
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaSemiFixed
 import com.zmanimclock.app.feature.womensarea.model.VesetRecord
@@ -22,6 +23,7 @@ import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarker
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaMarkers
 import com.zmanimclock.app.feature.womensarea.scheduling.WomensAreaReminderScheduler
+import com.zmanimclock.app.feature.womensarea.security.SemiFixedNotice
 import com.zmanimclock.app.feature.womensarea.security.WomensAreaReminders
 import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -99,7 +101,7 @@ class WomensAreaViewModel @Inject constructor(
         SemiFixedUi(
             semiFixed = state.semiFixed,
             status = state.semiFixed?.let { WomensAreaSemiFixed.status(vesetDates, it) },
-            cancelledMinDay = state.semiFixedCancelledMinDay,
+            notice = state.semiFixedNotice,
             shortestHaflaga = WomensAreaHistory.cycles(entries.vesetRecords(), emptyList())
                 .mapNotNull { it.haflagaInterval }.minOrNull(),
         )
@@ -109,12 +111,19 @@ class WomensAreaViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SemiFixedUi())
 
     init {
-        // WomensAreaSemiFixed.CANCEL_AFTER contradicting sightings in a row
-        // cancel it — once, remembered for the message she then confirms.
+        // Three in a row before day N uproot it; three in a row on time bring
+        // it back. Saved as soon as the vesets show it, with a one-time message.
         viewModelScope.launch {
             semiFixedSource.collect { ui ->
                 val sf = ui.semiFixed ?: return@collect
-                if (ui.status?.shouldCancel == true) settings.cancelSemiFixed(sf.minDay)
+                val change = ui.status?.transition ?: return@collect
+                settings.saveSemiFixedChange(
+                    WomensAreaSemiFixed.after(sf, change),
+                    when (change) {
+                        is SemiFixedTransition.Uprooted -> SemiFixedNotice.UPROOTED
+                        is SemiFixedTransition.Reestablished -> SemiFixedNotice.REESTABLISHED
+                    },
+                )
             }
         }
     }
@@ -211,8 +220,8 @@ class WomensAreaViewModel @Inject constructor(
     /** Sets N (by her rabbi's ruling), or with null removes the setting. */
     fun setSemiFixed(minDay: Int?) = viewModelScope.launch { settings.setSemiFixed(minDay) }
 
-    /** She confirmed the message that the app cancelled it. */
-    fun dismissSemiFixedCancelled() = viewModelScope.launch { settings.dismissSemiFixedCancelled() }
+    /** She confirmed the message that it was uprooted / established again. */
+    fun dismissSemiFixedNotice() = viewModelScope.launch { settings.dismissSemiFixedNotice() }
 
     // ------------------------------------------------------- reminders
 
@@ -241,13 +250,13 @@ class WomensAreaViewModel @Inject constructor(
 data class SemiFixedUi(
     val semiFixed: SemiFixedVeset? = null,
     val status: SemiFixedStatus? = null,
-    /** Set once the app cancelled it, until she confirms the message. */
-    val cancelledMinDay: Int? = null,
+    /** Set once the vesets uprooted it or established it again, until she confirms the message. */
+    val notice: SemiFixedNotice? = null,
     /** The shortest haflaga in the kept history — offered as a starting N. */
     val shortestHaflaga: Int? = null,
 ) {
     /** N while it applies to the current cycle — null with none, or after a contradicting sighting. */
-    val minDayInForce: Int? get() = WomensAreaSemiFixed.minDayFor(semiFixed, status?.latestContradicts == true)
+    val minDayInForce: Int? get() = WomensAreaSemiFixed.minDayFor(semiFixed, status)
 }
 
 data class HistoryUi(
