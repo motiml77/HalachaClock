@@ -187,6 +187,7 @@ fun WomensAreaScreen(
             date = date,
             today = today,
             entriesOnDay = entries.filter { it.epochDay == date.toEpochDay() },
+            latestEntryId = entries.latestEntry()?.id,
             earlierVesets = entries
                 .filter { it.type == WomensAreaEntryType.PERIOD_START && it.epochDay < date.toEpochDay() }
                 .map { VesetRecord(it.id, LocalDate.ofEpochDay(it.epochDay), it.onah) },
@@ -377,8 +378,7 @@ private fun PrishaSummaryCard(prediction: VesetPrediction) {
             Text(
                 text = "מהראייה של " + (
                     prediction.onah?.let { WomensAreaLabels.onahTiming(prediction.sourceStart, it) }
-                        ?: "${WomensAreaLabels.hebrewDate(prediction.sourceStart)} — חסר ביום או בלילה. " +
-                        "יש להשלים בהיסטוריית הרשומות (עריכה)"
+                        ?: "${WomensAreaLabels.hebrewDate(prediction.sourceStart)} — לא צוין ביום או בלילה"
                     ),
                 style = MaterialTheme.typography.bodySmall,
                 color = cs.onSurfaceVariant,
@@ -436,3 +436,11 @@ internal fun List<WomensAreaEntryEntity>.latestVesetOnOrBefore(date: LocalDate):
     filter { it.type == WomensAreaEntryType.PERIOD_START && it.epochDay <= date.toEpochDay() }
         .maxOfOrNull { it.epochDay }
         ?.let(LocalDate::ofEpochDay)
+
+/**
+ * The last entry on the calendar — the latest by date (a veset and a hefsek
+ * on one day: the one recorded last). The only one that can still be deleted
+ * or corrected: every entry before it was already counted from.
+ */
+internal fun List<WomensAreaEntryEntity>.latestEntry(): WomensAreaEntryEntity? =
+    maxWithOrNull(compareBy<WomensAreaEntryEntity>({ it.epochDay }, { it.createdAt }, { it.id }))

@@ -74,6 +74,11 @@ class WomensAreaSecurityRepository @Inject constructor(
         val SEMI_FIXED_SINCE = longPreferencesKey("semi_fixed_since_epoch_day")
         val SEMI_FIXED_UPROOTED_AT = longPreferencesKey("semi_fixed_uprooted_at_epoch_day")
         val SEMI_FIXED_NOTICE = stringPreferencesKey("semi_fixed_notice")
+        // The last change the vesets made on their own, so deleting the veset
+        // that made it puts back what was there before it.
+        val SEMI_FIXED_CHANGED_BY = longPreferencesKey("semi_fixed_changed_by_epoch_day")
+        val SEMI_FIXED_PREV_SINCE = longPreferencesKey("semi_fixed_prev_since_epoch_day")
+        val SEMI_FIXED_PREV_UPROOTED_AT = longPreferencesKey("semi_fixed_prev_uprooted_at_epoch_day")
     }
 
     val state: Flow<WomensAreaSecurity> = context.womensAreaSecurityStore.data.map { prefs ->
@@ -127,6 +132,7 @@ class WomensAreaSecurityRepository @Inject constructor(
                 it.remove(Keys.SEMI_FIXED_MIN_DAY)
                 it.remove(Keys.SEMI_FIXED_SINCE)
                 it.remove(Keys.SEMI_FIXED_UPROOTED_AT)
+                it.remove(Keys.SEMI_FIXED_CHANGED_BY)
             } else {
                 if (it[Keys.SEMI_FIXED_MIN_DAY] == null) it[Keys.SEMI_FIXED_SINCE] = LocalDate.now().toEpochDay()
                 it[Keys.SEMI_FIXED_MIN_DAY] = minDay
@@ -139,14 +145,37 @@ class WomensAreaSecurityRepository @Inject constructor(
      * Saves where the vesets took it on their own — uprooted, or established
      * again (WomensAreaSemiFixed.after) — with the message she sees once.
      */
-    suspend fun saveSemiFixedChange(updated: SemiFixedVeset, notice: SemiFixedNotice) {
+    suspend fun saveSemiFixedChange(before: SemiFixedVeset, updated: SemiFixedVeset, changedBy: LocalDate, notice: SemiFixedNotice) {
         context.womensAreaSecurityStore.edit {
             if (it[Keys.SEMI_FIXED_MIN_DAY] == null) return@edit // removed meanwhile
+            it[Keys.SEMI_FIXED_CHANGED_BY] = changedBy.toEpochDay()
+            it[Keys.SEMI_FIXED_PREV_SINCE] = before.since.toEpochDay()
+            val prevUprooted = before.uprootedAt
+            if (prevUprooted == null) it.remove(Keys.SEMI_FIXED_PREV_UPROOTED_AT)
+            else it[Keys.SEMI_FIXED_PREV_UPROOTED_AT] = prevUprooted.toEpochDay()
             it[Keys.SEMI_FIXED_SINCE] = updated.since.toEpochDay()
             val uprootedAt = updated.uprootedAt
             if (uprootedAt == null) it.remove(Keys.SEMI_FIXED_UPROOTED_AT)
             else it[Keys.SEMI_FIXED_UPROOTED_AT] = uprootedAt.toEpochDay()
             it[Keys.SEMI_FIXED_NOTICE] = notice.name
+        }
+    }
+
+    /**
+     * The veset on [date] was deleted or moved: if it was the one that just
+     * uprooted the וסת חצי קבוע or established it again, that change is
+     * undone — the calculations go back to what they were before that veset.
+     */
+    suspend fun undoSemiFixedChangeBy(date: LocalDate) {
+        context.womensAreaSecurityStore.edit {
+            if (it[Keys.SEMI_FIXED_CHANGED_BY] != date.toEpochDay()) return@edit
+            it[Keys.SEMI_FIXED_PREV_SINCE]?.let { since -> it[Keys.SEMI_FIXED_SINCE] = since }
+            val prevUprooted = it[Keys.SEMI_FIXED_PREV_UPROOTED_AT]
+            if (prevUprooted == null) it.remove(Keys.SEMI_FIXED_UPROOTED_AT) else it[Keys.SEMI_FIXED_UPROOTED_AT] = prevUprooted
+            it.remove(Keys.SEMI_FIXED_CHANGED_BY)
+            it.remove(Keys.SEMI_FIXED_PREV_SINCE)
+            it.remove(Keys.SEMI_FIXED_PREV_UPROOTED_AT)
+            it.remove(Keys.SEMI_FIXED_NOTICE)
         }
     }
 

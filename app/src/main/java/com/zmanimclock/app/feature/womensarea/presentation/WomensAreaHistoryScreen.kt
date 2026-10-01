@@ -94,6 +94,7 @@ fun WomensAreaHistoryScreen(
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val entries by viewModel.allEntries.collectAsStateWithLifecycle()
+    val latestEntryId = entries.latestEntry()?.id
     var editing by remember { mutableStateOf<WomensAreaEntryEntity?>(null) }
     var deleting by remember { mutableStateOf<WomensAreaEntryEntity?>(null) }
     // A hefsek edit waiting on the early-hefsek notice: the entry, its new date, its day in the count.
@@ -140,6 +141,7 @@ fun WomensAreaHistoryScreen(
                     CycleCard(
                         cycle = cycle,
                         entryOf = { id -> history.entriesById[id] },
+                        latestEntryId = latestEntryId,
                         onEdit = { editing = it },
                         onDelete = { deleting = it },
                     )
@@ -150,6 +152,7 @@ fun WomensAreaHistoryScreen(
                 items(history.otherHefseks, key = { it.id }) { entry ->
                     EntryActionsRow(
                         label = "הפסק טהרה: ${WomensAreaLabels.hefsekTiming(entry.date)}",
+                        actions = entry.id == latestEntryId,
                         onEdit = { editing = entry },
                         onDelete = { deleting = entry },
                     )
@@ -373,6 +376,8 @@ private fun DayOfMonthStrip(cycles: List<Cycle>) {
 private fun CycleCard(
     cycle: Cycle,
     entryOf: (Long) -> WomensAreaEntryEntity?,
+    /** Only the last entry on the calendar can be corrected or deleted — older ones were already counted from. */
+    latestEntryId: Long?,
     onEdit: (WomensAreaEntryEntity) -> Unit,
     onDelete: (WomensAreaEntryEntity) -> Unit,
 ) {
@@ -446,10 +451,10 @@ private fun CycleCard(
                     WomensAreaCalculator.tevilaNightBlock(hefsek.date)?.let { TevilaBlockWarning(it) }
                 }
                 entryOf(cycle.veset.id)?.let { entry ->
-                    EntryActionsRow("הראייה", onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })
+                    EntryActionsRow("הראייה", entry.id == latestEntryId, onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })
                 }
                 cycle.hefsek?.let { entryOf(it.id) }?.let { entry ->
-                    EntryActionsRow("ההפסק", onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })
+                    EntryActionsRow("ההפסק", entry.id == latestEntryId, onEdit = { onEdit(entry) }, onDelete = { onDelete(entry) })
                 }
             }
         }
@@ -457,7 +462,17 @@ private fun CycleCard(
 }
 
 @Composable
-private fun EntryActionsRow(label: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun EntryActionsRow(label: String, actions: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
+    if (!actions) {
+        // An older entry: shown, never changed — what came after it was counted from it.
+        Text(
+            "$label — רשומה קודמת, אינה ניתנת לשינוי",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()

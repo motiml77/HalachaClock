@@ -118,7 +118,10 @@ class WomensAreaViewModel @Inject constructor(
                 val sf = ui.semiFixed ?: return@collect
                 val change = ui.status?.transition ?: return@collect
                 settings.saveSemiFixedChange(
-                    WomensAreaSemiFixed.after(sf, change),
+                    before = sf,
+                    updated = WomensAreaSemiFixed.after(sf, change),
+                    changedBy = change.at,
+                    notice =
                     when (change) {
                         is SemiFixedTransition.Uprooted -> SemiFixedNotice.UPROOTED
                         is SemiFixedTransition.Reestablished -> SemiFixedNotice.REESTABLISHED
@@ -191,13 +194,24 @@ class WomensAreaViewModel @Inject constructor(
     fun updateEntry(entry: WomensAreaEntryEntity, newDate: LocalDate, onah: Onah?) = viewModelScope.launch {
         val isVeset = entry.type == WomensAreaEntryType.PERIOD_START
         if (isVeset && onah == null) return@launch
+        // Only the latest entry: everything after an older one was already counted from it.
+        if (dao.getAllEntries().first().latestEntry()?.id != entry.id) return@launch
+        if (isVeset) settings.undoSemiFixedChangeBy(entry.date)
         dao.update(entry.copy(epochDay = newDate.toEpochDay(), onah = if (isVeset) onah else null))
         // A moved date can reorder the cycles, so the keep-last-6 rule runs again.
         pruneToLastVesets()
         if (!isVeset) rescheduleLatest()
     }
 
+    /**
+     * Only the latest entry can be deleted — to correct a day chosen by
+     * mistake and record it again. Its calculations go with it, including a
+     * change it made to the וסת חצי קבוע. Older entries were already counted
+     * from, and stay.
+     */
     fun deleteEntry(entry: WomensAreaEntryEntity) = viewModelScope.launch {
+        if (dao.getAllEntries().first().latestEntry()?.id != entry.id) return@launch
+        if (entry.type == WomensAreaEntryType.PERIOD_START) settings.undoSemiFixedChangeBy(entry.date)
         dao.delete(entry)
         if (entry.type == WomensAreaEntryType.HEFSEK_TAHARA) rescheduleLatest()
     }

@@ -92,6 +92,8 @@ fun WomensAreaDaySheet(
     date: LocalDate,
     today: LocalDate,
     entriesOnDay: List<WomensAreaEntryEntity>,
+    /** The last entry on the calendar — the only one that can be deleted (see latestEntry). */
+    latestEntryId: Long?,
     /** Every veset recorded before [date] — for the haflaga and the carried-over days in the preview. */
     earlierVesets: List<VesetRecord>,
     /** The latest veset on or before [date], for the early-hefsek notice. */
@@ -130,6 +132,7 @@ fun WomensAreaDaySheet(
                     date = date,
                     today = today,
                     entriesOnDay = entriesOnDay,
+                    latestEntryId = latestEntryId,
                     onVeset = { step = Step.VESET },
                     onHefsek = {
                         // Before the 5th day: say so once, then carry on as usual.
@@ -199,6 +202,7 @@ private fun ChooseStep(
     date: LocalDate,
     today: LocalDate,
     entriesOnDay: List<WomensAreaEntryEntity>,
+    latestEntryId: Long?,
     onVeset: () -> Unit,
     onHefsek: () -> Unit,
     onDelete: (WomensAreaEntryEntity) -> Unit,
@@ -226,7 +230,9 @@ private fun ChooseStep(
     )
     if (entriesOnDay.isNotEmpty()) {
         Text("רשום ביום זה", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
-        entriesOnDay.forEach { RecordedRow(it, onDelete = { onDelete(it) }) }
+        entriesOnDay.forEach { entry ->
+            RecordedRow(entry, deletable = entry.id == latestEntryId, onDelete = { onDelete(entry) })
+        }
     }
 }
 
@@ -278,14 +284,36 @@ private fun OptionCard(
     }
 }
 
-/** An entry already on this day, with a delete that asks once before it deletes. */
+/**
+ * An entry already on this day. The latest entry on the calendar has a
+ * delete (asked once) — for a day chosen by mistake: delete, then record the
+ * right one. An older one was already counted from, and says so instead.
+ */
 @Composable
-private fun RecordedRow(entry: WomensAreaEntryEntity, onDelete: () -> Unit) {
+private fun RecordedRow(entry: WomensAreaEntryEntity, deletable: Boolean, onDelete: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     var confirming by remember(entry.id) { mutableStateOf(false) }
     val label = when (entry.type) {
         WomensAreaEntryType.PERIOD_START -> "התחלת ווסת" + (entry.onah?.let { " · ${it.hebrewName}" } ?: "")
         WomensAreaEntryType.HEFSEK_TAHARA -> "הפסק טהרה"
+    }
+    if (!deletable) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(cs.surfaceContainerHigh)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "רשומה קודמת — החישובים שאחריה כבר נעשו לפיה, ולכן אי אפשר למחוק אותה. " +
+                    "אפשר למחוק רק את הרשומה האחרונה בלוח.",
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant,
+            )
+        }
+        return
     }
     Row(
         modifier = Modifier
@@ -296,7 +324,7 @@ private fun RecordedRow(entry: WomensAreaEntryEntity, onDelete: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            if (confirming) "למחוק את \"$label\"?" else label,
+            if (confirming) "למחוק את \"$label\"? החישובים לפיה יימחקו, ואפשר לרשום מחדש." else label,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
