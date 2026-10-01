@@ -80,9 +80,14 @@ data class VesetPrediction(
     val yomHachodeshMissing: Boolean,
     /** Days carried over from earlier vesets, not yet uprooted (see WomensAreaCalculator.carriedOver). */
     val carried: List<PrishaDay> = emptyList(),
+    /**
+     * A וסת חצי קבוע in force for this cycle: separation days before this day
+     * of the count are not shown (see WomensAreaSemiFixed). Null = every day.
+     */
+    val semiFixedMinDay: Int? = null,
 ) {
-    /** The separation days, in date order — this veset's own, then any carried over. */
-    val prishaDays: List<PrishaDay>
+    /** Every separation day computed, in date order — this veset's own, then any carried over. */
+    val allPrishaDays: List<PrishaDay>
         get() = (
             listOfNotNull(
                 PrishaDay(VesetKind.ONAH_BEINONIT, onahBeinonit, onah, dayNumberOf(onahBeinonit)),
@@ -91,9 +96,21 @@ data class VesetPrediction(
             ) + carried
             ).sortedWith(compareBy({ it.date }, { it.kind.ordinal }))
 
-    /** How far the on-calendar count runs: at least to day 30, and on to the latest separation day. */
+    /** The separation days shown — all of them, less those a וסת חצי קבוע leaves out. */
+    val prishaDays: List<PrishaDay>
+        get() = allPrishaDays.filterNot(::hiddenBySemiFixed)
+
+    /** The days the וסת חצי קבוע leaves out: before day [semiFixedMinDay] of the count. */
+    val hiddenDays: List<PrishaDay>
+        get() = allPrishaDays.filter(::hiddenBySemiFixed)
+
+    private fun hiddenBySemiFixed(day: PrishaDay): Boolean =
+        semiFixedMinDay != null && dayNumberOf(day.date) < semiFixedMinDay
+
+    /** How far the on-calendar count runs: at least to day 30, and on to the latest separation day shown. */
     val lastCountedDay: Int
-        get() = prishaDays.maxOf { it.dayNumber }.coerceAtLeast(WomensAreaCalculator.ONAH_BEINONIT_DAY)
+        get() = (prishaDays.maxOfOrNull { dayNumberOf(it.date) } ?: 0)
+            .coerceAtLeast(WomensAreaCalculator.ONAH_BEINONIT_DAY)
 
     /** [date]'s number in the count (the veset day = 1), or null outside 1..[lastCountedDay]. */
     fun countDayNumber(date: LocalDate): Int? =

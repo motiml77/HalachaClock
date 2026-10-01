@@ -105,6 +105,7 @@ fun WomensAreaScreen(
     val hefsek by viewModel.latestHefsek.collectAsStateWithLifecycle()
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val semiFixed by viewModel.semiFixed.collectAsStateWithLifecycle()
     // The day whose sheet is open, if any.
     var tapped by remember { mutableStateOf<LocalDate?>(null) }
 
@@ -155,11 +156,26 @@ fun WomensAreaScreen(
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
             )
+            // A sighting before the וסת חצי קבוע's day N comes first, where she sees it.
+            val contradicted = semiFixed.status?.latestContradicts == true
+            val semiFixedCard = @Composable {
+                SemiFixedCard(
+                    ui = semiFixed,
+                    onSave = viewModel::setSemiFixed,
+                    onRemove = { viewModel.setSemiFixed(null) },
+                )
+            }
+            if (contradicted) semiFixedCard()
             prediction?.let { PrishaSummaryCard(it) }
+            if (!contradicted) semiFixedCard()
             hefsek?.let { TaharaSummaryCard(it, prediction) }
             WomensAreaRemindersCard(reminders = reminders, onChange = viewModel::setReminders)
             HistoryEntryCard(history, onClick = onOpenHistory)
         }
+    }
+
+    semiFixed.cancelledMinDay?.let { n ->
+        SemiFixedCancelledDialog(minDay = n, onConfirm = viewModel::dismissSemiFixedCancelled)
     }
 
     tapped?.let { date ->
@@ -172,6 +188,7 @@ fun WomensAreaScreen(
                 .map { VesetRecord(it.id, LocalDate.ofEpochDay(it.epochDay), it.onah) },
             vesetOnOrBefore = entries.latestVesetOnOrBefore(date),
             savedReminders = reminders,
+            semiFixed = semiFixed.semiFixed,
             onSaveVeset = { onah ->
                 viewModel.addPeriodStart(date, onah)
                 tapped = null
@@ -370,6 +387,9 @@ private fun PrishaSummaryCard(prediction: VesetPrediction) {
             }
             if (prediction.yomHachodeshMissing) {
                 MissingRow("יום החודש", "הראייה הייתה בל׳, ולחודש הבא אין ל׳ — יש לברר עם רב")
+            }
+            prediction.semiFixedMinDay?.let { n ->
+                if (prediction.hiddenDays.isNotEmpty()) SemiFixedHiddenNote(n, prediction.hiddenDays)
             }
 
             Text(

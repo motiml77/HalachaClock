@@ -4,13 +4,17 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedVeset
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaReminderTimes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -47,6 +51,14 @@ data class WomensAreaSecurity(
      */
     val enabled: Boolean = false,
     val reminders: WomensAreaReminders = WomensAreaReminders(),
+    /** וסת חצי קבוע, if she set one (by her rabbi's ruling) — null when none. */
+    val semiFixed: SemiFixedVeset? = null,
+    /**
+     * Set when the app itself cancelled a וסת חצי קבוע after
+     * WomensAreaSemiFixed.CANCEL_AFTER contradicting sightings in a row: the N
+     * it had, for the message she sees once and confirms.
+     */
+    val semiFixedCancelledMinDay: Int? = null,
 )
 
 @Singleton
@@ -59,6 +71,9 @@ class WomensAreaSecurityRepository @Inject constructor(
         val REMINDER_TIMES = stringPreferencesKey("reminder_times")
         val TEVILA_REMINDER_ENABLED = booleanPreferencesKey("tevila_reminder_enabled")
         val TEVILA_REMINDER_TIMES = stringPreferencesKey("tevila_reminder_times")
+        val SEMI_FIXED_MIN_DAY = intPreferencesKey("semi_fixed_min_day")
+        val SEMI_FIXED_SINCE = longPreferencesKey("semi_fixed_since_epoch_day")
+        val SEMI_FIXED_CANCELLED = intPreferencesKey("semi_fixed_cancelled_min_day")
     }
 
     val state: Flow<WomensAreaSecurity> = context.womensAreaSecurityStore.data.map { prefs ->
@@ -73,6 +88,10 @@ class WomensAreaSecurityRepository @Inject constructor(
                     default = WomensAreaReminderTimes.TEVILA_DEFAULT,
                 ),
             ),
+            semiFixed = prefs[Keys.SEMI_FIXED_MIN_DAY]?.let { minDay ->
+                SemiFixedVeset(minDay, LocalDate.ofEpochDay(prefs[Keys.SEMI_FIXED_SINCE] ?: 0L))
+            },
+            semiFixedCancelledMinDay = prefs[Keys.SEMI_FIXED_CANCELLED],
         )
     }
 
@@ -88,5 +107,37 @@ class WomensAreaSecurityRepository @Inject constructor(
             it[Keys.TEVILA_REMINDER_ENABLED] = reminders.tevilaEnabled
             it[Keys.TEVILA_REMINDER_TIMES] = WomensAreaReminderTimes.encode(reminders.tevilaTimes)
         }
+    }
+
+    /**
+     * Sets (or, with null, removes) the וסת חצי קבוע. A new setting counts
+     * contradictions only from today — see SemiFixedVeset.since. Changing N
+     * keeps the original date, so an edit does not wipe a run already counting.
+     */
+    suspend fun setSemiFixed(minDay: Int?) {
+        context.womensAreaSecurityStore.edit {
+            if (minDay == null) {
+                it.remove(Keys.SEMI_FIXED_MIN_DAY)
+                it.remove(Keys.SEMI_FIXED_SINCE)
+            } else {
+                if (it[Keys.SEMI_FIXED_MIN_DAY] == null) it[Keys.SEMI_FIXED_SINCE] = LocalDate.now().toEpochDay()
+                it[Keys.SEMI_FIXED_MIN_DAY] = minDay
+            }
+            it.remove(Keys.SEMI_FIXED_CANCELLED)
+        }
+    }
+
+    /** Cancelled by the app after the contradictions in a row — remembered for the one-time message. */
+    suspend fun cancelSemiFixed(minDay: Int) {
+        context.womensAreaSecurityStore.edit {
+            it.remove(Keys.SEMI_FIXED_MIN_DAY)
+            it.remove(Keys.SEMI_FIXED_SINCE)
+            it[Keys.SEMI_FIXED_CANCELLED] = minDay
+        }
+    }
+
+    /** She saw the cancellation message and confirmed it. */
+    suspend fun dismissSemiFixedCancelled() {
+        context.womensAreaSecurityStore.edit { it.remove(Keys.SEMI_FIXED_CANCELLED) }
     }
 }

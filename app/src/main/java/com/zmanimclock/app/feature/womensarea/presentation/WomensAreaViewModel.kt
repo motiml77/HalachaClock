@@ -12,6 +12,9 @@ import com.zmanimclock.app.feature.womensarea.model.Cycle
 import com.zmanimclock.app.feature.womensarea.model.HefsekRecord
 import com.zmanimclock.app.feature.womensarea.model.HistoryPattern
 import com.zmanimclock.app.feature.womensarea.model.Onah
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedStatus
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedVeset
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaSemiFixed
 import com.zmanimclock.app.feature.womensarea.model.VesetRecord
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaHistory
 import com.zmanimclock.app.feature.womensarea.model.VesetPrediction
@@ -24,6 +27,7 @@ import com.zmanimclock.app.feature.womensarea.security.WomensAreaSecurityReposit
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -85,26 +89,56 @@ class WomensAreaViewModel @Inject constructor(
         .map { it.hefsek?.date }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** The latest veset's full prediction, for the separation-days card under the calendar. */
-    val latestPrediction: StateFlow<VesetPrediction?> = latestEntries
-        .map { latest ->
-            latest.veset?.let { veset ->
-                WomensAreaCalculator.predictWithHistory(veset.date, veset.onah, latest.earlierVesets)
+    /**
+     * The וסת חצי קבוע she set (if any) and where the latest veset stands
+     * against it. Built from the dao and the settings directly, not from the
+     * WhileSubscribed flows above, so the cancellation below sees it too.
+     */
+    private val semiFixedSource = combine(settings.state, dao.getAllEntries()) { state, entries ->
+        val vesetDates = entries.filter { it.type == WomensAreaEntryType.PERIOD_START }.map { it.date }
+        SemiFixedUi(
+            semiFixed = state.semiFixed,
+            status = state.semiFixed?.let { WomensAreaSemiFixed.status(vesetDates, it) },
+            cancelledMinDay = state.semiFixedCancelledMinDay,
+            shortestHaflaga = WomensAreaHistory.cycles(entries.vesetRecords(), emptyList())
+                .mapNotNull { it.haflagaInterval }.minOrNull(),
+        )
+    }
+
+    val semiFixed: StateFlow<SemiFixedUi> = semiFixedSource
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SemiFixedUi())
+
+    init {
+        // WomensAreaSemiFixed.CANCEL_AFTER contradicting sightings in a row
+        // cancel it — once, remembered for the message she then confirms.
+        viewModelScope.launch {
+            semiFixedSource.collect { ui ->
+                val sf = ui.semiFixed ?: return@collect
+                if (ui.status?.shouldCancel == true) settings.cancelSemiFixed(sf.minDay)
             }
         }
+    }
+
+    /** The latest veset's full prediction, for the separation-days card under the calendar. */
+    val latestPrediction: StateFlow<VesetPrediction?> = combine(latestEntries, semiFixed) { latest, sf ->
+        latest.veset?.let { veset ->
+            WomensAreaCalculator.predictWithHistory(veset.date, veset.onah, latest.earlierVesets)
+                .copy(semiFixedMinDay = sf.minDayInForce)
+        }
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** date -> marker, recomputed whenever the latest entries change. */
-    val markersByDate: StateFlow<Map<LocalDate, WomensAreaMarker>> = latestEntries
-        .map { latest ->
-            WomensAreaMarkers.build(
-                latestVeset = latest.veset?.date,
-                latestVesetOnah = latest.veset?.onah,
-                previousVeset = latest.previousVeset?.date,
-                latestHefsek = latest.hefsek?.date,
-                earlierVesets = latest.earlierVesets,
-            )
-        }
+    val markersByDate: StateFlow<Map<LocalDate, WomensAreaMarker>> = combine(latestEntries, semiFixed) { latest, sf ->
+        WomensAreaMarkers.build(
+            latestVeset = latest.veset?.date,
+            latestVesetOnah = latest.veset?.onah,
+            previousVeset = latest.previousVeset?.date,
+            latestHefsek = latest.hefsek?.date,
+            earlierVesets = latest.earlierVesets,
+            semiFixedMinDay = sf.minDayInForce,
+        )
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     // ------------------------------------------------------------- grid
@@ -172,6 +206,14 @@ class WomensAreaViewModel @Inject constructor(
         rescheduleLatest()
     }
 
+    // ------------------------------------------------ וסת חצי קבוע
+
+    /** Sets N (by her rabbi's ruling), or with null removes the setting. */
+    fun setSemiFixed(minDay: Int?) = viewModelScope.launch { settings.setSemiFixed(minDay) }
+
+    /** She confirmed the message that the app cancelled it. */
+    fun dismissSemiFixedCancelled() = viewModelScope.launch { settings.dismissSemiFixedCancelled() }
+
     // ------------------------------------------------------- reminders
 
     /** From the reminders card on the main screen. */
@@ -193,6 +235,19 @@ class WomensAreaViewModel @Inject constructor(
             .maxByOrNull { it.epochDay } ?: return
         reminderScheduler.schedule(latest.id, latest.date, settings.state.first().reminders)
     }
+}
+
+/** The וסת חצי קבוע, as the screens need it. */
+data class SemiFixedUi(
+    val semiFixed: SemiFixedVeset? = null,
+    val status: SemiFixedStatus? = null,
+    /** Set once the app cancelled it, until she confirms the message. */
+    val cancelledMinDay: Int? = null,
+    /** The shortest haflaga in the kept history — offered as a starting N. */
+    val shortestHaflaga: Int? = null,
+) {
+    /** N while it applies to the current cycle — null with none, or after a contradicting sighting. */
+    val minDayInForce: Int? get() = WomensAreaSemiFixed.minDayFor(semiFixed, status?.latestContradicts == true)
 }
 
 data class HistoryUi(

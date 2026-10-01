@@ -43,6 +43,8 @@ object WomensAreaMarkers {
          * means only [previousVeset] is known, for the haflaga alone.
          */
         earlierVesets: List<VesetRecord> = emptyList(),
+        /** A וסת חצי קבוע in force for this cycle: no separation day before this day of the count. */
+        semiFixedMinDay: Int? = null,
     ): Map<LocalDate, WomensAreaMarker> {
         val markers = mutableMapOf<LocalDate, WomensAreaMarker>()
         fun edit(date: LocalDate, change: (WomensAreaMarker) -> WomensAreaMarker) {
@@ -54,7 +56,7 @@ object WomensAreaMarkers {
                 WomensAreaCalculator.predictWithHistory(start, latestVesetOnah, earlierVesets)
             } else {
                 WomensAreaCalculator.predict(start, latestVesetOnah, previousVeset)
-            }
+            }.copy(semiFixedMinDay = semiFixedMinDay)
             for (n in 1..prediction.lastCountedDay) {
                 edit(start.plusDays((n - 1).toLong())) { it.copy(countDayNumber = n) }
             }

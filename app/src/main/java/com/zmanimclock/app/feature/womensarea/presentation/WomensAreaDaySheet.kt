@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryEntity
 import com.zmanimclock.app.feature.womensarea.data.WomensAreaEntryType
 import com.zmanimclock.app.feature.womensarea.model.Onah
+import com.zmanimclock.app.feature.womensarea.model.SemiFixedVeset
+import com.zmanimclock.app.feature.womensarea.model.WomensAreaSemiFixed
 import com.zmanimclock.app.feature.womensarea.model.TevilaBlock
 import com.zmanimclock.app.feature.womensarea.model.VesetRecord
 import com.zmanimclock.app.feature.womensarea.model.WomensAreaCalculator
@@ -94,6 +96,8 @@ fun WomensAreaDaySheet(
     /** The latest veset on or before [date], for the early-hefsek notice. */
     vesetOnOrBefore: LocalDate?,
     savedReminders: WomensAreaReminders,
+    /** The וסת חצי קבוע she set, if any — the preview leaves out what it hides, or warns. */
+    semiFixed: SemiFixedVeset?,
     onSaveVeset: (Onah) -> Unit,
     onSaveHefsek: (WomensAreaReminders) -> Unit,
     onDelete: (WomensAreaEntryEntity) -> Unit,
@@ -140,6 +144,7 @@ fun WomensAreaDaySheet(
                     date = date,
                     onah = onah,
                     earlierVesets = earlierVesets,
+                    semiFixed = semiFixed,
                     onOnahChange = { onah = it },
                     onSave = { onah?.let(onSaveVeset) },
                 )
@@ -312,6 +317,7 @@ private fun VesetStep(
     date: LocalDate,
     onah: Onah?,
     earlierVesets: List<VesetRecord>,
+    semiFixed: SemiFixedVeset?,
     onOnahChange: (Onah) -> Unit,
     onSave: () -> Unit,
 ) {
@@ -330,7 +336,7 @@ private fun VesetStep(
         )
     }
     if (onah != Onah.NIGHT) HebrewDayInfoNote()
-    onah?.let { PrishaPreview(date, it, earlierVesets) }
+    onah?.let { PrishaPreview(date, it, earlierVesets, semiFixed) }
     SaveButton(enabled = onah != null, label = if (onah == null) "יש לבחור ביום או בלילה" else "שמירה", onClick = onSave)
 }
 
@@ -365,9 +371,19 @@ private fun OnahTile(
 
 /** The separation days this veset will mark, before she saves it. */
 @Composable
-private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<VesetRecord>) {
+private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<VesetRecord>, semiFixed: SemiFixedVeset?) {
+    val previous = earlierVesets.filter { it.date < date }.maxOfOrNull { it.date }
+    val contradicts = semiFixed != null && WomensAreaSemiFixed.contradicts(date, previous, semiFixed)
     val prediction = WomensAreaCalculator.predictWithHistory(date, onah, earlierVesets)
+        .copy(semiFixedMinDay = WomensAreaSemiFixed.minDayFor(semiFixed, contradicts))
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Before day N: say so before she saves — this month will show every day.
+        if (contradicts) {
+            SemiFixedWarning(
+                "ראייה זו מגיעה ביום ${WomensAreaCalculator.haflagaInterval(date, previous)} — לפני יום ${semiFixed.minDay} " +
+                    "שהוגדר כוסת חצי קבוע. בחודש זה יוצגו כל ימי הפרישה. יש לשאול רב.",
+            )
+        }
         Text("ימי הפרישה שיסומנו בלוח:", style = MaterialTheme.typography.labelLarge)
         prediction.prishaDays.forEach { day ->
             FramedBlock(WomensAreaPrishaRed) {
@@ -388,6 +404,9 @@ private fun PrishaPreview(date: LocalDate, onah: Onah, earlierVesets: List<Veset
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        prediction.semiFixedMinDay?.let { n ->
+            if (prediction.hiddenDays.isNotEmpty()) SemiFixedHiddenNote(n, prediction.hiddenDays)
         }
     }
 }

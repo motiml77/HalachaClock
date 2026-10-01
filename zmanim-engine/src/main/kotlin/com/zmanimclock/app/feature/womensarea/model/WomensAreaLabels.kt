@@ -163,6 +163,37 @@ object WomensAreaLabels {
         }
     } + if (pattern.onah == Onah.DAY) " — כולן ביום" else " — כולן בלילה"
 
+    // ------------------------------------------------- וסת חצי קבוע
+
+    /** The method, word for word as the setting window shows it. */
+    fun semiFixedMethod(minDay: Int): List<String> = listOf(
+        "וסת חצי קבוע — אישה שנקבע אצלה שאינה רואה לעולם לפני יום $minDay, " +
+            "בספירה מיום הראייה הקודמת (יום הראייה = יום 1, כמו בהפלגה).",
+        "לפי שיטה זו, הדבר עצמו הוא מעין וסת — וסת שלא לראות בימים שלפני כן. " +
+            "לכן ימי פרישה שחלים לפני יום $minDay אינם מוצגים בלוח: הפלגה קצרה, יום החודש " +
+            "והימים שנמשכים מראיות קודמות" +
+            (if (minDay > WomensAreaCalculator.ONAH_BEINONIT_DAY) ", וגם העונה הבינונית (יום 30)." else ".") +
+            " ימי פרישה מיום $minDay והלאה מוצגים כרגיל.",
+        "ראייה שתגיע לפני יום $minDay — תוצג אזהרה, ובאותו חודש יוצגו כל ימי הפרישה. " +
+            "אחרי ${WomensAreaSemiFixed.CANCEL_AFTER} ראיות כאלה ברצף ההגדרה תבוטל.",
+        "יש פוסקים שאינם סוברים כך. יש להגדיר רק לפי הוראת רב.",
+    )
+
+    /** "לא מוצגים לפי וסת חצי קבוע (לא לפני יום 26): הפלגה (24 יום) · יום החודש · ט״ו אייר". */
+    fun semiFixedHiddenLine(minDay: Int, hidden: List<PrishaDay>): String =
+        "לפי וסת חצי קבוע (לא לפני יום $minDay) אינם מוצגים: " + hidden.joinToString(" · ") { prishaTitle(it) }
+
+    /** The warning on a cycle whose veset came before day [minDay]. */
+    fun semiFixedContradiction(interval: Int?, minDay: Int, consecutive: Int): String =
+        "הראייה האחרונה הגיעה " + (interval?.let { "ביום $it " } ?: "") +
+            "— לפני יום $minDay שהוגדר כוסת חצי קבוע. בחודש זה מוצגים כל ימי הפרישה. יש לשאול רב." +
+            " (ראייה סותרת $consecutive מתוך ${WomensAreaSemiFixed.CANCEL_AFTER} ברצף)"
+
+    /** The message once [WomensAreaSemiFixed.CANCEL_AFTER] sightings in a row came before day [minDay]. */
+    fun semiFixedCancelled(minDay: Int): String =
+        "${WomensAreaSemiFixed.CANCEL_AFTER} ראיות ברצף הגיעו לפני יום $minDay, ולכן הוסת החצי קבוע בוטל. " +
+            "מעתה מוצגים בלוח כל ימי הפרישה. יש להתייעץ עם רב."
+
     /** The warning when ליל הטבילה is a night with no tevila. */
     fun tevilaBlockText(block: TevilaBlock): String =
         "ליל הטבילה חל ב" + (if (block == TevilaBlock.YOM_KIPPUR) "ליל יום הכיפורים" else "ליל תשעה באב") +
