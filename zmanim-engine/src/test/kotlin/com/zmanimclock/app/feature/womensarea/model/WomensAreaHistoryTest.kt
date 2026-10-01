@@ -32,13 +32,27 @@ class WomensAreaHistoryTest {
     }
 
     @Test
-    fun `only the last 6 vesets are kept, and hefseks older than the oldest kept go with them`() {
-        val vs = everyN(h(5786, 7, 1), gap = 29, n = 8)
+    fun `7 vesets are stored - 6 shown and one behind them - and older hefseks go with the rest`() {
+        val vs = everyN(h(5786, 7, 1), gap = 29, n = 9)
         val oldHefsek = HefsekRecord(200, vs[1].date.plusDays(5)) // belongs to the 2nd-oldest cycle
-        val keptHefsek = HefsekRecord(201, vs[2].date.plusDays(5))
+        val keptHefsek = HefsekRecord(201, vs[2].date.plusDays(5)) // the cycle stored behind the 6 shown
         val prune = WomensAreaHistory.idsToPrune(vs.shuffled(), listOf(oldHefsek, keptHefsek))
         assertEquals(setOf(vs[0].id, vs[1].id, 200L), prune)
-        assertEquals(emptySet<Long>(), WomensAreaHistory.idsToPrune(vs.take(6), listOf(oldHefsek)))
+        assertEquals(emptySet<Long>(), WomensAreaHistory.idsToPrune(vs.take(7), listOf(oldHefsek)))
+    }
+
+    @Test
+    fun `the 6 shown include the oldest one's haflaga, from the veset stored behind it`() {
+        val vs = everyN(h(5786, 7, 1), gap = 29, n = 7)
+        val cycles = WomensAreaHistory.cycles(vs, emptyList())
+        assertEquals(6, cycles.size)
+        assertEquals(vs.last().date, cycles.first().veset.date)
+        assertEquals(vs[1].date, cycles.last().veset.date)
+        assertEquals(List(6) { 29 }, cycles.map { it.haflagaInterval })
+        // Deleting the latest brings the one behind into view: still 6.
+        val after = WomensAreaHistory.cycles(vs.dropLast(1), emptyList())
+        assertEquals(6, after.size)
+        assertEquals(null, after.last().haflagaInterval)
     }
 
     @Test

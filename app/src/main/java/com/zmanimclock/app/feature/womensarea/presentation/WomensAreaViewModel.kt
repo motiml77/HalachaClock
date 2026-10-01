@@ -77,11 +77,16 @@ class WomensAreaViewModel @Inject constructor(
         .map { entries ->
             val cycles = WomensAreaHistory.cycles(entries.vesetRecords(), entries.hefsekRecords())
             val attached = cycles.mapNotNull { it.hefsek?.id }.toSet()
+            // The cycle stored behind the shown ones keeps its hefsek out of view too.
+            val oldestShown = cycles.lastOrNull()?.veset?.date
             HistoryUi(
                 cycles = cycles,
                 patterns = WomensAreaHistory.patterns(cycles),
                 entriesById = entries.associateBy { it.id },
-                otherHefseks = entries.filter { it.type == WomensAreaEntryType.HEFSEK_TAHARA && it.id !in attached },
+                otherHefseks = entries.filter {
+                    it.type == WomensAreaEntryType.HEFSEK_TAHARA && it.id !in attached &&
+                        (oldestShown == null || it.date >= oldestShown)
+                },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUi())
@@ -217,7 +222,7 @@ class WomensAreaViewModel @Inject constructor(
     }
 
     /**
-     * Keeps only the last WomensAreaHistory.KEEP vesets, and the hefseks of
+     * Keeps only the last WomensAreaHistory.STORED vesets (6 shown, one behind them), and the hefseks of
      * their cycles — a new veset beyond that replaces the oldest, as the
      * owner asked. Re-queues reminders if a hefsek went with it.
      */

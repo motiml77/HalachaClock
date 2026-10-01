@@ -44,19 +44,31 @@ sealed class HistoryPattern {
 }
 
 /**
- * The Women's Area history: the last [KEEP] vesets and what was computed on
+ * The Women's Area history: the last [KEEP] vesets (one more stored behind them) and what was computed on
  * each, laid out so a pattern can be SEEN — never decided. Pure: the app
  * feeds it rows and draws what comes back.
  */
 object WomensAreaHistory {
 
-    /** How many vesets are kept; a new one beyond this replaces the oldest. */
+    /** How many vesets the history shows; a new one beyond this replaces the oldest. */
     const val KEEP = 6
+
+    /**
+     * How many are stored: one more than shown, behind the scenes — so the
+     * oldest one shown still has its haflaga, and deleting the latest (a day
+     * chosen by mistake) brings the one before back into view instead of
+     * leaving a gap.
+     */
+    const val STORED = KEEP + 1
 
     /** Patterns are shown from this many repeats in a row. */
     const val MIN_REPEAT = 3
 
-    /** The cycles, newest first. */
+    /**
+     * The [KEEP] newest cycles, newest first — computed from every veset
+     * given, so the extra one stored behind them still gives the oldest shown
+     * its haflaga and its carried-over days.
+     */
     fun cycles(vesets: List<VesetRecord>, hefseks: List<HefsekRecord>): List<Cycle> {
         val sorted = vesets.sortedBy { it.date }
         return sorted.mapIndexed { i, veset ->
@@ -74,19 +86,19 @@ object WomensAreaHistory {
                     .filter { it.date >= veset.date && (next == null || it.date < next) }
                     .maxByOrNull { it.date },
             )
-        }.reversed()
+        }.reversed().take(KEEP)
     }
 
     /**
-     * The entry ids to delete so only the last [KEEP] vesets remain, together
-     * with every hefsek older than the oldest veset kept (it belongs to a
-     * cycle no longer shown).
+     * The entry ids to delete so only the last [STORED] vesets remain, together
+     * with every hefsek older than the oldest of them (it belongs to a cycle
+     * no longer kept at all).
      */
     fun idsToPrune(vesets: List<VesetRecord>, hefseks: List<HefsekRecord>): Set<Long> {
         val sorted = vesets.sortedByDescending { it.date }
-        if (sorted.size <= KEEP) return emptySet()
-        val oldestKept = sorted[KEEP - 1].date
-        return (sorted.drop(KEEP).map { it.id } + hefseks.filter { it.date < oldestKept }.map { it.id }).toSet()
+        if (sorted.size <= STORED) return emptySet()
+        val oldestKept = sorted[STORED - 1].date
+        return (sorted.drop(STORED).map { it.id } + hefseks.filter { it.date < oldestKept }.map { it.id }).toSet()
     }
 
     /**
