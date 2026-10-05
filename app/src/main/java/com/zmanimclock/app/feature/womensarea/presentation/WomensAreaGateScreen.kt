@@ -31,7 +31,7 @@ import androidx.fragment.app.FragmentActivity
 import com.zmanimclock.app.feature.womensarea.security.BiometricAuthResult
 import com.zmanimclock.app.feature.womensarea.security.BiometricAuthenticator
 import com.zmanimclock.app.ui.WomensAreaLilac
-import com.zmanimclock.app.ui.WomensAreaSpringIcon
+import com.zmanimclock.app.ui.WomensAreaLogo
 import kotlinx.coroutines.launch
 
 /**
@@ -67,7 +67,7 @@ fun WomensAreaGateScreen(onUnlocked: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(WomensAreaSpringIcon, contentDescription = null, modifier = Modifier.size(56.dp), tint = WomensAreaLilac)
+        WomensAreaLogo(size = 112.dp)
         Spacer(Modifier.height(12.dp))
         Text("איזור נשי", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))

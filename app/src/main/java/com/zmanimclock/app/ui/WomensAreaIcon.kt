@@ -1,6 +1,13 @@
 package com.zmanimclock.app.ui
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
+import com.zmanimclock.app.R
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -50,4 +57,20 @@ val WomensAreaSpringIcon: ImageVector by lazy {
             }
         }
     }.build()
+}
+
+/**
+ * The Women's Area's own logo, in full colour — a circle with its edge cut
+ * clean (transparent outside it, no white corners). Shown wherever the area
+ * is entered or introduced; never tinted, so it does not follow the nav bar's
+ * colours like a vector icon. (The notification's STATUS-BAR icon is a
+ * monochrome drawing of it instead — see ic_stat_womens_area.)
+ */
+@Composable
+fun WomensAreaLogo(size: Dp, modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.women_area_logo),
+        contentDescription = null,
+        modifier = modifier.size(size),
+    )
 }

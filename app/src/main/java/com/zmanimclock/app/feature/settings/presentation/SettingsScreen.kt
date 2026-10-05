@@ -65,7 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zmanimclock.app.ui.WheatEar
-import com.zmanimclock.app.ui.WomensAreaSpringIcon
+import com.zmanimclock.app.ui.WomensAreaLogo
 import com.zmanimclock.app.feature.womensarea.presentation.rememberWomensAreaToggle
 import androidx.core.content.getSystemService
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -717,7 +717,6 @@ private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit
     val dark = isSystemInDarkTheme()
     val cardBg = if (dark) Color(0xFF2E2333) else Color(0xFFF3E5F9)
     val tileBg = if (dark) Color(0xFF453249) else Color(0xFFE3C9EF)
-    val iconTint = if (dark) Color(0xFFD3A8E8) else Color(0xFF7C4A94)
     val titleColor = if (dark) Color(0xFFEADCF0) else Color(0xFF3A2145)
     val subColor = if (dark) Color(0xFFC7AFCF) else Color(0xFF6B4C78)
 
@@ -738,12 +737,7 @@ private fun WomensAreaSettingsCard(enabled: Boolean, onToggle: (Boolean) -> Unit
                     .background(tileBg, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    WomensAreaSpringIcon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(24.dp),
-                )
+                WomensAreaLogo(size = 34.dp)
             }
             Column(
                 modifier = Modifier

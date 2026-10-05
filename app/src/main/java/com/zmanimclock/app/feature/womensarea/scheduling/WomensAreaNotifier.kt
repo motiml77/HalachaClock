@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import com.zmanimclock.app.MainActivity
@@ -25,9 +27,11 @@ import javax.inject.Singleton
  * - The words never say what it is about: "התראה אישית · יום 3" (see
  *   WomensAreaNotificationText, whose test forbids the telling words).
  * - The lock screen shows only the public version: "התראה אישית", no text.
- * - The small icon is the area's spring (ic_stat_womens_area — water, no
- *   words) in its lilac, as the owner chose; the app's own ic_stat_zman is
- *   left as it is.
+ * - The small icon is the logo reduced to one colour (ic_stat_womens_area —
+ *   an arch over waves; no words) in its lilac: Android draws a small icon from
+ *   its alpha alone. The full-colour logo is the LARGE icon, on the unlocked
+ *   notification only — the lock screen's public version stays bare. The
+ *   app's own ic_stat_zman is left as it is.
  * - The channel's name in the system settings is the neutral "התראות אישיות".
  */
 @Singleton
@@ -52,6 +56,7 @@ class WomensAreaNotifier @Inject constructor(
             .build()
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_womens_area)
+            .setLargeIcon(largeIcon())
             .setColor(LILAC)
             .setContentTitle(content.title)
             .setContentText(content.text)
@@ -65,6 +70,12 @@ class WomensAreaNotifier @Inject constructor(
         manager.notify(notificationId, notification)
     }
 
+    /** The full-colour logo at a notification-friendly size; null (no large icon) if it cannot be decoded. */
+    private fun largeIcon(): Bitmap? = runCatching {
+        val logo = BitmapFactory.decodeResource(context.resources, R.drawable.women_area_logo)
+        Bitmap.createScaledBitmap(logo, LARGE_ICON_PX, LARGE_ICON_PX, true)
+    }.getOrNull()
+
     /** Idempotent: re-creating an existing channel only updates its name and description. */
     private fun ensureChannel(manager: NotificationManager) {
         val channel = NotificationChannel(CHANNEL, "התראות אישיות", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -76,6 +87,7 @@ class WomensAreaNotifier @Inject constructor(
 
     private companion object {
         const val CHANNEL = "womens_area_private"
+        const val LARGE_ICON_PX = 192
         /** WomensAreaLilac (0xFF9C7AB8) — the area's own colour, at the owner's request. */
         const val LILAC = 0xFF9C7AB8.toInt()
     }

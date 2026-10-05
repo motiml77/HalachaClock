@@ -68,7 +68,7 @@ import com.zmanimclock.app.ui.WomensAreaInterruptOrange
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaPrishaRed
-import com.zmanimclock.app.ui.WomensAreaSpringIcon
+import com.zmanimclock.app.ui.WomensAreaLogo
 import com.zmanimclock.app.ui.WomensAreaTevilaBlue
 import com.zmanimclock.app.ui.WomensAreaTodayYellow
 import com.zmanimclock.app.ui.WomensAreaVesetMarker
@@ -336,7 +336,7 @@ private fun FirstTimeCard() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(WomensAreaSpringIcon, contentDescription = null, tint = OnWomensAreaLilacContainer, modifier = Modifier.size(32.dp))
+        WomensAreaLogo(size = 44.dp)
         Text(
             "כדי להתחיל, הקישי על היום שבו התחילה הראייה ובחרי \"התחלת ווסת\". ימי הפרישה יסומנו בלוח מעצמם.",
             style = MaterialTheme.typography.bodyMedium,

@@ -56,7 +56,9 @@ import com.zmanimclock.app.feature.womensarea.security.WomensAreaReminders
 import com.zmanimclock.app.ui.OnWomensAreaLilacContainer
 import com.zmanimclock.app.ui.WomensAreaLilac
 import com.zmanimclock.app.ui.WomensAreaLilacContainer
-import com.zmanimclock.app.ui.WomensAreaSpringIcon
+import com.zmanimclock.app.R
+import com.zmanimclock.app.ui.WomensAreaLogo
+import androidx.compose.ui.res.painterResource
 import java.time.LocalTime
 
 /**
@@ -218,8 +220,9 @@ private fun ReminderToggle(
 }
 
 /**
- * A drawn copy of the notification as the system will show it — the area's
- * spring in lilac, the app's name, then exactly the words the notifier posts.
+ * A drawn copy of the notification as the system will show it — the small
+ * monochrome icon in lilac, the app's name, exactly the words the notifier
+ * posts, and the full-colour logo as the large icon.
  */
 @Composable
 private fun NotificationPreview(content: NotificationText) {
@@ -240,7 +243,7 @@ private fun NotificationPreview(content: NotificationText) {
                         modifier = Modifier.size(18.dp).clip(CircleShape).background(WomensAreaLilac),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(WomensAreaSpringIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Icon(painterResource(R.drawable.ic_stat_womens_area), contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                     }
                     Text(
                         "Halacha Clock · עכשיו",
@@ -248,8 +251,14 @@ private fun NotificationPreview(content: NotificationText) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(content.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(content.text, style = MaterialTheme.typography.bodyMedium)
+                // The words, with the full-colour logo at the end as the large icon.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(content.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(content.text, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    WomensAreaLogo(size = 40.dp)
+                }
             }
         }
     }

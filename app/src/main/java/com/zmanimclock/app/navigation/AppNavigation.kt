@@ -34,6 +34,8 @@ import com.zmanimclock.app.feature.womensarea.presentation.WomensAreaGateViewMod
 import com.zmanimclock.app.feature.womensarea.presentation.WomensAreaHistoryScreen
 import com.zmanimclock.app.feature.womensarea.presentation.WomensAreaHostScreen
 import com.zmanimclock.app.feature.zmanim.presentation.HomeScreen
+import androidx.compose.ui.unit.dp
+import com.zmanimclock.app.ui.WomensAreaLogo
 
 @Composable
 fun AppNavigation() {
@@ -74,7 +76,11 @@ fun AppNavigation() {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(screen.icon, contentDescription = screen.labelHebrew) },
+                        icon = {
+                            // The Women's Area keeps its own full-colour logo; every other tab is a tinted vector.
+                            if (screen == Screen.WomensArea) WomensAreaLogo(size = 26.dp)
+                            else Icon(screen.icon, contentDescription = screen.labelHebrew)
+                        },
                         label = { Text(screen.labelHebrew, maxLines = 1, softWrap = false) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
