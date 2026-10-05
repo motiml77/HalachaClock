@@ -83,7 +83,7 @@ fun CalendarScreen(
         }
     }
 
-    val grid = remember(state.visibleMonthIndex) { viewModel.monthGrid(state.visibleMonthIndex) }
+    val grid = remember(state.visibleMonthIndex, state.inIsrael) { viewModel.monthGrid(state.visibleMonthIndex) }
     val todayMonth = remember(state.today) { HebrewMonthSequence.indexOf(state.today) }
 
     LazyColumn(Modifier.fillMaxSize()) {
@@ -101,7 +101,7 @@ fun CalendarScreen(
         item {
             MonthPager(
                 pagerState = pagerState,
-                gridAt = { viewModel.monthGrid(it) },
+                gridAt = remember(state.inIsrael) { { index: Int -> viewModel.monthGrid(index) } },
                 today = state.today,
                 selected = state.selectedDate,
                 onSelect = viewModel::select,

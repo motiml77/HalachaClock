@@ -13,10 +13,11 @@ import java.time.LocalDate
  *
  * TWO SETTINGS THAT ARE DELIBERATE, NOT DEFAULTS
  *
- * `inIsrael = true` matches what FastDays and ZmanKind already hardcode. It is
- * a known limitation for the 16 foreign cities in the city list, but the grid
- * MUST agree with the zmanim list — a calendar that marks one day as Yom Tov
- * while the zmanim screen disagrees is worse than a consistent limitation.
+ * `inIsrael` selects one day of Yom Tov (Eretz Yisrael) or two (everywhere
+ * else). It defaults to TRUE — what this grid always used — so an Israeli
+ * caller that passes nothing gets exactly the old calendar. The grid MUST
+ * agree with the zmanim list, which derives the same flag from the city's
+ * time zone ([com.zmanimclock.app.feature.location.HolidayLocale]).
  *
  * `isUseModernHolidays = true` is on at the user's instruction, so Yom
  * Ha'atzmaut, Yom HaZikaron, Yom HaShoah and Yom Yerushalayim appear. They are
@@ -46,13 +47,13 @@ object MonthGridBuilder {
         isUseGershGershayim = true
     }
 
-    private fun calendarFor(year: Int, month: Int, day: Int) =
+    private fun calendarFor(year: Int, month: Int, day: Int, inIsrael: Boolean) =
         JewishCalendar(year, month, day).apply {
-            inIsrael = true
+            this.inIsrael = inIsrael
             isUseModernHolidays = true
         }
 
-    fun build(ref: HebrewMonthRef): MonthGrid {
+    fun build(ref: HebrewMonthRef, inIsrael: Boolean = true): MonthGrid {
         val fmt = formatter()
         val daysInMonth = ref.daysInMonth
         // KosherJava reports 1 = Sunday … 7 = Shabbat.
@@ -60,7 +61,7 @@ object MonthGridBuilder {
 
         val firstCellDate = ref.firstDay.minusDays(firstColumnOffset.toLong())
         val cells = (0 until ROWS * WEEK).map { i ->
-            metaFor(firstCellDate.plusDays(i.toLong()), ref, fmt)
+            metaFor(firstCellDate.plusDays(i.toLong()), ref, fmt, inIsrael)
         }
 
         return MonthGrid(
@@ -80,9 +81,10 @@ object MonthGridBuilder {
         date: LocalDate,
         displayedMonth: HebrewMonthRef? = null,
         formatter: HebrewDateFormatter = formatter(),
+        inIsrael: Boolean = true,
     ): CalendarDayMeta {
         val jd = JewishDate(date.toGregorianCalendar())
-        val jc = calendarFor(jd.jewishYear, jd.jewishMonth, jd.jewishDayOfMonth)
+        val jc = calendarFor(jd.jewishYear, jd.jewishMonth, jd.jewishDayOfMonth, inIsrael)
         val idx = jc.yomTovIndex
         val omer = jc.dayOfOmer
         val chanukah = jc.dayOfChanukah

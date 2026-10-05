@@ -1,6 +1,7 @@
 package com.zmanimclock.app.feature.zmanim.model
 
 import com.kosherjava.zmanim.hebrewcalendar.JewishCalendar
+import com.zmanimclock.app.feature.location.HolidayLocale
 import com.zmanimclock.app.feature.zmanim.engine.DayZmanim
 import java.time.DayOfWeek
 import java.time.Instant
@@ -152,9 +153,12 @@ enum class ZmanKind(val hebrewName: String, val shortName: String = hebrewName) 
  * carries it, only when the value really is the mishor one, and the badge is
  * gone. Both platforms call this, so neither can drift from the other.
  */
-fun DayZmanim.hebrewNameOf(kind: ZmanKind): String =
-    if (kind == ZmanKind.HANETZ && !basedOnVisibleSunrise) "${kind.hebrewName} (מישור)"
-    else kind.hebrewName
+fun DayZmanim.hebrewNameOf(kind: ZmanKind): String = when {
+    kind == ZmanKind.HANETZ && !basedOnVisibleSunrise -> "${kind.hebrewName} (מישור)"
+    kind == ZmanKind.CANDLE_LIGHTING && isSecondNightLighting() ->
+        "${kind.hebrewName} ליל יו\"ט שני (מאש קיימת, אחרי צאת הכוכבים)"
+    else -> kind.hebrewName
+}
 
 fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>> {
     val zone = ZoneId.of(location.timeZoneId)
@@ -187,15 +191,39 @@ fun DayZmanim.relevantTimedZmanim(date: LocalDate): List<Pair<ZmanKind, Instant>
  */
 fun isZmanRelevantOn(kind: ZmanKind, date: LocalDate, zone: ZoneId): Boolean {
     if (kind != ZmanKind.CANDLE_LIGHTING && kind != ZmanKind.TZEIT_SHABBAT) return true
-    val jc = JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone))).apply { inIsrael = true }
+    val israel = HolidayLocale.inIsrael(zone)
+    val jc = JewishCalendar(GregorianCalendar.from(date.atStartOfDay(zone))).apply { inIsrael = israel }
     return when (kind) {
         ZmanKind.CANDLE_LIGHTING ->
-            date.dayOfWeek == DayOfWeek.FRIDAY || jc.isErevYomTov || jc.isErevYomTovSheni
+            date.dayOfWeek == DayOfWeek.FRIDAY || jc.isErevYomTov ||
+                // Israel keeps the exact old rule. Abroad, the first day of a
+                // two-day Yom Tov is the eve of the second.
+                if (israel) jc.isErevYomTovSheni else isSecondNightLightingDay(date, zone)
         ZmanKind.TZEIT_SHABBAT ->
             date.dayOfWeek == DayOfWeek.SATURDAY || jc.isYomTovAssurBemelacha
         else -> true
     }
 }
+
+/**
+ * Outside Eretz Yisrael: [date] is the FIRST day of a two-day Yom Tov, so
+ * tonight begins the second and its candles are lit AFTER nightfall, from an
+ * existing flame — never at the usual pre-sunset time, which would be lighting
+ * a fire on Yom Tov.
+ *
+ * Friday is excluded on purpose: Yom Tov on Friday lights for Shabbat before
+ * sunset as always. Israel is always false (it has no second day), and the
+ * Israeli rule in [isZmanRelevantOn] is untouched.
+ */
+fun isSecondNightLightingDay(date: LocalDate, zone: ZoneId): Boolean {
+    if (HolidayLocale.inIsrael(zone) || date.dayOfWeek == DayOfWeek.FRIDAY) return false
+    fun assur(d: LocalDate) = JewishCalendar(GregorianCalendar.from(d.atStartOfDay(zone)))
+        .apply { inIsrael = false }.isYomTovAssurBemelacha
+    return assur(date) && assur(date.plusDays(1))
+}
+
+internal fun DayZmanim.isSecondNightLighting(): Boolean =
+    isSecondNightLightingDay(date, ZoneId.of(location.timeZoneId))
 
 /**
  * The single "next zman" ranked across [today]'s list AND [yesterday]'s
@@ -273,5 +301,12 @@ fun DayZmanim.instantOf(kind: ZmanKind): Instant? = when (kind) {
     ZmanKind.TZEIT_LECHUMRA -> tzeitLechumra
     ZmanKind.TZEIT_SHABBAT -> tzeitShabbat
     ZmanKind.TZEIT_RABBEINU_TAM -> tzeitRabbeinuTam
-    ZmanKind.CANDLE_LIGHTING -> candleLighting
+    // A second-night lighting waits for nightfall (after Shabbat, if the first
+    // day IS Shabbat). Every other day, and all of Israel, keeps the usual time.
+    ZmanKind.CANDLE_LIGHTING ->
+        if (isSecondNightLighting()) {
+            if (date.dayOfWeek == DayOfWeek.SATURDAY) tzeitShabbat else tzeitLechumra ?: tzeitHakochavim
+        } else {
+            candleLighting
+        }
 }

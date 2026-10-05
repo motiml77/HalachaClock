@@ -1,6 +1,7 @@
 package com.zmanimclock.app.feature.zmanim.model
 
 import com.kosherjava.zmanim.hebrewcalendar.JewishCalendar
+import com.zmanimclock.app.feature.location.HolidayLocale
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.GregorianCalendar
@@ -38,7 +39,7 @@ object OmerCount {
      */
     fun dayOfOmerAtTzeit(fireDate: LocalDate, zone: ZoneId): Int? {
         val jc = JewishCalendar(GregorianCalendar.from(fireDate.plusDays(1).atStartOfDay(zone)))
-            .apply { inIsrael = true }
+            .apply { inIsrael = HolidayLocale.inIsrael(zone) }
         return jc.dayOfOmer.takeIf { it in 1..LAST_DAY }
     }
 
@@ -70,7 +71,7 @@ object OmerCount {
      */
     fun seasonYearOrNull(today: LocalDate, zone: ZoneId): Int? {
         val jc = JewishCalendar(GregorianCalendar.from(today.atStartOfDay(zone)))
-            .apply { inIsrael = true }
+            .apply { inIsrael = HolidayLocale.inIsrael(zone) }
         val eligible = jc.dayOfOmer in 1..LAST_DAY && !jc.isAssurBemelacha
         return today.year.takeIf { eligible }
     }

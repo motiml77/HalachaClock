@@ -3,6 +3,7 @@ package com.zmanimclock.app.feature.calendar.presentation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zmanimclock.app.feature.location.HolidayLocale
 import com.zmanimclock.app.feature.alarms.data.AlarmDao
 import com.zmanimclock.app.feature.alarms.data.AlarmType
 import com.zmanimclock.app.feature.calendar.model.CalendarDayMeta
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -88,6 +90,8 @@ class CalendarViewModel @Inject constructor(
         val today: LocalDate = LocalDate.now(),
         val selectedDate: LocalDate = LocalDate.now(),
         val visibleMonthIndex: Int = HebrewMonthSequence.indexOf(LocalDate.now()),
+        /** One day of Yom Tov (Eretz Yisrael) or two — follows the chosen city's zone. */
+        val inIsrael: Boolean = true,
     )
 
     /** Zman kinds with at least one active alarm — drives the bell markers. */
@@ -132,9 +136,25 @@ class CalendarViewModel @Inject constructor(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, MonthGrid>) = size > 24
     }
 
+    init {
+        // The holiday calendar depends on where the user is: when the city moves
+        // between Israel and abroad, every cached month is stale.
+        viewModelScope.launch {
+            prefsRepository.preferences
+                .map { HolidayLocale.inIsrael(it.timeZoneId) }
+                .distinctUntilChanged()
+                .collect { israel ->
+                    synchronized(gridCache) { gridCache.clear() }
+                    _uiState.value = _uiState.value.copy(inIsrael = israel)
+                }
+        }
+    }
+
     /** The month at [index]. Cheap and cached; safe to call from composition. */
     fun monthGrid(index: Int): MonthGrid = synchronized(gridCache) {
-        gridCache.getOrPut(index) { MonthGridBuilder.build(HebrewMonthSequence.refAt(index)) }
+        gridCache.getOrPut(index) {
+            MonthGridBuilder.build(HebrewMonthSequence.refAt(index), _uiState.value.inIsrael)
+        }
     }
 
     // ---------------------------------------------------------- actions
@@ -193,7 +213,7 @@ class CalendarViewModel @Inject constructor(
             tzeitShabbatMinutes = prefs.tzeitShabbatMinutes.toLong(),
             cacheOnly = true,
         )
-        val meta = MonthGridBuilder.metaFor(date)
+        val meta = MonthGridBuilder.metaFor(date, inIsrael = HolidayLocale.inIsrael(zone))
         val timed = day.relevantTimedZmanim(date)
         val now = Instant.now()
 

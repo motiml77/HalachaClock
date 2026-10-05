@@ -8,6 +8,7 @@ import com.zmanimclock.app.feature.calendar.model.HebrewMonthSequence
 import com.zmanimclock.app.feature.calendar.model.MonthGrid
 import com.zmanimclock.app.feature.calendar.model.MonthGridBuilder
 import com.zmanimclock.app.feature.location.CityCatalog
+import com.zmanimclock.app.feature.location.HolidayLocale
 import com.zmanimclock.app.feature.location.CityInfo
 import com.zmanimclock.app.feature.zmanim.engine.DayZmanim
 import com.zmanimclock.app.feature.zmanim.engine.EngineLocation
@@ -102,6 +103,7 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
 
     /** Applies a change, persists it, and drops anything it invalidates. */
     fun update(block: (DesktopPrefs) -> DesktopPrefs) {
+        val before = prefs.cityId
         val next = block(prefs.copy())
         val locationChanged = next.cityId != prefs.cityId ||
             next.candleLightingMinutes != prefs.candleLightingMinutes ||
@@ -109,8 +111,13 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
         prefs = next
         next.save()
         if (locationChanged) synchronized(dayCache) { dayCache.clear() }
-        // The month grid is location-independent, so it is deliberately NOT
-        // cleared here — a common reflex, and wasted work.
+        // The month grid depends on the city only through one bit: one day of
+        // Yom Tov (Israel) or two. Clear it exactly when that bit flips.
+        if (HolidayLocale.inIsrael(CityCatalog.byId(before)?.timeZoneId ?: "Asia/Jerusalem") !=
+            HolidayLocale.inIsrael(CityCatalog.byId(next.cityId)?.timeZoneId ?: "Asia/Jerusalem")
+        ) {
+            synchronized(gridCache) { gridCache.clear() }
+        }
     }
 
     private fun location() = EngineLocation(
@@ -188,10 +195,13 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
     }
 
     fun monthGrid(index: Int): MonthGrid = synchronized(gridCache) {
-        gridCache.getOrPut(index) { MonthGridBuilder.build(HebrewMonthSequence.refAt(index)) }
+        gridCache.getOrPut(index) {
+            MonthGridBuilder.build(HebrewMonthSequence.refAt(index), HolidayLocale.inIsrael(zone))
+        }
     }
 
-    fun meta(date: LocalDate): CalendarDayMeta = MonthGridBuilder.metaFor(date)
+    fun meta(date: LocalDate): CalendarDayMeta =
+        MonthGridBuilder.metaFor(date, inIsrael = HolidayLocale.inIsrael(zone))
 
     /** The next zman today, honouring the user's filter. Null once the day is done. */
     fun nextZman(now: Instant = Instant.now()): Pair<ZmanKind, Instant>? {
@@ -208,10 +218,17 @@ class DesktopZmanimService(initialPrefs: DesktopPrefs) {
         val next = if (isToday) nextZman(now) else null
         val headline = headlineFor(isToday, next, timed, m)
 
+        // The Hebrew day begins at nightfall (tzeit hakochavim), not civil
+        // midnight, so once tonight's tzeit has passed today's label already
+        // reads tomorrow's Hebrew date. Only this label moves: the Gregorian
+        // date and the zman list stay on the civil day (same rule as the phone).
+        val labelDate =
+            if (isToday && d.tzeitHakochavim?.let(now::isAfter) == true) date.plusDays(1) else date
+
         return DayView(
             date = date,
             isToday = isToday,
-            hebrewDate = hebrewDateOf(date, m),
+            hebrewDate = hebrewDateOf(labelDate, if (labelDate == date) m else meta(labelDate)),
             gregorianDate = "${date.dayOfMonth}.${date.monthValue}.${date.year}",
             weekdayName = WEEKDAYS[date.dayOfWeek.value % 7],
             cityName = city.nameHebrew,

@@ -2,6 +2,7 @@ package com.zmanimclock.app.scheduling
 
 import com.kosherjava.zmanim.hebrewcalendar.JewishCalendar
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
+import com.zmanimclock.app.feature.location.HolidayLocale
 import com.zmanimclock.app.feature.zmanim.model.OmerCount
 import java.time.DayOfWeek
 import java.time.Instant
@@ -61,7 +62,7 @@ object AlarmTimeCalculator {
         if (alarm.omerMode) {
             if (OmerCount.dayOfOmerAtTzeit(date, zone) == null) return false
             val enteredNight = JewishCalendar(GregorianCalendar.from(date.plusDays(1).atStartOfDay(zone)))
-                .apply { inIsrael = true }
+                .apply { inIsrael = HolidayLocale.inIsrael(zone) }
             if (enteredNight.isAssurBemelacha) return false
         }
         if (!alarm.skipShabbat && !alarm.skipYomTov) return true
@@ -69,7 +70,7 @@ object AlarmTimeCalculator {
         if (alarm.skipShabbat && isShabbat) return false
         if (alarm.skipYomTov) {
             val cal = GregorianCalendar.from(date.atStartOfDay(zone))
-            val jewish = JewishCalendar(cal).apply { inIsrael = true }
+            val jewish = JewishCalendar(cal).apply { inIsrael = HolidayLocale.inIsrael(zone) }
             if (jewish.isYomTovAssurBemelacha) return false
         }
         return true
