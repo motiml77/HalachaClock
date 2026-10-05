@@ -94,9 +94,28 @@ android {
         // Settings entry point moved off the bottom nav into that same
         // card's own top-left corner.
         //
-        // versionName moves to 1.3.0 — a real, visible change, not a fix pass.
-        versionCode = 18
-        versionName = "1.3.0"
+        // 19 (Internal) / 20 (Closed): fixed the Hebrew date shown in the
+        // hero and the home-screen widget — it only rolled over at civil
+        // midnight (JewishDate's own mapping), not at halachic nightfall
+        // (tzeit hakochavim), so the date was wrong for hours every evening.
+        //
+        // versionName moves to 1.3.1 — a real correctness fix, not cosmetic.
+        //
+        // 21 (both tracks, paywall=false): שומר לערבית no longer silently arms
+        // TOMORROW once tonight's tzeit has passed — it says Kriat Shema time
+        // has arrived and offers only a later time tonight.
+        //
+        // 22 (both tracks, paywall=false): ten diaspora cities with large Jewish
+        // communities added to the list (Philadelphia, Boston, Washington,
+        // Baltimore, San Francisco, Moscow, Kyiv, Budapest, Marseille, Rio),
+        // each checked against an outside solar calculation.
+        //
+        // 23 (both tracks, paywall=false): יום טוב שני outside Eretz Yisrael — the
+        // calendar, the candle-lighting time of the second night, and the
+        // omer/alarm Yom Tov rules follow the chosen city. Israel is unchanged
+        // (pinned by HolidayLocaleTest).
+        versionCode = 23
+        versionName = "1.3.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
