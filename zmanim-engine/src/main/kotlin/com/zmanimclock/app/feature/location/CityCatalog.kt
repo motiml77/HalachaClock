@@ -33,8 +33,8 @@ data class CityInfo(
  * platforms disagree about which library is available: org.json ships with
  * Android but not with a desktop JVM, and adding the Maven org.json to a
  * module Android also consumes risks a duplicate-class conflict. The file is a
- * flat array of flat objects with no nesting and no escapes, so a scanner for
- * exactly that shape is smaller and safer than the dependency.
+ * flat array of flat objects with no nesting (only \" and \\ escapes), so a
+ * scanner for exactly that shape is smaller and safer than the dependency.
  */
 object CityCatalog {
 
@@ -109,10 +109,18 @@ object CityCatalog {
             while (v < body.length && body[v] == ' ') v++
             if (v >= body.length) break
             if (body[v] == '"') {
-                val close = body.indexOf('"', v + 1)
-                if (close < 0) break
-                map[key] = body.substring(v + 1, close)
-                i = close + 1
+                // A value may hold \" (the region ארה"ב does) — stopping at the
+                // first quote would cut it to "ארה\".
+                val text = StringBuilder()
+                var p = v + 1
+                while (p < body.length && body[p] != '"') {
+                    if (body[p] == '\\' && p + 1 < body.length) p++
+                    text.append(body[p])
+                    p++
+                }
+                if (p >= body.length) break
+                map[key] = text.toString()
+                i = p + 1
             } else {
                 var e = v
                 while (e < body.length && body[e] != ',') e++

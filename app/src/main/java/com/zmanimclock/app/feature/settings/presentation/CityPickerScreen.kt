@@ -64,7 +64,7 @@ fun CityPickerScreen(
         )
 
         Text(
-            text = "${cities.size} יישובים · כולם עם נתוני הנץ הנראה",
+            text = "${cities.size} יישובים",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),

@@ -182,6 +182,19 @@ class MetroAreaMapper @Inject constructor() {
     }
 
     /**
+     * Whether ChaiTables has a visible-sunrise table we can trust for [cityId].
+     *
+     * Israeli localities and the worldwide metros mapped above do. A city added
+     * to the list without a mapping does NOT: the fetch would fall back to a
+     * bounding-box guess of the country and a placeholder metro, which can
+     * return a table for the wrong place or fail on every refresh. Such cities
+     * take the sea-level sunrise instead — correct, just without הנץ הנראה.
+     * A null id (GPS) keeps the coordinate-based path.
+     */
+    fun hasVisibleSunriseSource(cityId: String?): Boolean =
+        cityId == null || isIsraeliCity(cityId) || cityId in worldwideMetroMap
+
+    /**
      * Get the worldwide metro index for ChaiTables URL.
      */
     fun getWorldwideMetroIndex(cityId: String?): Int {

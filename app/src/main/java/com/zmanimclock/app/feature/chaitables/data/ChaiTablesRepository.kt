@@ -72,6 +72,7 @@ class ChaiTablesRepository @Inject constructor(
         date: LocalDate,
         allowNetwork: Boolean = true,
     ): Instant? {
+        if (!metroMapper.hasVisibleSunriseSource(cityId)) return null
         val locationKey = metroMapper.computeLocationKey(cityId, location)
         // Keyed by (month, day), NOT by day-of-year: the table is a solar
         // almanac, and a leap day shifts every later day-of-year by one, so
@@ -201,6 +202,8 @@ class ChaiTablesRepository @Inject constructor(
         cityId: String?,
         date: LocalDate = LocalDate.now(),
     ): Boolean {
+        // Nothing to fetch is not a failure — the worker would retry forever.
+        if (!metroMapper.hasVisibleSunriseSource(cityId)) return true
         val locationKey = metroMapper.computeLocationKey(cityId, location)
 
         val count = dao.getCountForLocation(locationKey)

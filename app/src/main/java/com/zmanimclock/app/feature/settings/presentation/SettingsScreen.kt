@@ -370,7 +370,7 @@ fun SettingsContent(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
-                        text = "הקש לבחירת יישוב (415 יישובים)",
+                        text = "הקש לבחירת יישוב",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                     )
