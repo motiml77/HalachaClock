@@ -169,7 +169,16 @@ class WidgetRenderer @Inject constructor(
             null
         }
 
-        val hebrew = hebrewDate(today, zone)
+        // Same tzeit-based day rollover as the in-app hero (ZmanimViewModel):
+        // the Hebrew date shown must already be tomorrow's once tonight's
+        // tzeit has passed, even though `today` (civil) stays put until
+        // midnight and every zman lookup above correctly keeps using it.
+        val hebrewDateFor = if (dayToday.tzeitHakochavim?.let(now::isAfter) == true) {
+            today.plusDays(1)
+        } else {
+            today
+        }
+        val hebrew = hebrewDate(hebrewDateFor, zone)
         val gregorian = dateFmt.format(today)
 
         for (id in ids) {

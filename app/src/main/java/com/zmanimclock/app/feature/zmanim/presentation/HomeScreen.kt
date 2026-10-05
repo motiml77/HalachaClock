@@ -99,6 +99,8 @@ fun HomeScreen(
         TzeitGuardDialog(
             zmanTime = row.time,
             armedAt = tzeitGuard?.let { "%02d:%02d".format(it.hour, it.minute) },
+            nowMinuteOfDay = state.nowMinuteOfDay,
+            dawnMinuteOfDay = state.dawnMinuteOfDay,
             onArm = { h, m -> viewModel.armTzeitGuard(h, m); guardDialogFor = null },
             onCancelGuard = { viewModel.cancelTzeitGuard(); guardDialogFor = null },
             onDismiss = { guardDialogFor = null },

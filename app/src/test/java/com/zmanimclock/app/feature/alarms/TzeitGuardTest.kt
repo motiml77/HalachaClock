@@ -6,6 +6,7 @@ import com.zmanimclock.app.feature.zmanim.presentation.GUARD_OFFSET_MINUTES
 import com.zmanimclock.app.feature.zmanim.presentation.ZmanimViewModel
 import com.zmanimclock.app.feature.zmanim.presentation.buildGuardAlarm
 import com.zmanimclock.app.feature.zmanim.presentation.guardArmedAt
+import com.zmanimclock.app.feature.zmanim.presentation.guardTimeIsTonight
 import com.zmanimclock.app.feature.zmanim.presentation.shiftClock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -195,5 +196,34 @@ class TzeitGuardTest {
     @Test
     fun `no guard reads as not armed`() {
         assertEquals(null, guardArmedAt(null))
+    }
+
+    // ---- tzeit already passed -------------------------------------------------
+
+    private val dawn = 4 * 60 + 50
+
+    @Test
+    fun `a time later this evening is tonight`() {
+        assertTrue(guardTimeIsTonight(21, 30, nowMinute = 20 * 60, dawnMinute = dawn))
+    }
+
+    /** The bug: a passed tzeit armed as-is would ring TOMORROW evening. */
+    @Test
+    fun `a minute already behind now is not tonight`() {
+        assertFalse(guardTimeIsTonight(18, 32, nowMinute = 20 * 60, dawnMinute = dawn))
+        assertFalse("the current minute itself is already gone", guardTimeIsTonight(20, 0, 20 * 60, dawn))
+    }
+
+    @Test
+    fun `after midnight but before dawn still counts as tonight`() {
+        assertTrue(guardTimeIsTonight(0, 30, nowMinute = 22 * 60, dawnMinute = dawn))
+        assertFalse("past dawn is tomorrow", guardTimeIsTonight(6, 0, nowMinute = 22 * 60, dawnMinute = dawn))
+    }
+
+    /** At 01:00 the civil day already rolled; this evening's tzeit is ahead, not behind. */
+    @Test
+    fun `after midnight the coming evening is still ahead`() {
+        assertTrue(guardTimeIsTonight(18, 32, nowMinute = 60, dawnMinute = dawn))
+        assertFalse(guardTimeIsTonight(0, 30, nowMinute = 60, dawnMinute = dawn))
     }
 }

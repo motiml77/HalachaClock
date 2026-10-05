@@ -69,6 +69,19 @@ internal fun shiftClock(hour: Int, minute: Int, byMinutes: Int): Pair<Int, Int> 
 }
 
 /**
+ * Whether [hour]:[minute] still lands TONIGHT. The guard is a one-time FIXED
+ * alarm, which fires at the NEXT occurrence of its wall clock — so a minute
+ * already behind [nowMinute] would silently ring tomorrow evening instead.
+ * After midnight but before [dawnMinute] is still tonight (maariv runs until
+ * עלות השחר), so those minutes stay allowed while it is evening.
+ */
+internal fun guardTimeIsTonight(hour: Int, minute: Int, nowMinute: Int, dawnMinute: Int?): Boolean {
+    val t = hour * 60 + minute
+    if (t > nowMinute) return true
+    return dawnMinute != null && nowMinute >= dawnMinute && t < dawnMinute
+}
+
+/**
  * A small red disc, sized to the ROW rather than to the words.
  *
  * The text is two lines of one word each — שומר over לערבית — which is what
@@ -123,6 +136,10 @@ internal fun TzeitGuardDialog(
     zmanTime: String,
     /** "HH:mm" when one is already armed, else null. */
     armedAt: String?,
+    /** Minute of the day now, in the city's zone; -1 when not known yet. */
+    nowMinuteOfDay: Int = -1,
+    /** Today's עלות השחר as minute of day — where "tonight" ends. */
+    dawnMinuteOfDay: Int? = null,
     onArm: (hour: Int, minute: Int) -> Unit,
     onCancelGuard: () -> Unit,
     onDismiss: () -> Unit,
@@ -133,9 +150,21 @@ internal fun TzeitGuardDialog(
     val (defaultHour, defaultMinute) = shiftClock(zmanHour, zmanMinute, GUARD_OFFSET_MINUTES)
     val defaultLabel = "%02d:%02d".format(defaultHour, defaultMinute)
 
-    var custom by remember { mutableStateOf(false) }
-    var hour by remember { mutableIntStateOf(defaultHour) }
-    var minute by remember { mutableIntStateOf(defaultMinute) }
+    fun isTonight(h: Int, m: Int) =
+        nowMinuteOfDay < 0 || guardTimeIsTonight(h, m, nowMinuteOfDay, dawnMinuteOfDay)
+
+    // Tzeit already behind us: arming it would quietly mean TOMORROW's, so
+    // the zman option disappears and only a time of one's own is offered.
+    val defaultPassed = !isTonight(defaultHour, defaultMinute)
+    val (startHour, startMinute) =
+        if (defaultPassed) shiftClock(nowMinuteOfDay / 60, nowMinuteOfDay % 60, 10)
+        else defaultHour to defaultMinute
+
+    var customChosen by remember { mutableStateOf(false) }
+    val custom = customChosen || defaultPassed
+    var hour by remember { mutableIntStateOf(startHour) }
+    var minute by remember { mutableIntStateOf(startMinute) }
+    val canArm = !custom || isTonight(hour, minute)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -152,15 +181,25 @@ internal fun TzeitGuardDialog(
                 )
                 Spacer(Modifier.height(12.dp))
 
-                GuardOption(
-                    "$GUARD_OFFSET_MINUTES דקות אחרי צאת הכוכבים · $defaultLabel",
-                    selected = !custom,
-                ) {
-                    custom = false
-                    hour = defaultHour
-                    minute = defaultMinute
+                if (defaultPassed) {
+                    Text(
+                        "צאת הכוכבים כבר עבר היום ($zmanTime) — כבר הגיע זמן קריאת שמע של ערבית.\n" +
+                            "אפשר לקבוע תזכורת לשעה אחרת הלילה:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GuardRed,
+                        fontWeight = FontWeight.Bold,
+                    )
+                } else {
+                    GuardOption(
+                        "$GUARD_OFFSET_MINUTES דקות אחרי צאת הכוכבים · $defaultLabel",
+                        selected = !custom,
+                    ) {
+                        customChosen = false
+                        hour = defaultHour
+                        minute = defaultMinute
+                    }
+                    GuardOption("בשעה אחרת", selected = custom) { customChosen = true }
                 }
-                GuardOption("בשעה אחרת", selected = custom) { custom = true }
 
                 if (custom) {
                     Spacer(Modifier.height(10.dp))
@@ -190,6 +229,14 @@ internal fun TzeitGuardDialog(
                         )
                         TimeStepper("שעה", hour, 0..23) { hour = it }
                     }
+                    if (!canArm) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "השעה הזו כבר עברה — בחר שעה מאוחרת יותר הלילה",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GuardRed,
+                        )
+                    }
                 }
 
                 if (armedAt != null) {
@@ -204,7 +251,7 @@ internal fun TzeitGuardDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onArm(hour, minute) }) {
+            TextButton(onClick = { onArm(hour, minute) }, enabled = canArm) {
                 Text(if (armedAt != null) "עדכן" else "הפעל")
             }
         },

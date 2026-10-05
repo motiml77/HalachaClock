@@ -97,6 +97,10 @@ class ZmanimViewModel @Inject constructor(
         val sunUp: Boolean = true,
         val rows: List<ZmanRow> = emptyList(),
         val fastBanner: FastBanner? = null,
+        /** Wall-clock minute of the day in the city's zone; -1 before the first load. */
+        val nowMinuteOfDay: Int = -1,
+        /** Today's עלות השחר as minute of day — the שומר לערבית's "tonight" ends there. */
+        val dawnMinuteOfDay: Int? = null,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -162,6 +166,18 @@ class ZmanimViewModel @Inject constructor(
 
             val now = Instant.now()
 
+            // The Hebrew day begins at halachic nightfall (tzeit hakochavim),
+            // not civil midnight. JewishDate only knows the Gregorian→Hebrew
+            // mapping at midnight, so once tonight's tzeit has passed, the
+            // Hebrew date shown must already be tomorrow's — even though
+            // `today` (civil) and the zman list below correctly stay on
+            // today's date until midnight; only the Hebrew-date LABEL shifts.
+            val hebrewDateFor = if (day.tzeitHakochavim?.let(now::isAfter) == true) {
+                today.plusDays(1)
+            } else {
+                today
+            }
+
             val timed = day.relevantTimedZmanim(today)
             // Yesterday only for the NEXT-ZMAN ranking, not for `rows` — the
             // list itself should keep showing today's own חצות לילה (which
@@ -181,7 +197,7 @@ class ZmanimViewModel @Inject constructor(
             _uiState.value = UiState(
                 loading = false,
                 locationName = prefs.cityNameHebrew,
-                hebrewDate = hebrewDate(today, zone),
+                hebrewDate = hebrewDate(hebrewDateFor, zone),
                 gregorianDate = DateTimeFormatter.ofPattern("d.M.yyyy").format(today),
                 basedOnVisibleSunrise = day.basedOnVisibleSunrise,
                 nextName = next?.first?.let { day.hebrewNameOf(it) },
@@ -198,6 +214,8 @@ class ZmanimViewModel @Inject constructor(
                     )
                 },
                 fastBanner = fastBanner(today, zone, day),
+                nowMinuteOfDay = now.atZone(zone).let { it.hour * 60 + it.minute },
+                dawnMinuteOfDay = day.alotHashachar?.atZone(zone)?.let { it.hour * 60 + it.minute },
             )
         }
     }

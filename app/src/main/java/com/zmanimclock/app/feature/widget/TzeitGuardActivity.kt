@@ -115,6 +115,8 @@ class TzeitGuardActivity : ComponentActivity() {
                     else -> TzeitGuardDialog(
                         zmanTime = tzeit,
                         armedAt = guardArmedAt(guard),
+                        nowMinuteOfDay = state.nowMinuteOfDay,
+                        dawnMinuteOfDay = state.dawnMinuteOfDay,
                         onArm = { hour, minute ->
                             finishAfter("שומר לערבית הופעל ל-%02d:%02d".format(hour, minute)) {
                                 guardController.arm(hour, minute)
