@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -370,7 +371,7 @@ private fun SkipNextChip(onClick: () -> Unit) {
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = cs.primary, modifier = Modifier.size(18.dp))
+        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = cs.primary, modifier = Modifier.size(18.dp).mirrorInRtl())
         Spacer(Modifier.width(6.dp))
         Text("דלג על הבא", style = MaterialTheme.typography.labelLarge, color = cs.primary)
     }
@@ -390,7 +391,7 @@ private fun SkippingRow(skipped: String, onUndo: () -> Unit) {
             .padding(start = 10.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = ink, modifier = Modifier.size(18.dp))
+        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = ink, modifier = Modifier.size(18.dp).mirrorInRtl())
         Spacer(Modifier.width(6.dp))
         Text(
             text = "מדלג על $skipped",
@@ -405,6 +406,13 @@ private fun SkippingRow(skipped: String, onUndo: () -> Unit) {
         }
     }
 }
+
+/** "Next" points the way the text runs: leftwards in Hebrew. SkipNext has no auto-mirrored twin. */
+@Composable
+private fun Modifier.mirrorInRtl(): Modifier =
+    if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) {
+        this.graphicsLayer { scaleX = -1f }
+    } else this
 
 /** Dark gold ink for text on the gold skip wash — the gold itself is too light to read on it. */
 private val SkipInk = androidx.compose.ui.graphics.Color(0xFF6B4E00)
