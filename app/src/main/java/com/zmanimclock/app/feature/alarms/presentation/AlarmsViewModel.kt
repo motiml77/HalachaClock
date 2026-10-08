@@ -43,6 +43,8 @@ data class AlarmListItem(
      * after it.
      */
     val skippedLabel: String? = null,
+    /** The local date of the next ring — the list's timeline is grouped by it. */
+    val nextFireDate: LocalDate? = null,
 )
 
 @HiltViewModel
@@ -103,6 +105,7 @@ class AlarmsViewModel @Inject constructor(
                 nextFireEpochMs = fire.toEpochMilli(),
                 bucket = bucket,
                 skippedLabel = skipped?.let { "${dayWord(it.atZone(zone).toLocalDate(), today)} ${it.asZmanTime(zone)}" },
+                nextFireDate = local.toLocalDate(),
             )
         }.getOrElse { AlarmListItem(alarm, null, null, null, FireBucket.OFF) }
     }

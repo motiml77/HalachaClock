@@ -1,6 +1,22 @@
 package com.zmanimclock.app.feature.alarms.presentation
 
 import androidx.compose.foundation.background
+import java.time.LocalDate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.scale
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.SkipNext
@@ -143,35 +159,7 @@ fun AlarmsContent(
                 )
             }
         } else {
-            // Grouped by WHEN the next ring falls, sorted by time inside each
-            // group so it's clear what's coming and in what order.
-            val groups = listOf(
-                FireBucket.TODAY to "היום",
-                FireBucket.TOMORROW to "מחר",
-                FireBucket.LATER to "שבוע הבא",
-                FireBucket.OFF to "כבויים",
-            )
-            val byBucket = items.groupBy { it.bucket }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                // bottom inset clears the FAB so the last card stays tappable
-                contentPadding = PaddingValues(
-                    start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                groups.forEach { (bucket, title) ->
-                    val group = byBucket[bucket].orEmpty().sortedWith(
-                        compareBy({ it.nextFireEpochMs ?: Long.MAX_VALUE }, { it.alarm.id })
-                    )
-                    if (group.isNotEmpty()) {
-                        item(key = "header_$bucket") { SectionHeader(title, group.size) }
-                        items(group, key = { it.alarm.id }) { item ->
-                            AlarmCard(item, onToggle, onDelete, onSkipNext, onClick = { onEditAlarm(item.alarm.id) })
-                        }
-                    }
-                }
-            }
+            AlarmTimeline(items, onToggle, onDelete, onSkipNext, onEditAlarm)
         }
 
         FloatingActionButton(
@@ -187,173 +175,333 @@ fun AlarmsContent(
     }
 }
 
-/** Category header ("שעונים מעוררים · 3"). */
-@Composable
-private fun SectionHeader(title: String, count: Int) {
-    Text(
-        text = "$title · $count",
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 2.dp),
-    )
-}
-
 /**
- * Compact alarm card (~76dp → 6+ fit without scrolling).
- * Inactive alarms stay listed but dimmed; the round ✓ next to the alarm
- * re-activates (or deactivates) it. Trash deletes permanently.
+ * The alarms as a timeline (design ב): grouped by the day each one will next
+ * ring — היום, מחר, then the weekday — in ring order, joined by a thin line
+ * with a dot in each alarm's own colour. Alarms that are switched off sit in
+ * a folded section at the bottom.
+ *
+ * Deleting is a swipe on the card (or a long press), always followed by a
+ * confirmation — the old always-visible trash icon sat right next to the
+ * on/off control and was one stray tap away from losing an alarm.
  */
 @Composable
-private fun AlarmCard(
-    item: AlarmListItem,
+private fun AlarmTimeline(
+    items: List<AlarmListItem>,
     onToggle: (AlarmEntity, Boolean) -> Unit,
     onDelete: (AlarmEntity) -> Unit,
     onSkipNext: (AlarmEntity) -> Unit,
+    onEditAlarm: (Long) -> Unit,
+) {
+    val today = LocalDate.now()
+    val scheduled = items
+        .filter { it.alarm.isActive && it.nextFireDate != null }
+        .sortedWith(compareBy({ it.nextFireEpochMs ?: Long.MAX_VALUE }, { it.alarm.id }))
+    val byDay = scheduled.groupBy { it.nextFireDate!! }
+    // On, but with nothing to ring in the lookahead (an omer alert out of season).
+    val idle = items.filter { it.alarm.isActive && it.nextFireDate == null }
+    val off = items.filter { !it.alarm.isActive }.sortedBy { it.alarm.id }
+
+    var showOff by rememberSaveable { mutableStateOf(scheduled.isEmpty() && idle.isEmpty()) }
+    var deleting by remember { mutableStateOf<AlarmEntity?>(null) }
+
+    @Composable
+    fun entry(item: AlarmListItem, first: Boolean, last: Boolean) {
+        TimelineEntry(
+            item = item,
+            first = first,
+            last = last,
+            onToggle = onToggle,
+            onSkipNext = onSkipNext,
+            onEdit = { onEditAlarm(item.alarm.id) },
+            onDeleteRequest = { deleting = item.alarm },
+        )
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        // bottom inset clears the FAB so the last card stays tappable
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 96.dp),
+    ) {
+        byDay.forEach { (date, group) ->
+            item(key = "day_$date") { DayHeader(dayHeading(date, today)) }
+            group.forEachIndexed { i, item ->
+                item(key = item.alarm.id) { entry(item, first = i == 0, last = i == group.lastIndex) }
+            }
+        }
+        if (idle.isNotEmpty()) {
+            item(key = "idle") { DayHeader("ללא צלצול בקרוב") }
+            idle.forEachIndexed { i, item ->
+                item(key = item.alarm.id) { entry(item, first = i == 0, last = i == idle.lastIndex) }
+            }
+        }
+        if (off.isNotEmpty()) {
+            item(key = "off") { OffHeader(count = off.size, expanded = showOff, onClick = { showOff = !showOff }) }
+            if (showOff) {
+                off.forEachIndexed { i, item ->
+                    item(key = item.alarm.id) { entry(item, first = i == 0, last = i == off.lastIndex) }
+                }
+            }
+        }
+    }
+
+    deleting?.let { alarm ->
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            shape = RoundedCornerShape(28.dp),
+            title = { Text("למחוק את השעון?") },
+            text = { Text("\"${alarm.label.ifBlank { defaultAlarmLabel(alarm) }}\" יימחק לצמיתות.") },
+            confirmButton = {
+                TextButton(onClick = { onDelete(alarm); deleting = null }) {
+                    Text("מחיקה", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("ביטול") } },
+        )
+    }
+}
+
+/** "היום · יום חמישי", "מחר · יום שישי", or "יום ראשון · 11.10". */
+private fun dayHeading(date: LocalDate, today: LocalDate): String {
+    val weekday = when (date.dayOfWeek) {
+        java.time.DayOfWeek.SUNDAY -> "יום ראשון"
+        java.time.DayOfWeek.MONDAY -> "יום שני"
+        java.time.DayOfWeek.TUESDAY -> "יום שלישי"
+        java.time.DayOfWeek.WEDNESDAY -> "יום רביעי"
+        java.time.DayOfWeek.THURSDAY -> "יום חמישי"
+        java.time.DayOfWeek.FRIDAY -> "יום שישי"
+        java.time.DayOfWeek.SATURDAY -> "שבת"
+    }
+    return when (date) {
+        today -> "היום · $weekday"
+        today.plusDays(1) -> "מחר · $weekday"
+        else -> "$weekday · ${date.dayOfMonth}.${date.monthValue}"
+    }
+}
+
+@Composable
+private fun DayHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 2.dp, top = 12.dp, bottom = 2.dp),
+    )
+}
+
+/** "כבויים · 2" with a chevron — the switched-off alarms fold away. */
+@Composable
+private fun OffHeader(count: Int, expanded: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .padding(top = 12.dp, bottom = 2.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "כבויים · $count",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = if (expanded) "הסתרה" else "הצגה",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/** The alarm's own colour: a clock time, a zman, Shabbat entry, the omer. */
+@Composable
+private fun kindColor(alarm: AlarmEntity): Color = when {
+    alarm.shabbatMode -> Ext.colors.accentGold
+    alarm.omerMode -> OmerAccent
+    alarm.type == AlarmType.ZMAN -> Ext.colors.zmanAccent
+    else -> MaterialTheme.colorScheme.primary
+}
+
+/** One row of the timeline: the line and its dot, then the swipeable card. */
+@Composable
+private fun TimelineEntry(
+    item: AlarmListItem,
+    first: Boolean,
+    last: Boolean,
+    onToggle: (AlarmEntity, Boolean) -> Unit,
+    onSkipNext: (AlarmEntity) -> Unit,
+    onEdit: () -> Unit,
+    onDeleteRequest: () -> Unit,
+) {
+    val active = item.alarm.isActive
+    val dot = kindColor(item.alarm)
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+    ) {
+        Column(
+            modifier = Modifier
+                .width(16.dp)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.width(2.dp).height(18.dp).background(if (first) Color.Transparent else line))
+            Box(
+                Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(if (active) dot else dot.copy(alpha = 0.3f)),
+            )
+            Box(Modifier.width(2.dp).weight(1f).background(if (last) Color.Transparent else line))
+        }
+        Spacer(Modifier.width(6.dp))
+        SwipeToDelete(
+            onRequest = onDeleteRequest,
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 3.dp),
+        ) {
+            AlarmTimelineCard(item, onToggle, onSkipNext, onClick = onEdit, onLongPress = onDeleteRequest)
+        }
+    }
+}
+
+/** A swipe either way shows the delete colour; letting go asks first and the card springs back. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDelete(onRequest: () -> Unit, modifier: Modifier, content: @Composable () -> Unit) {
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) onRequest()
+            false // never dismiss here — the dialog decides
+        },
+    )
+    SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        backgroundContent = {
+            val cs = MaterialTheme.colorScheme
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(cs.errorContainer)
+                    .padding(horizontal = 18.dp),
+                contentAlignment = if (state.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                    Alignment.CenterStart
+                } else {
+                    Alignment.CenterEnd
+                },
+            ) {
+                Icon(Icons.Outlined.DeleteOutline, contentDescription = "מחיקה", tint = cs.onErrorContainer)
+            }
+        },
+    ) { content() }
+}
+
+/**
+ * The card itself: time (with the time left beside it), switch, then the
+ * name and repeat days on one line, and "דלג על הבא" under them. Shabbat
+ * entry gets a gold wash. Smaller type than the old cards — the day heading
+ * now carries "when", so the card only has to say "what".
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AlarmTimelineCard(
+    item: AlarmListItem,
+    onToggle: (AlarmEntity, Boolean) -> Unit,
+    onSkipNext: (AlarmEntity) -> Unit,
     onClick: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val alarm = item.alarm
     val cs = MaterialTheme.colorScheme
-    val isZman = alarm.type == AlarmType.ZMAN
     val active = alarm.isActive
+    val isZman = alarm.type == AlarmType.ZMAN
+    val gold = Ext.colors.accentGold
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val shabbat = alarm.shabbatMode && active
+    val accent = kindColor(alarm)
 
-    // OFF state: quiet, not buried. A grey fill plus heavy dimming made the
-    // card read as a smudge — the surface colour fought the text and the row
-    // became hard to scan. Instead an off alarm keeps the SAME surface as an
-    // active one and is marked by three light touches: no elevation, a
-    // hairline outline, and a drained accent stripe. The text only steps down
-    // one level of emphasis, so the name and time stay properly readable.
-    val contentAlpha = if (active) 1f else 0.72f
-
-    // Accent stripe identifies the alarm's kind at a glance, one hue each:
-    // navy = a clock time, sunrise amber = a time that follows the sun,
-    // candle gold = Shabbat entry. The zman kind used to borrow `tertiary`,
-    // whose olive-brown read as the Shabbat gold gone stale — two kinds in
-    // one muddy family instead of three you can tell apart across a room.
-    val accent = when {
-        alarm.shabbatMode -> Ext.colors.accentGold
-        alarm.omerMode -> OmerAccent
-        isZman -> Ext.colors.zmanAccent
+    val container = if (shabbat) gold.copy(alpha = if (dark) 0.18f else 0.14f) else cs.surface
+    val border = if (shabbat) gold.copy(alpha = 0.45f) else cs.outlineVariant.copy(alpha = 0.6f)
+    val timeColor = when {
+        !active -> cs.onSurfaceVariant.copy(alpha = 0.7f)
+        shabbat && !dark -> SkipInk
         else -> cs.primary
     }
-    // Keep a HINT of the kind colour when off — a grey stripe would throw away
-    // the one cue that says what this alarm is.
-    val stripeColor = if (active) accent else accent.copy(alpha = 0.28f)
-    val timeColor = if (active) cs.primary else cs.onSurfaceVariant
+    val textColor = if (shabbat && !dark) SkipInk else cs.onSurfaceVariant
 
-    Card(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = cs.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (active) 1.dp else 0.dp),
-        border = if (active) null else androidx.compose.foundation.BorderStroke(
-            1.dp, cs.outlineVariant.copy(alpha = 0.6f),
-        ),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(container)
+            .border(1.dp, border, RoundedCornerShape(14.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
+            .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 8.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Full-height colour stripe on the leading (right, RTL) edge
-            Box(
-                modifier = Modifier
-                    .width(5.dp)
-                    .fillMaxHeight()
-                    .background(stripeColor),
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp, end = 12.dp, top = 10.dp, bottom = 10.dp)
-                    .alpha(contentAlpha),
-            ) {
-                // Name first — the clearest identifier
-                Text(
-                    text = alarm.label.ifBlank { defaultAlarmLabel(alarm) },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = cs.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                // Time, large — zman alarms show the computed next fire time
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isZman) {
-                        if (alarm.omerMode) {
-                            WheatEar(modifier = Modifier.size(18.dp), tint = stripeColor)
-                        } else {
-                            Icon(
-                                imageVector = if (alarm.shabbatMode) AppIcons.Candle
-                                else Icons.Filled.WbTwilight,
-                                contentDescription = null,
-                                tint = stripeColor,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(6.dp))
-                    }
-                    Text(
-                        text = if (isZman) (item.nextFireTime ?: "--:--")
-                        else "%02d:%02d".format(alarm.hour, alarm.minute),
-                        style = ZmanListTimeStyle.copy(fontSize = 26.sp, lineHeight = 28.sp),
-                        color = timeColor,
-                    )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            when {
+                alarm.omerMode -> {
+                    WheatEar(modifier = Modifier.size(16.dp), tint = accent)
+                    Spacer(Modifier.width(5.dp))
                 }
-                // Detail lines: schedule, then the countdown
-                Text(
-                    text = daysText(alarm),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = cs.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                item.nextFireLabel?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = cs.tertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                isZman -> {
+                    Icon(
+                        imageVector = if (alarm.shabbatMode) AppIcons.Candle else Icons.Filled.WbTwilight,
+                        contentDescription = null,
+                        tint = if (active) accent else accent.copy(alpha = 0.4f),
+                        modifier = Modifier.size(16.dp),
                     )
-                }
-                // "דלג על הבא": only for a repeating alarm — a one-time alarm
-                // has no "after" to keep, so skipping it would just be turning
-                // it off. The alarm itself stays on for every later ring.
-                if (alarm.isActive && !alarm.isOneTime) {
-                    Spacer(Modifier.height(8.dp))
-                    val skipped = item.skippedLabel
-                    if (skipped == null) {
-                        SkipNextChip(onClick = { onSkipNext(alarm) })
-                    } else {
-                        SkippingRow(skipped = skipped, onUndo = { onSkipNext(alarm) })
-                    }
+                    Spacer(Modifier.width(5.dp))
                 }
             }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // The ✓: active = filled check; inactive = empty circle to tap
-                IconButton(
-                    onClick = { onToggle(alarm, !alarm.isActive) },
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = if (alarm.isActive) Icons.Filled.CheckCircle
-                        else Icons.Outlined.Circle,
-                        contentDescription = if (alarm.isActive) "פעיל — הקש לכיבוי" else "כבוי — הקש להפעלה",
-                        tint = if (alarm.isActive) cs.primary else cs.outline,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-                IconButton(onClick = { onDelete(alarm) }, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Outlined.DeleteOutline,
-                        contentDescription = "מחק לצמיתות",
-                        tint = cs.onSurfaceVariant.copy(alpha = if (active) 1f else 0.7f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+            Text(
+                text = if (isZman) (item.nextFireTime ?: "--:--") else "%02d:%02d".format(alarm.hour, alarm.minute),
+                style = ZmanListTimeStyle.copy(fontSize = 22.sp, lineHeight = 26.sp),
+                color = timeColor,
+            )
+            // The heading says which day; the card adds how long until then.
+            item.nextFireLabel?.substringAfter(" · ", "")?.takeIf { active && it.isNotEmpty() }?.let {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (shabbat && !dark) SkipInk else cs.tertiary,
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Switch(
+                checked = active,
+                onCheckedChange = { onToggle(alarm, it) },
+                modifier = Modifier.scale(0.78f),
+                colors = SwitchDefaults.colors(checkedTrackColor = cs.primary),
+            )
+        }
+        Text(
+            text = "${alarm.label.ifBlank { defaultAlarmLabel(alarm) }} · ${daysText(alarm)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (active) textColor else textColor.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // "דלג על הבא": only for a repeating alarm — a one-time alarm has no
+        // "after" to keep, so skipping it would just be turning it off. The
+        // alarm itself stays on for every later ring.
+        if (active && !alarm.isOneTime) {
+            Spacer(Modifier.height(6.dp))
+            val skipped = item.skippedLabel
+            if (skipped == null) {
+                SkipNextChip(onClick = { onSkipNext(alarm) })
+            } else {
+                SkippingRow(skipped = skipped, onUndo = { onSkipNext(alarm) })
             }
         }
     }
@@ -368,12 +516,12 @@ private fun SkipNextChip(onClick: () -> Unit) {
             .clip(RoundedCornerShape(50))
             .border(1.dp, cs.outlineVariant, RoundedCornerShape(50))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = cs.primary, modifier = Modifier.size(18.dp).mirrorInRtl())
-        Spacer(Modifier.width(6.dp))
-        Text("דלג על הבא", style = MaterialTheme.typography.labelLarge, color = cs.primary)
+        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = cs.primary, modifier = Modifier.size(16.dp).mirrorInRtl())
+        Spacer(Modifier.width(4.dp))
+        Text("דלג על הבא", style = MaterialTheme.typography.labelMedium, color = cs.primary)
     }
 }
 
@@ -391,18 +539,18 @@ private fun SkippingRow(skipped: String, onUndo: () -> Unit) {
             .padding(start = 10.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = ink, modifier = Modifier.size(18.dp).mirrorInRtl())
-        Spacer(Modifier.width(6.dp))
+        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp).mirrorInRtl())
+        Spacer(Modifier.width(4.dp))
         Text(
             text = "מדלג על $skipped",
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = ink,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         TextButton(onClick = onUndo) {
-            Text("ביטול הדילוג", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink)
+            Text("ביטול הדילוג", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = ink)
         }
     }
 }
