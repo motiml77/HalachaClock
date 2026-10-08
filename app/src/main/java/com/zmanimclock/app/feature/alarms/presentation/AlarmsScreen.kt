@@ -3,6 +3,7 @@ package com.zmanimclock.app.feature.alarms.presentation
 import androidx.compose.foundation.background
 import java.time.LocalDate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.draw.scale
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.LaunchedEffect
@@ -428,7 +429,9 @@ private fun AlarmTimelineCard(
     val shabbat = alarm.shabbatMode && active
     val accent = kindColor(alarm)
 
-    val container = if (shabbat) gold.copy(alpha = if (dark) 0.18f else 0.14f) else cs.surface
+    // Opaque: the swipe-to-delete layer sits right under the card, and a
+    // see-through wash would let its red and trash icon show through.
+    val container = if (shabbat) gold.copy(alpha = if (dark) 0.18f else 0.14f).compositeOver(cs.surface) else cs.surface
     val border = if (shabbat) gold.copy(alpha = 0.45f) else cs.outlineVariant.copy(alpha = 0.6f)
     val timeColor = when {
         !active -> cs.onSurfaceVariant.copy(alpha = 0.7f)
