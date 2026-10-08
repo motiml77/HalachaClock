@@ -1,6 +1,10 @@
 package com.zmanimclock.app.feature.alarms.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -313,14 +317,17 @@ private fun AlarmCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                // "דלג על הבא": only for a repeating alarm — a one-time alarm
+                // has no "after" to keep, so skipping it would just be turning
+                // it off. The alarm itself stays on for every later ring.
                 if (alarm.isActive && !alarm.isOneTime) {
-                    val skipping = alarm.skipUntilEpochMs > System.currentTimeMillis()
-                    Text(
-                        text = if (skipping) "מדלג על הבאה — בטל" else "דלג על הבאה",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (skipping) Ext.colors.accentGold else cs.primary,
-                        modifier = Modifier.clickable { onSkipNext(alarm) },
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    val skipped = item.skippedLabel
+                    if (skipped == null) {
+                        SkipNextChip(onClick = { onSkipNext(alarm) })
+                    } else {
+                        SkippingRow(skipped = skipped, onUndo = { onSkipNext(alarm) })
+                    }
                 }
             }
 
@@ -350,6 +357,57 @@ private fun AlarmCard(
         }
     }
 }
+
+/** The quiet outlined chip that skips only the next ring. */
+@Composable
+private fun SkipNextChip(onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, cs.outlineVariant, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = cs.primary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text("דלג על הבא", style = MaterialTheme.typography.labelLarge, color = cs.primary)
+    }
+}
+
+/** While a skip is set: which ring is skipped, and a way back. */
+@Composable
+private fun SkippingRow(skipped: String, onUndo: () -> Unit) {
+    val gold = Ext.colors.accentGold
+    // On a dark surface the wash is dark too, so the gold itself is the ink there.
+    val ink = if (androidx.compose.foundation.isSystemInDarkTheme()) gold else SkipInk
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(gold.copy(alpha = 0.16f))
+            .padding(start = 10.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.SkipNext, contentDescription = null, tint = ink, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "מדלג על $skipped",
+            style = MaterialTheme.typography.labelLarge,
+            color = ink,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = onUndo) {
+            Text("ביטול הדילוג", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink)
+        }
+    }
+}
+
+/** Dark gold ink for text on the gold skip wash — the gold itself is too light to read on it. */
+private val SkipInk = androidx.compose.ui.graphics.Color(0xFF6B4E00)
 
 private fun daysText(alarm: AlarmEntity): String {
     val base = when {

@@ -37,6 +37,12 @@ data class AlarmListItem(
     val nextFireTime: String?,
     val nextFireEpochMs: Long?,
     val bucket: FireBucket,
+    /**
+     * "מחר 06:30" — the occurrence "דלג על הבא" is suppressing, while a skip
+     * is set; null otherwise. [nextFireLabel] then already names the ring
+     * after it.
+     */
+    val skippedLabel: String? = null,
 )
 
 @HiltViewModel
@@ -86,14 +92,25 @@ class AlarmsViewModel @Inject constructor(
                 else -> hebrewWeekday(local.dayOfWeek)
             }
             val time = fire.asZmanTime(zone)
+            // The skip watermark is the skipped ring + 1 minute (AlarmScheduler.skipNext).
+            val skipped = alarm.skipUntilEpochMs
+                .takeIf { it > System.currentTimeMillis() }
+                ?.let { java.time.Instant.ofEpochMilli(it - 60_000L) }
             AlarmListItem(
                 alarm = alarm,
                 nextFireLabel = "$day · ${remainingText(fire)}",
                 nextFireTime = time,
                 nextFireEpochMs = fire.toEpochMilli(),
                 bucket = bucket,
+                skippedLabel = skipped?.let { "${dayWord(it.atZone(zone).toLocalDate(), today)} ${it.asZmanTime(zone)}" },
             )
         }.getOrElse { AlarmListItem(alarm, null, null, null, FireBucket.OFF) }
+    }
+
+    private fun dayWord(date: LocalDate, today: LocalDate): String = when (date) {
+        today -> "היום"
+        today.plusDays(1) -> "מחר"
+        else -> hebrewWeekday(date.dayOfWeek)
     }
 
     private fun hebrewWeekday(d: java.time.DayOfWeek): String = when (d) {

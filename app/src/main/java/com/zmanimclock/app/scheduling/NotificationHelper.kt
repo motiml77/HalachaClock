@@ -3,6 +3,7 @@ package com.zmanimclock.app.scheduling
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import com.zmanimclock.app.feature.alarms.data.AlarmEntity
+import com.zmanimclock.app.feature.alarms.data.DismissChallenge
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -77,6 +78,8 @@ class NotificationHelper @Inject constructor(
 
         /** style-1D primary — notification accent. */
         private const val ACCENT = 0xFF123A8B.toInt()
+        private const val SHABBAT_COLOR = 0xFF7A3B2E.toInt()
+        private const val OMER_COLOR = 0xFF4C5A22.toInt()
     }
 
     /**
@@ -330,22 +333,45 @@ class NotificationHelper @Inject constructor(
         val snoozePi = servicePendingIntent(alertId, AlarmSoundService.ACTION_SNOOZE, 2, snoozeMinutes)
         val snoozeLabel = when {
             snoozesLeft == 0 -> null // no snooze action shown
-            snoozesLeft > 0 -> "נודניק ($snoozeMinutes ד' · נשארו $snoozesLeft)"
-            else -> "נודניק ($snoozeMinutes ד')"
+            snoozesLeft > 0 -> "נודניק · $snoozeMinutes דק' (נשארו $snoozesLeft)"
+            else -> "נודניק · $snoozeMinutes דק'"
+        }
+        // With a math challenge the alarm may only be stopped on the ringing
+        // screen, after solving it. The notification's own button used to
+        // dismiss straight from the service — a way around the very gate the
+        // user set up to keep themselves awake. It now opens the screen.
+        val hasChallenge = challenge != DismissChallenge.NONE.name
+        val (primaryLabel, primaryPi) =
+            if (hasChallenge) "פתיחה לכיבוי" to fullScreenPi else "אישור" to dismissPi
+
+        // The heads-up seen when the phone is in use: a solid, colourized card
+        // in the ringing screen's own colours — night blue, the Shabbat dusk,
+        // or the omer's olive — with the time leading the title so it reads
+        // at a glance. Colourization is honoured because this notification
+        // belongs to AlarmSoundService's foreground service.
+        val skinColor = when {
+            shabbatMode -> SHABBAT_COLOR
+            omerText != null -> OMER_COLOR
+            else -> ACCENT
+        }
+        val heading = when {
+            shabbatMode || omerText != null -> title
+            timeText.isNotEmpty() -> "$timeText · $title"
+            else -> title
+        }
+        val body = when {
+            shabbatMode -> "השקיעה בעוד דקות ספורות — שבת שלום!"
+            omerText != null -> omerText
+            else -> "לחיצה על ההתראה פותחת את מסך השעון"
         }
 
         return NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_zman)
-            .setColor(ACCENT)
-            .setContentTitle(title)
-            .setContentText(
-                when {
-                    shabbatMode -> "השקיעה בעוד דקות ספורות — שבת שלום!"
-                    omerText != null -> omerText
-                    timeText.isNotEmpty() -> "בשעה $timeText"
-                    else -> "עכשיו"
-                }
-            )
+            .setColor(skinColor)
+            .setColorized(true)
+            .setContentTitle(heading)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -353,8 +379,8 @@ class NotificationHelper @Inject constructor(
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreenPi, true)
             .setContentIntent(fullScreenPi)
-            .addAction(0, "ביטול", dismissPi)
-            .apply { snoozeLabel?.let { addAction(0, it, snoozePi) } }
+            .addAction(R.drawable.ic_stat_zman, primaryLabel, primaryPi)
+            .apply { snoozeLabel?.let { addAction(R.drawable.ic_stat_zman, it, snoozePi) } }
             .build()
     }
 
