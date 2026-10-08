@@ -114,8 +114,13 @@ android {
         // calendar, the candle-lighting time of the second night, and the
         // omer/alarm Yom Tov rules follow the chosen city. Israel is unchanged
         // (pinned by HolidayLocaleTest).
-        versionCode = 23
-        versionName = "1.3.4"
+        //
+        // 24 (both tracks, paywall=false): a redesigned ringing screen (slide to
+        // confirm, pulsing rings), a colourized alarm notification whose button
+        // no longer bypasses a math challenge, and a timeline alarms list with a
+        // clear "דלג על הבא".
+        versionCode = 24
+        versionName = "1.3.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
